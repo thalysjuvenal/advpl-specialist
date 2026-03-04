@@ -68,9 +68,11 @@ Replaces all occurrences of a substring within a string.
 **Example:**
 ```advpl
 Local cText := "Hello World"
+Local cCPF  := ""
+
 cText := StrTran(cText, "World", "Protheus") // "Hello Protheus"
 // Remove characters
-Local cCPF := StrTran("123.456.789-00", ".", "")
+cCPF := StrTran("123.456.789-00", ".", "")
 cCPF := StrTran(cCPF, "-", "") // "12345678900"
 ```
 
@@ -1087,10 +1089,11 @@ Sorts an array in ascending order.
 **Example:**
 ```advpl
 Local aList := {"Cherry", "Apple", "Banana"}
+Local aNums := {3, 1, 4, 1, 5}
+
 aSort(aList) // {"Apple", "Banana", "Cherry"}
 
 // Descending order
-Local aNums := {3, 1, 4, 1, 5}
 aSort(aNums,,, {|x, y| x > y}) // {5, 4, 3, 1, 1}
 ```
 
@@ -1723,8 +1726,9 @@ Returns the name of a field by its position number.
 
 **Example:**
 ```advpl
+Local nI := 0
+
 DbSelectArea("SA1")
-Local nI
 For nI := 1 To FCount()
     Conout(FieldName(nI))
 Next nI
@@ -1746,9 +1750,11 @@ Returns the value of a field by its position number.
 
 **Example:**
 ```advpl
+Local xVal := NIL
+
 DbSelectArea("SA1")
 DbGoTop()
-Local xVal := FieldGet(1) // Value of first field
+xVal := FieldGet(1) // Value of first field
 ```
 
 ---
@@ -2686,8 +2692,10 @@ Returns the number of seconds elapsed since midnight.
 **Example:**
 ```advpl
 Local nStart := Seconds()
+Local nEnd   := 0
+
 // ... perform operation ...
-Local nEnd := Seconds()
+nEnd := Seconds()
 Conout("Elapsed: " + Str(nEnd - nStart, 10, 3) + " seconds")
 ```
 
@@ -2887,8 +2895,9 @@ Sets the return field for a query opened with TCGenQry or embedded SQL.
 **Example:**
 ```advpl
 Local cQuery := "SELECT A1_COD, A1_NOME, A1_SALDO FROM " + RetSqlName("SA1")
-cQuery += " WHERE D_E_L_E_T_ = ' '"
 Local cAlias := GetNextAlias()
+
+cQuery += " WHERE D_E_L_E_T_ = ' '"
 DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
 TCSetField(cAlias, "A1_SALDO", "N", 14, 2)
 ```
@@ -2993,10 +3002,10 @@ Executes a standard Protheus routine automatically (batch mode) for AxCadastro-b
 
 **Example:**
 ```advpl
-Private lMsErroAuto := .F.
-
 Local aFields := {}
 Local cError  := ""
+
+Private lMsErroAuto := .F.
 
 aAdd(aFields, {"A1_FILIAL", xFilial("SA1"), NIL})
 aAdd(aFields, {"A1_COD",    "000100",        NIL})
@@ -3070,7 +3079,9 @@ Calls a user-defined function by name. In ADVPL, functions prefixed with `User F
 User Function MyCalc(nVal1, nVal2)
     Local nResult := nVal1 + nVal2
 Return nResult
+```
 
+```advpl
 // Call
 Local nTotal := u_MyCalc(10, 20) // 30
 ```
@@ -3159,8 +3170,9 @@ Framework class for building REST API services (server-side).
 
 @Get("/api/v1/customers")
 Function getCustomers()
-    Local oJson := JsonObject():New()
+    Local oJson     := JsonObject():New()
     Local jResponse := JsonObject():New()
+    Local jCust     := NIL
 
     DbSelectArea("SA1")
     DbSetOrder(1)
@@ -3168,7 +3180,7 @@ Function getCustomers()
 
     jResponse["customers"] := {}
     While !Eof()
-        Local jCust := JsonObject():New()
+        jCust := JsonObject():New()
         jCust["code"] := Alltrim(SA1->A1_COD)
         jCust["name"] := Alltrim(SA1->A1_NOME)
         aAdd(jResponse["customers"], jCust)
@@ -3260,11 +3272,13 @@ Serializes an ADVPL object to a JSON string.
 **Example:**
 ```advpl
 Local oData := JsonObject():New()
+Local cJson := ""
+
 oData["name"] := "John"
 oData["age"]  := 30
 oData["items"] := {"A", "B", "C"}
 
-Local cJson := FWJsonSerialize(oData, .T.)
+cJson := FWJsonSerialize(oData, .T.)
 Conout(cJson)
 ```
 
@@ -3280,7 +3294,9 @@ Creates a new JSON object for building and parsing JSON data.
 
 **Example:**
 ```advpl
-Local oJson := JsonObject():New()
+Local oJson  := JsonObject():New()
+Local cJson  := ""
+Local oJson2 := JsonObject():New()
 
 // Build JSON
 oJson["name"]    := "Protheus"
@@ -3288,10 +3304,9 @@ oJson["version"] := 12
 oJson["modules"] := {"Faturamento", "Financeiro", "Estoque"}
 
 // Convert to string
-Local cJson := oJson:toJson()
+cJson := oJson:toJson()
 
 // Parse from string
-Local oJson2 := JsonObject():New()
 oJson2:fromJson('{"status": "ok", "count": 42}')
 Conout(oJson2["status"]) // "ok"
 
@@ -3465,11 +3480,12 @@ Generates a query for use with DbUseArea and the TOPCONN driver.
 **Example:**
 ```advpl
 Local cQuery := "SELECT A1_COD, A1_NOME FROM " + RetSqlName("SA1")
+Local cAlias := GetNextAlias()
+
 cQuery += " WHERE A1_FILIAL = '" + xFilial("SA1") + "'"
 cQuery += " AND D_E_L_E_T_ = ' '"
 cQuery += " ORDER BY A1_COD"
 
-Local cAlias := GetNextAlias()
 DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
 
 While !(cAlias)->(Eof())
@@ -3567,11 +3583,13 @@ Loads an MVC model definition.
 
 **Example:**
 ```advpl
-Local oModel := FWLoadModel("MATA030")
+Local oModel  := FWLoadModel("MATA030")
+Local oMaster := NIL
+
 oModel:SetOperation(MODEL_OPERATION_INSERT)
 oModel:Activate()
 
-Local oMaster := oModel:GetModel("SA1MASTER")
+oMaster := oModel:GetModel("SA1MASTER")
 oMaster:SetValue("A1_COD",  "000300")
 oMaster:SetValue("A1_LOJA", "01")
 oMaster:SetValue("A1_NOME", "Model Customer")
@@ -3604,9 +3622,10 @@ Opens a SQL query as a work area (simplified alternative to TCGenQry + DbUseArea
 **Example:**
 ```advpl
 Local cQuery := "SELECT A1_COD, A1_NOME FROM " + RetSqlName("SA1")
+Local cAlias := GetNextAlias()
+
 cQuery += " WHERE D_E_L_E_T_ = ' '"
 
-Local cAlias := GetNextAlias()
 MsOpenQuery(cQuery, cAlias)
 
 While !(cAlias)->(Eof())
