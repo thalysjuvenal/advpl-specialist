@@ -4,6 +4,27 @@ Reference for the most commonly used entry points in TOTVS Protheus, organized b
 
 ---
 
+## IMPORTANT: Always Search TDN First
+
+**Before generating code for ANY entry point, you MUST search the TDN (TOTVS Developer Network) for the official documentation of that specific entry point.**
+
+The examples in this file cover only the most common entry points. There are **hundreds** of entry points in Protheus, each with its own specific PARAMIXB parameters and expected return type. Using wrong parameters or return types will cause runtime errors or unexpected behavior.
+
+**Mandatory steps:**
+1. Use `WebSearch` to find: `"ENTRY_POINT_NAME site:tdn.totvs.com"`
+2. Use `WebFetch` to read the TDN page found
+3. Extract from the page:
+   - **PARAMIXB** — parameter positions, types, and descriptions
+   - **Expected return** — type and meaning (Logical, Array, Character, Nil, etc.)
+   - **Calling routine** — which standard program triggers this entry point
+   - **When it fires** — at what moment in the standard flow
+   - **Caveats** — version-specific behavior or known limitations
+4. Use this information to generate accurate code
+
+If the TDN page is not found or is incomplete, inform the user and generate code based on the local reference below, clearly noting that the parameters should be validated.
+
+---
+
 ## 1. What are Entry Points
 
 Entry points (Pontos de Entrada) are predefined hooks in Protheus standard source code where custom logic can be injected without modifying the original source. When the standard code reaches a specific point, it checks if a User Function with the expected name exists; if so, it calls that function.

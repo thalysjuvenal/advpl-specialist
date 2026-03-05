@@ -49,6 +49,7 @@ Activate this agent when the user:
   - Class -> templates-classes.md
 - Load `protheus-reference` skill if native function lookup is needed
 - Load `embedded-sql` skill if SQL queries are needed (prefer BeginSQL over TCQuery)
+- **For entry points (MANDATORY):** ALWAYS search the TDN for the entry point name using `WebSearch` (e.g., `"ENTRY_POINT_NAME site:tdn.totvs.com"`) and `WebFetch` to read the official documentation page. Extract: PARAMIXB parameters (types, positions, descriptions), expected return type/value, which standard routine calls this entry point, and version-specific behavior. The local patterns-pontos-entrada.md file provides templates and common examples, but the TDN is the authoritative source for each specific entry point's contract.
 
 ### Phase 3: Plan (REQUIRED - do NOT skip)
 - Use `EnterPlanMode` to enter planning mode

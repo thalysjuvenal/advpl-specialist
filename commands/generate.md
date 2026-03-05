@@ -45,21 +45,23 @@ Generate new ADVPL or TLPP code following Protheus conventions and best practice
 3. **Ask business requirements** - What should the code do?
 4. **Load skill** - Invoke `advpl-code-generation` skill
 5. **Load patterns** - Read appropriate supporting file for the type
-6. **Enter plan mode** - Use `EnterPlanMode` to create a structured implementation plan
-7. **Present plan** - Show the user a clear plan including:
+6. **Search TDN for entry points** - **If the type is `ponto-entrada`**, ALWAYS search the TDN (TOTVS Developer Network) for the entry point name before generating code. Use `WebSearch` to find the official documentation page (e.g., search for `"ENTRY_POINT_NAME site:tdn.totvs.com"`). Extract from the TDN page: PARAMIXB parameters (types, positions, descriptions), expected return type and value, which standard routine calls this entry point, and any caveats or version-specific behavior. This ensures the generated code uses the correct parameters and return type as defined by TOTVS.
+7. **Enter plan mode** - Use `EnterPlanMode` to create a structured implementation plan
+8. **Present plan** - Show the user a clear plan including:
    - File(s) to be created (name, path, extension)
    - Code structure (functions, classes, methods to implement)
    - Includes and dependencies
    - Key patterns to apply (MVC, REST, SOAP, etc.)
    - Naming conventions to follow (Hungarian notation, module prefix)
    - Error handling and DB operation patterns
-8. **Wait for approval** - The user must approve the plan before any code is written. If the user requests changes, revise the plan.
-9. **Exit plan mode** - Use `ExitPlanMode` after approval
+   - **For entry points:** TDN documentation found (PARAMIXB parameters, return type, calling routine)
+9. **Wait for approval** - The user must approve the plan before any code is written. If the user requests changes, revise the plan.
+10. **Exit plan mode** - Use `ExitPlanMode` after approval
 
 ### Implementation Phase (only after approval)
-10. **Generate code** - Create complete, production-ready code following the approved plan
-11. **Write file** - Save with correct extension (.prw or .tlpp)
-12. **Report** - Show what was created and key decisions
+11. **Generate code** - Create complete, production-ready code following the approved plan
+12. **Write file** - Save with correct extension (.prw or .tlpp)
+13. **Report** - Show what was created and key decisions
 
 ## Examples
 
