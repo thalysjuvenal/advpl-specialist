@@ -52,8 +52,10 @@ cNome := "Test"
 ```advpl
 // Check spelling matches exactly
 // Verify the .prw/.tlpp file is compiled into the RPO
-// For TLPP namespaces:
-Using Namespace totvs.framework.core
+// If using TLPP with namespaces, ensure the .tlpp file
+// with the class/function is compiled and the caller
+// references the correct namespace via fully qualified name
+// e.g.: custom.vendas.PedidoService():New()
 ```
 
 ### 4. Missing END / ENDDO / ENDIF

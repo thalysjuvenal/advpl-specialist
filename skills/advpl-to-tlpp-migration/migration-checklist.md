@@ -58,13 +58,13 @@ Create the TLPP class structure and convert all functions.
 - [ ] Replace `Conout()` logging with `FWLogMsg()` where appropriate
 - [ ] Verify that `xFilial(cAlias)` is used in all `DbSeek` operations
 
-### Update Includes
+### Update Includes (in the `.tlpp` file)
 
 - [ ] Replace ADVPL `.ch` includes with TLPP `.th` includes: `#Include "tlpp-core.th"` (main), `#Include "tlpp-rest.th"` (REST annotations), `#Include "tlpp-object.th"` (advanced objects)
 - [ ] Add the `namespace` declaration for the project (e.g., `namespace custom.faturamento.pedido`)
 - [ ] Do NOT add `using namespace tlpp.core`, `tlpp.log`, `tlpp.rest`, `tlpp.data`, etc. -- these are NOT needed; use the `.th` includes instead
 
-### Backward Compatibility Wrapper
+### Backward Compatibility Wrapper (`.prw` file — uses `#Include "TOTVS.CH"`)
 
 - [ ] Create or update the `.prw` wrapper file that preserves the original `User Function` name
 - [ ] The wrapper must instantiate the TLPP class and delegate to the appropriate method

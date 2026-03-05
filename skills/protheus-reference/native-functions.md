@@ -3164,7 +3164,7 @@ Framework class for building REST API services (server-side).
 **Return:** O - FWRest object.
 
 **Example:**
-```advpl
+```tlpp
 #Include "tlpp-core.th"
 #Include "tlpp-rest.th"
 

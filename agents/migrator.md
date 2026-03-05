@@ -24,7 +24,7 @@ Activate this agent when the user:
 2. **Incremental migration** - One file/function at a time, not big-bang
 3. **Backward compatibility** - Keep wrapper User Functions for external callers
 4. **One class per file** - Each .tlpp file contains exactly one class
-5. **Meaningful namespaces** - Reflect module structure: `company.module.submodule`
+5. **Meaningful namespaces** - Follow TOTVS convention: `custom.<agrupador>.<servico>` or `totvs.protheus.<segmento>.<agrupador>`
 6. **Test after each migration** - Compile and validate before moving to next file
 
 ## Workflow
@@ -69,6 +69,6 @@ Activate this agent when the user:
 - [ ] User Functions become public methods
 - [ ] Backward compatibility wrappers created for external callers
 - [ ] Namespace reflects module structure
-- [ ] using namespace declarations replace #include where appropriate
+- [ ] TLPP `.th` includes used instead of ADVPL `.ch` includes (e.g., `tlpp-core.th` instead of `TOTVS.CH`)
 - [ ] Error handling preserved or improved
 - [ ] Database operations preserve GetArea/RestArea pattern
