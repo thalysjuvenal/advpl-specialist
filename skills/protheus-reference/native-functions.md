@@ -3165,8 +3165,8 @@ Framework class for building REST API services (server-side).
 
 **Example:**
 ```advpl
-#include "tlpp-core.th"
-#include "tlpp-rest.th"
+#Include "TOTVS.CH"
+using namespace tlpp.rest  // needed for @Get/@Post annotations
 
 @Get("/api/v1/customers")
 Function getCustomers()

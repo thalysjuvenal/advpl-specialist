@@ -310,10 +310,9 @@ The TLPP approach uses annotations (decorators) to define REST endpoints. This i
 ### 2.1 Complete TLPP REST Service
 
 ```tlpp
-#Include "Protheus.ch"
-#Include "tlpp-core.th"
+#Include "TOTVS.CH"
 
-using namespace tlpp.rest
+using namespace tlpp.rest  // needed for @RestService annotations
 
 /*/{Protheus.doc} ProductsAPI
 API REST de Produtos usando TLPP

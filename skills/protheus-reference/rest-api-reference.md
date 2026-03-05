@@ -478,10 +478,9 @@ The modern TLPP framework uses annotations to define REST endpoints. This approa
 ### Complete Service with Annotations
 
 ```tlpp
-#Include "Protheus.ch"
-#Include "RestFul.ch"
+#Include "TOTVS.CH"
 
-using namespace tlpp.rest
+using namespace tlpp.rest  // needed for @RestService annotations
 
 @RestService("/api/v1/customers")
 class CustomerAPI from LongClassName

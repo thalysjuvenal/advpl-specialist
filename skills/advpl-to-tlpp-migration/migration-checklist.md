@@ -16,7 +16,7 @@ Perform this analysis before writing any TLPP code.
 - [ ] Identify `Static` file-level variables and their usage patterns
 - [ ] List all external callers of each `User Function` (other `.prw` files, menus, jobs, schedules)
 - [ ] Identify all database aliases used (`DbSelectArea`, `RecLock`, direct alias references)
-- [ ] Document all `#Include` directives and map them to TLPP `using namespace` equivalents
+- [ ] Document all `#Include` directives (they will be replaced by `#Include "TOTVS.CH"`)
 - [ ] Identify any code blocks (`{|| ...}`) that reference `Private`/`Static` variables
 - [ ] Check for `MV_*` parameter usage (`GetMV`, `SuperGetMV`) that may need class-level access
 - [ ] Note any UI elements (dialogs, buttons, gets) that will need a separate View class
@@ -29,9 +29,9 @@ Create the TLPP class structure and convert all functions.
 
 ### Namespace and File Setup
 
-- [ ] Define the namespace based on the module/functional area (e.g., `namespace faturamento`)
-- [ ] Create the `.tlpp` file with one class per file
-- [ ] Add the appropriate `using namespace` declarations at the top of the file
+- [ ] Define the namespace following TOTVS convention: `custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product code (all lowercase, dots, no underscores)
+- [ ] Create the `.tlpp` file with one class per file, named following convention: `custom.<agrupador>.<funcionalidade>.tlpp`
+- [ ] Add `#Include "TOTVS.CH"` at the top of the file
 
 ### Class Skeleton
 
@@ -60,10 +60,10 @@ Create the TLPP class structure and convert all functions.
 
 ### Update Includes
 
-- [ ] Replace `#Include "Protheus.ch"` with `using namespace tlpp.core`
-- [ ] Replace `#Include "TopConn.ch"` with `using namespace tlpp.data` (if database access is used)
-- [ ] Replace other `#Include` directives with their namespace equivalents
-- [ ] Remove any `#Include` directives that are no longer needed
+- [ ] Replace all `#Include` directives (`Protheus.ch`, `TopConn.ch`, `FWMVCDef.ch`, etc.) with a single `#Include "TOTVS.CH"`
+- [ ] Add the `namespace` declaration for the project (e.g., `namespace custom.faturamento.pedido`)
+- [ ] Do NOT add `using namespace tlpp.core`, `tlpp.log`, `tlpp.data`, etc. unless the code explicitly uses classes from those namespaces
+- [ ] Only add `using namespace tlpp.rest` if using TLPP REST annotations (`@RestService`, `@Get`, `@Post`)
 
 ### Backward Compatibility Wrapper
 
@@ -99,7 +99,7 @@ Verify that the migration is complete and correct.
 - [ ] Class properties use correct Hungarian notation prefixes (`cName`, `nValue`, `lFlag`, `aList`, `oObj`)
 - [ ] Method names follow camelCase convention
 - [ ] Class name follows PascalCase convention
-- [ ] Namespace matches the module or functional area
+- [ ] Namespace follows TOTVS convention (`custom.<agrupador>.<servico>` or `totvs.protheus.<segmento>.<agrupador>`)
 - [ ] One class per `.tlpp` file
 - [ ] All `GetArea()` calls have matching `RestArea()` calls (no area leaks)
 - [ ] Code blocks that reference class state use `self` explicitly when evaluated externally
