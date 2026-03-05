@@ -158,8 +158,10 @@ advpl-specialist/
 │   ├── hooks.json
 │   └── session-start
 ├── CHANGELOG.md                   # Historico de versoes
+├── CODE_OF_CONDUCT.md             # Codigo de conduta
 ├── CONTRIBUTING.md                # Guia de contribuicao
 ├── LICENSE                        # Licenca MIT
+├── SECURITY.md                    # Politica de seguranca
 └── README.md
 ```
 
