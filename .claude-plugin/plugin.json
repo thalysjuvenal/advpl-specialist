@@ -4,5 +4,8 @@
   "version": "1.0.1",
   "author": { "name": "Thalys Augusto" },
   "license": "MIT",
+  "homepage": "https://github.com/thalysjuvenal/advpl-specialist",
+  "repository": "https://github.com/thalysjuvenal/advpl-specialist",
+  "bugs": "https://github.com/thalysjuvenal/advpl-specialist/issues",
   "keywords": ["advpl", "tlpp", "protheus", "totvs", "erp"]
 }

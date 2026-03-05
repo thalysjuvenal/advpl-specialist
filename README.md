@@ -1,5 +1,11 @@
 # advpl-specialist
 
+![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-Claude%20Code-blueviolet)
+![TOTVS](https://img.shields.io/badge/TOTVS-Protheus-orange)
+![ADVPL](https://img.shields.io/badge/lang-ADVPL%20%7C%20TLPP-yellow)
+
 Plugin para Claude Code especializado em **ADVPL** e **TLPP** para desenvolvimento no ecossistema **TOTVS Protheus**.
 
 ## Funcionalidades
@@ -138,6 +144,14 @@ O plugin inclui referencia local para consulta rapida:
 
 Para casos nao cobertos localmente, o plugin busca no TDN (TOTVS Developer Network) automaticamente.
 
+## Contribuindo
+
+Contribuicoes sao bem-vindas! Leia o [CONTRIBUTING.md](CONTRIBUTING.md) para saber como participar.
+
+## Changelog
+
+Veja o [CHANGELOG.md](CHANGELOG.md) para o historico completo de versoes.
+
 ## Licenca
 
-MIT
+[MIT](LICENSE)
