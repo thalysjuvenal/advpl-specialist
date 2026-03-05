@@ -57,13 +57,72 @@ digraph migration {
 | ADVPL Construct | TLPP Equivalent | Notes |
 |----------------|-----------------|-------|
 | `#Include "Protheus.ch"` | `#Include "TOTVS.CH"` | Use the standard TOTVS include; do NOT add `using namespace tlpp.core` or `tlpp.log` unless the code explicitly uses classes from those namespaces |
-| `User Function Name()` | `namespace mymod; class NameService; method execute()` | Main entry point becomes the primary public method |
+| `User Function Name()` | `namespace custom.module.service; class NameService; method execute()` | Main entry point becomes the primary public method. See namespace conventions below |
 | `Static Function Helper()` | `method helper() as private` | Internal functions become private methods |
 | `Private cVar := "x"` | `data cVar as character` (class property) | Private variables become class-level data declarations |
 | `Public nGlobal` | Remove -- pass via constructor/parameters | Public variables must be eliminated entirely |
 | `Local aArray := {}` | Unchanged inside methods | Local variables remain as-is within method bodies |
 
 See `migration-rules.md` for the complete mapping reference covering preprocessor directives, database operations, error handling, and UI elements.
+
+## TLPP Naming Conventions (Official TOTVS Standard)
+
+Follow the official TOTVS naming conventions from TDN (https://tdn.totvs.com/pages/releaseview.action?pageId=633537898).
+
+### Namespaces
+
+All names must be **lowercase**, separated by **dots**, with **no underscores**.
+
+**For TOTVS product code:**
+```
+totvs.protheus.<segmento>.<agrupador/servico>
+```
+
+Available segments: agrobusiness, backoffice, construction, distribution, educational, financial, health, hospitality, legal, manufacturing, retail, services
+
+Examples:
+- `totvs.protheus.backoffice.customer`
+- `totvs.protheus.backoffice.supplier`
+- `totvs.protheus.financial.payment.receive`
+- `totvs.protheus.manufacturing.material.balance`
+
+Exceptions: Framework team uses `framework`, Protheus Engineering uses `software.engineering`.
+
+**For client customizations (most common in migrations):**
+```
+custom.<agrupador>.<servico>
+```
+
+Start with `custom.`, the rest is free. Examples:
+- `custom.cadastros.cliente`
+- `custom.relatorios.customizados`
+- `custom.faturamento.pedido`
+
+### File Naming
+
+**For TOTVS product:** `<segmento>.<agrupador/servico>.<funcionalidade>.tlpp`
+- Examples: `backoffice.tgv.contact.controller.tlpp`, `financial.payment.receive.tlpp`
+
+**For client customizations:** `custom.<agrupador>.<funcionalidade>.tlpp`
+- Examples: `custom.cadastros.cliente.tlpp`, `custom.ma030inc.tlpp`
+
+### Classes, Functions, and Methods
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Classes | **PascalCase** | `ContactsController`, `PedidoService` |
+| Functions | **camelCase** | `contactsController()`, `calcTotal()` |
+| Methods | **camelCase** | `validName()`, `processOrder()` |
+
+**No underscores** in any identifier.
+
+### Deciding the Namespace
+
+When migrating, ask the user if the code is:
+1. **TOTVS product code** -> use `totvs.protheus.<segmento>.<agrupador>`
+2. **Client customization** -> use `custom.<agrupador>.<servico>` (this is the most common case)
+
+If the user does not specify, default to `custom.<module>.<service>` pattern.
 
 ## Before/After Example
 
@@ -123,12 +182,12 @@ Static Function fCalcTotal(cPedido)
 Return nSoma
 ```
 
-### After (TLPP Object-Oriented) -- `PedidoService.tlpp`
+### After (TLPP Object-Oriented) -- `custom.faturamento.pedido.tlpp`
 
 ```tlpp
 #Include "TOTVS.CH"
 
-namespace pedidos
+namespace custom.faturamento.pedido
 
 class PedidoService
 
@@ -201,7 +260,7 @@ Wrapper de compatibilidade - delega para PedidoService (TLPP)
 @return nTotal, Numerico, Valor total do pedido
 /*/
 User Function CalcPed(cPedido)
-    Local oService := pedidos.PedidoService():new()
+    Local oService := custom.faturamento.pedido.PedidoService():new()
 Return oService:calcTotal(cPedido)
 ```
 
@@ -210,7 +269,7 @@ Return oService:calcTotal(cPedido)
 | Decision | Guideline |
 |----------|-----------|
 | One class per file | Each `.tlpp` file should contain a single class with a clear responsibility |
-| Namespace = module path | Use the module or functional area as the namespace (e.g., `pedidos`, `faturamento`, `estoque`) |
+| Namespace = official TOTVS convention | For customizations use `custom.<agrupador>.<servico>` (e.g., `custom.faturamento.pedido`). For TOTVS product use `totvs.protheus.<segmento>.<agrupador>`. All lowercase, no underscores, separated by dots |
 | User Function preserved as wrapper | Keep the original `.prw` User Function as a thin wrapper that delegates to the new class |
 | Gradual migration | Migrate one function group at a time; wrappers ensure existing callers are not broken |
 | Constructor for shared state | Values that were previously `Private`/`Public` variables shared across functions should be passed through the constructor or set as class properties |

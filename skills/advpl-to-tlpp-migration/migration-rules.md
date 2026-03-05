@@ -17,8 +17,37 @@ Complete mapping reference for converting ADVPL procedural constructs to their T
 **Notes:**
 - In TLPP, `#Include "TOTVS.CH"` is the standard include that replaces all the individual Protheus includes (`Protheus.ch`, `TopConn.ch`, `FWMVCDef.ch`, etc.).
 - Do NOT add `using namespace tlpp.core`, `tlpp.log`, `tlpp.data`, etc. unless the code explicitly uses classes from those namespaces (e.g., `TlppCore`, `TlppLog`). The `using namespace` directive is only needed to import namespaces of classes/functions you are directly referencing.
-- Only add the project's own `namespace` declaration (e.g., `namespace mycompany.module`) to organize your own code.
+- Only add the project's own `namespace` declaration following the official TOTVS convention (see Namespace Conventions below).
 - `#Define` constants used only within a class can become `static data` properties. Constants shared across files should remain as `#define` in a shared `.ch` file.
+
+## Namespace Conventions (Official TOTVS Standard - TDN)
+
+All namespace names must be **lowercase**, separated by **dots**, with **no underscores**.
+
+**For TOTVS product code:**
+```
+totvs.protheus.<segmento>.<agrupador/servico>
+```
+
+Available segments: agrobusiness, backoffice, construction, distribution, educational, financial, health, hospitality, legal, manufacturing, retail, services
+
+Examples: `totvs.protheus.backoffice.customer`, `totvs.protheus.financial.payment.receive`
+
+**For client customizations (most common):**
+```
+custom.<agrupador>.<servico>
+```
+
+Start with `custom.`, the rest is free. Examples: `custom.cadastros.cliente`, `custom.faturamento.pedido`
+
+**File naming convention:**
+- Product: `<segmento>.<agrupador>.<funcionalidade>.tlpp` (e.g., `backoffice.tgv.contact.controller.tlpp`)
+- Customizations: `custom.<agrupador>.<funcionalidade>.tlpp` (e.g., `custom.cadastros.cliente.tlpp`)
+
+**Classes, functions, and methods naming:**
+- Classes: **PascalCase** (e.g., `ContactsController`, `PedidoService`)
+- Functions and methods: **camelCase** (e.g., `validName()`, `calcTotal()`)
+- **No underscores** in any identifier
 
 ## Variable Scope
 
@@ -51,7 +80,7 @@ Complete mapping reference for converting ADVPL procedural constructs to their T
 #Include "Protheus.ch"
 
 User Function OriginalName(cParam1, nParam2)
-    Local oService := mymodule.OriginalNameService():new()
+    Local oService := custom.mymodule.OriginalNameService():new()
 Return oService:execute(cParam1, nParam2)
 ```
 
@@ -227,6 +256,6 @@ The fundamental principle of ADVPL-to-TLPP migration is **structure changes, syn
 
 1. **Organization** -- functions become methods on classes
 2. **Scope** -- Private/Public variables become class properties
-3. **Imports** -- Multiple `#Include` directives are replaced by `#Include "TOTVS.CH"`; add your own `namespace` declaration for code organization
-4. **Naming** -- files become `.tlpp`, classes follow PascalCase conventions
+3. **Imports** -- Multiple `#Include` directives are replaced by `#Include "TOTVS.CH"`; add your own `namespace` declaration following TOTVS convention (`custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product)
+4. **Naming** -- files follow `<namespace>.<funcionalidade>.tlpp` convention, classes use PascalCase, methods use camelCase, no underscores
 5. **Encapsulation** -- internal helpers become private methods instead of Static Functions
