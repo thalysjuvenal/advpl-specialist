@@ -56,7 +56,7 @@ digraph migration {
 
 | ADVPL Construct | TLPP Equivalent | Notes |
 |----------------|-----------------|-------|
-| `#Include "Protheus.ch"` | `#Include "TOTVS.CH"` | Use the standard TOTVS include; do NOT add `using namespace tlpp.core` or `tlpp.log` unless the code explicitly uses classes from those namespaces |
+| `#Include "Protheus.ch"` | `#Include "tlpp-core.th"` | Use the TLPP-specific includes (`.th` files); do NOT add `using namespace tlpp.core` or `tlpp.log` -- those are NOT replacements for includes |
 | `User Function Name()` | `namespace custom.module.service; class NameService; method execute()` | Main entry point becomes the primary public method. See namespace conventions below |
 | `Static Function Helper()` | `method helper() as private` | Internal functions become private methods |
 | `Private cVar := "x"` | `data cVar as character` (class property) | Private variables become class-level data declarations |
@@ -185,7 +185,7 @@ Return nSoma
 ### After (TLPP Object-Oriented) -- `custom.faturamento.pedido.tlpp`
 
 ```tlpp
-#Include "TOTVS.CH"
+#Include "tlpp-core.th"
 
 namespace custom.faturamento.pedido
 

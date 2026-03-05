@@ -9,7 +9,7 @@ Templates for creating classes in TLPP (TOTVS Language Plus Plus) for TOTVS Prot
 A TLPP class declaration includes the class name, properties (`data`), and methods.
 
 ```tlpp
-#Include "TOTVS.CH"
+#Include "tlpp-core.th"
 
 /*/{Protheus.doc} MinhaClasse
 Descricao da classe
@@ -385,7 +385,7 @@ Local nClamped := MathHelper():Clamp(150, 0, 100) // 100
 Namespaces organize classes and avoid name conflicts.
 
 ```tlpp
-#Include "TOTVS.CH"
+#Include "tlpp-core.th"
 
 // Declaring a namespace
 namespace custom.vendas
@@ -435,7 +435,7 @@ oService:CriarPedido(oData)
 A Service class encapsulates business logic, keeping it separate from controllers and data access.
 
 ```tlpp
-#Include "TOTVS.CH"
+#Include "tlpp-core.th"
 
 /*/{Protheus.doc} ClienteService
 Servico de regras de negocio para clientes
@@ -630,7 +630,7 @@ FreeObj(oRepo)
 A Repository class encapsulates data access, providing CRUD operations and query methods.
 
 ```tlpp
-#Include "TOTVS.CH"
+#Include "tlpp-core.th"
 
 /*/{Protheus.doc} ClienteRepository
 Repositorio de acesso a dados de clientes (SA1)
@@ -905,7 +905,7 @@ Return oJson
 A DTO class carries data between layers. It includes serialization (toJson/fromJson) and validation.
 
 ```tlpp
-#Include "TOTVS.CH"
+#Include "tlpp-core.th"
 
 /*/{Protheus.doc} ClienteDTO
 Data Transfer Object para dados de cliente

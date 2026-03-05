@@ -6,17 +6,21 @@ Complete mapping reference for converting ADVPL procedural constructs to their T
 
 | ADVPL | TLPP | Notes |
 |-------|------|-------|
-| `#Include "Protheus.ch"` | `#Include "TOTVS.CH"` | Use the standard TOTVS include; do NOT add `using namespace tlpp.core/tlpp.log` unless the code explicitly uses classes from those namespaces |
-| `#Include "TopConn.ch"` | `#Include "TOTVS.CH"` | TOTVS.CH already includes TopConn functionality |
-| `#Include "RestFul.ch"` | `#Include "TOTVS.CH"` | For REST with TLPP annotations, use `@rest` annotations instead of WsRestFul macros |
-| `#Include "FWMVCDef.ch"` | `#Include "TOTVS.CH"` | TOTVS.CH already includes MVC definitions |
+| `#Include "Protheus.ch"` | `#Include "tlpp-core.th"` | Main TLPP include; do NOT add `using namespace tlpp.core/tlpp.log` -- those are NOT replacements for includes |
+| `#Include "TopConn.ch"` | `#Include "tlpp-core.th"` | Database connectivity is available via tlpp-core.th |
+| `#Include "RestFul.ch"` | `#Include "tlpp-rest.th"` | For REST with TLPP annotations (`@RestService`, `@Get`, `@Post`) |
+| `#Include "FWMVCDef.ch"` | `#Include "tlpp-core.th"` | MVC framework functions available via tlpp-core.th |
 | `#Define CONST_NAME value` | `static data CONST_NAME := value` | Define constants as static class data, or use `#define` if purely compile-time |
 | `#ifdef TOP_HAS_FEATURE` | Conditional compilation preserved | `#ifdef` / `#ifndef` blocks remain valid in `.tlpp` for compile-time branching |
 | `#ifndef` | Conditional compilation preserved | Same as `#ifdef` -- unchanged in TLPP |
 
 **Notes:**
-- In TLPP, `#Include "TOTVS.CH"` is the standard include that replaces all the individual Protheus includes (`Protheus.ch`, `TopConn.ch`, `FWMVCDef.ch`, etc.).
-- Do NOT add `using namespace tlpp.core`, `tlpp.log`, `tlpp.data`, etc. unless the code explicitly uses classes from those namespaces (e.g., `TlppCore`, `TlppLog`). The `using namespace` directive is only needed to import namespaces of classes/functions you are directly referencing.
+- In TLPP, use the specific `.th` includes instead of the `.ch` ADVPL includes:
+  - `#Include "tlpp-core.th"` -- main include for TLPP (replaces Protheus.ch, TopConn.ch)
+  - `#Include "tlpp-rest.th"` -- for REST annotations (@RestService, @Get, @Post)
+  - `#Include "tlpp-object.th"` -- for advanced object features
+  - `#Include "tlpp-probat.th"` -- for automated testing (ProBat framework)
+- Do NOT use `using namespace tlpp.core`, `tlpp.log`, `tlpp.data`, etc. as replacements for includes. Those are NOT include replacements -- they are namespace imports that are rarely needed.
 - Only add the project's own `namespace` declaration following the official TOTVS convention (see Namespace Conventions below).
 - `#Define` constants used only within a class can become `static data` properties. Constants shared across files should remain as `#define` in a shared `.ch` file.
 
@@ -256,6 +260,6 @@ The fundamental principle of ADVPL-to-TLPP migration is **structure changes, syn
 
 1. **Organization** -- functions become methods on classes
 2. **Scope** -- Private/Public variables become class properties
-3. **Imports** -- Multiple `#Include` directives are replaced by `#Include "TOTVS.CH"`; add your own `namespace` declaration following TOTVS convention (`custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product)
+3. **Imports** -- ADVPL `.ch` includes are replaced by TLPP `.th` includes (`tlpp-core.th`, `tlpp-rest.th`, etc.); add your own `namespace` declaration following TOTVS convention (`custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product)
 4. **Naming** -- files follow `<namespace>.<funcionalidade>.tlpp` convention, classes use PascalCase, methods use camelCase, no underscores
 5. **Encapsulation** -- internal helpers become private methods instead of Static Functions

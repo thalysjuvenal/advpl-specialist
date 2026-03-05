@@ -478,9 +478,8 @@ The modern TLPP framework uses annotations to define REST endpoints. This approa
 ### Complete Service with Annotations
 
 ```tlpp
-#Include "TOTVS.CH"
-
-using namespace tlpp.rest  // needed for @RestService annotations
+#Include "tlpp-core.th"
+#Include "tlpp-rest.th"
 
 @RestService("/api/v1/customers")
 class CustomerAPI from LongClassName

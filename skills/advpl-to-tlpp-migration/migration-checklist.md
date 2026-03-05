@@ -31,7 +31,7 @@ Create the TLPP class structure and convert all functions.
 
 - [ ] Define the namespace following TOTVS convention: `custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product code (all lowercase, dots, no underscores)
 - [ ] Create the `.tlpp` file with one class per file, named following convention: `custom.<agrupador>.<funcionalidade>.tlpp`
-- [ ] Add `#Include "TOTVS.CH"` at the top of the file
+- [ ] Add `#Include "tlpp-core.th"` at the top of the file (and `tlpp-rest.th` if using REST annotations)
 
 ### Class Skeleton
 
@@ -60,7 +60,7 @@ Create the TLPP class structure and convert all functions.
 
 ### Update Includes
 
-- [ ] Replace all `#Include` directives (`Protheus.ch`, `TopConn.ch`, `FWMVCDef.ch`, etc.) with a single `#Include "TOTVS.CH"`
+- [ ] Replace ADVPL `.ch` includes with TLPP `.th` includes: `#Include "tlpp-core.th"` (main), `#Include "tlpp-rest.th"` (REST annotations), `#Include "tlpp-object.th"` (advanced objects)
 - [ ] Add the `namespace` declaration for the project (e.g., `namespace custom.faturamento.pedido`)
 - [ ] Do NOT add `using namespace tlpp.core`, `tlpp.log`, `tlpp.data`, etc. unless the code explicitly uses classes from those namespaces
 - [ ] Only add `using namespace tlpp.rest` if using TLPP REST annotations (`@RestService`, `@Get`, `@Post`)
