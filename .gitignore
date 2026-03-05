@@ -1,6 +1,14 @@
+# OS
 .DS_Store
+Thumbs.db
+
+# Editors
 *.swp
 *.swo
 *~
+.vscode/
+.idea/
+
+# Project local files
 docs/
 linkedin-post.txt

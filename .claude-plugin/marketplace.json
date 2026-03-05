@@ -18,7 +18,7 @@
       "homepage": "https://github.com/thalysjuvenal/advpl-specialist",
       "repository": "https://github.com/thalysjuvenal/advpl-specialist",
       "license": "MIT",
-      "keywords": ["advpl", "tlpp", "protheus", "totvs", "erp"]
+      "keywords": ["advpl", "tlpp", "protheus", "totvs", "erp", "code-generation", "migration", "debugging", "claude-code-plugin"]
     }
   ]
 }

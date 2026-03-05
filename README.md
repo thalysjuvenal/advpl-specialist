@@ -8,6 +8,33 @@
 
 Plugin para Claude Code especializado em **ADVPL** e **TLPP** para desenvolvimento no ecossistema **TOTVS Protheus**.
 
+## Indice
+
+- [Quick Start](#quick-start)
+- [Funcionalidades](#funcionalidades)
+- [Instalacao](#instalacao)
+- [Commands](#commands)
+- [Agents](#agents)
+- [Skills](#skills)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Referencia Embutida](#referencia-embutida)
+- [Contribuindo](#contribuindo)
+- [Changelog](#changelog)
+- [Licenca](#licenca)
+
+## Quick Start
+
+```bash
+# 1. Instale o plugin
+/plugin marketplace add thalysjuvenal/advpl-specialist
+/plugin install advpl-specialist@thalysjuvenal-advpl-specialist
+
+# 2. Abra um projeto Protheus e use os comandos
+/advpl-specialist:generate function FATA050 --module FAT
+/advpl-specialist:diagnose "Variable does not exist: cCodCli"
+/advpl-specialist:docs FWExecView
+```
+
 ## Funcionalidades
 
 - **Geracao de codigo** - Funcoes, classes TLPP, MVC, REST APIs, Web Services, pontos de entrada
@@ -106,6 +133,11 @@ advpl-specialist/
 ├── .claude-plugin/
 │   ├── plugin.json                # Metadata do plugin
 │   └── marketplace.json           # Catalogo do marketplace
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md          # Template para reportar bugs
+│   │   └── feature_request.md     # Template para sugestoes
+│   └── pull_request_template.md   # Template para PRs
 ├── agents/                        # 4 agents especializados
 │   ├── code-generator.md
 │   ├── migrator.md
@@ -117,7 +149,7 @@ advpl-specialist/
 │   ├── diagnose.md
 │   └── docs.md
 ├── skills/                        # 5 skills com supporting files
-│   ├── advpl-code-generation/     # Padroes MVC, REST, PE, classes
+│   ├── advpl-code-generation/     # Padroes MVC, REST, SOAP, PE, classes
 │   ├── advpl-to-tlpp-migration/   # Regras e checklist de migracao
 │   ├── advpl-debugging/           # Erros comuns e performance
 │   ├── embedded-sql/              # BeginSQL/EndSQL, macros, patterns
@@ -125,6 +157,9 @@ advpl-specialist/
 ├── hooks/                         # SessionStart hook
 │   ├── hooks.json
 │   └── session-start
+├── CHANGELOG.md                   # Historico de versoes
+├── CONTRIBUTING.md                # Guia de contribuicao
+├── LICENSE                        # Licenca MIT
 └── README.md
 ```
 
