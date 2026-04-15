@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `tdn-lookup` reference to README (was missing from the skills table since v1.0.9)
 - Adicionada referencia `tdn-lookup` ao README (estava faltando na tabela de skills desde v1.0.9)
 
+### Added / Adicionado
+- Field Name Validation guardrail: agent now validates SX3 field names against 3 confirmed sources (local reference examples, user prompt, TDN lookup) before emitting any `ALIAS_CAMPO` identifier. When uncertain, asks the user or generates a `cx*` placeholder variable with `// TODO: confirmar campo no SX3`
+- Guardrail de validacao de nomes de campos: agent agora valida nomes de campos SX3 contra 3 fontes confirmadas (exemplos em referencias locais, prompt do usuario, busca TDN) antes de emitir qualquer identificador `ALIAS_CAMPO`. Quando incerto, pergunta ao usuario ou gera variavel placeholder `cx*` com `// TODO: confirmar campo no SX3`
+
 ## [1.0.9] - 2026-04-13
 
 ### Added / Adicionado
