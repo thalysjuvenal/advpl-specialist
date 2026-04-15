@@ -54,6 +54,14 @@ Arquivo com ~15 campos mais usados de cada uma das 15 tabelas principais do Prot
 | Financeiro | SE1 | Contas a Receber |
 | Financeiro | SE2 | Contas a Pagar |
 | Financeiro | SE5 | Movimentação Bancária |
+| Contábil | CT1 | Cabeçalho dos Lançamentos Contábeis |
+| Contábil | CT2 | Itens dos Lançamentos Contábeis |
+| Contábil | CTD | Plano de Contas |
+| Fiscal | SF3 | Livros Fiscais |
+| Fiscal | SFT | Livro Fiscal por Item (SPED) |
+| Fiscal | CDO | Configuração Fiscal / TES |
+
+**Nota**: Tabelas que possuem campos contábeis/fiscais (SE1, SE2, SD1, SD2, SF1, SF2) incluem esses campos além dos operacionais (ex: E2_CCD, E2_DEBITO, D1_TES, D1_CF).
 
 **Formato por tabela:**
 
@@ -79,7 +87,7 @@ Arquivo com ~15 campos mais usados de cada uma das 15 tabelas principais do Prot
 | E2_NOMFOR | C | 20 | Nome do Fornecedor |
 ```
 
-~15 campos x 15 tabelas = ~225 campos. Estimativa: ~2.500-3.000 tokens quando carregado.
+~15 campos x 21 tabelas = ~315 campos. Estimativa: ~3.500-4.000 tokens quando carregado.
 
 ### Seção CRITICAL: Field Name Validation reescrita
 
