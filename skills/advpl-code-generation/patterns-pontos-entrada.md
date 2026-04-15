@@ -25,34 +25,6 @@ If the TDN page is not found or is incomplete, inform the user and generate code
 
 ---
 
-## CRITICAL: Context Availability
-
-**PARAMIXB is the ONLY guaranteed data source in an entry point.** Everything else depends on the calling routine and may NOT be available:
-
-| Source | Availability | Action |
-|--------|-------------|--------|
-| `PARAMIXB[n]` | **Guaranteed** (if documented on TDN) | Access directly |
-| `PARAMIXE[n]` | **Probable** (secondary params) | Verify with `Type("PARAMIXE")` |
-| Private variables (`CNFISCAL`, `CNFSERIE`, etc.) | **NOT guaranteed** — depends on caller and Protheus version | Verify with `Type("VAR") == "C"` |
-| `M->CAMPO` (memvars) | **NOT guaranteed** — depends on EnchoiceBar/MsGetDados context | Verify with `Type("M->CAMPO")` |
-| `ALIAS->CAMPO` (work areas) | **NOT guaranteed** — table may not be open or positioned | Verify with `Select("ALIAS") > 0` |
-
-**Always use `Type()` for defensive verification** before accessing any non-PARAMIXB source. This prevents runtime errors when the variable does not exist in the entry point's context.
-
-```advpl
-// Padrao defensivo para variaveis de contexto em PE:
-Local cNFiscal := ""
-If Type("CNFISCAL") == "C"
-    cNFiscal := CNFISCAL
-EndIf
-
-// Padrao defensivo para work areas em PE:
-Local cDoc := ""
-If Select("SF1") > 0
-    cDoc := SF1->F1_DOC
-EndIf
-```
-
 ## 1. What are Entry Points
 
 Entry points (Pontos de Entrada) are predefined hooks in Protheus standard source code where custom logic can be injected without modifying the original source. When the standard code reaches a specific point, it checks if a User Function with the expected name exists; if so, it calls that function.
