@@ -21,8 +21,11 @@ e este projeto segue o [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ### Adicionado
 
-- Guardrail de validacao de nomes de campos SX3: agent agora valida nomes de campos contra 3 fontes confirmadas (exemplos em referencias locais, prompt do usuario, busca TDN) antes de emitir qualquer identificador `ALIAS_CAMPO`. Quando incerto, pergunta ao usuario ou gera variavel placeholder `cx*` com `// TODO: confirmar campo no SX3`
-- Guardrail de validacao de contexto em pontos de entrada: agent agora valida que variaveis de contexto (Private/Public do caller), work areas (ALIAS->CAMPO) e memvars (M->CAMPO) estao disponiveis antes de usa-los em codigo de pontos de entrada. Quando incerto, gera codigo defensivo com verificacao `Type()` em vez de assumir disponibilidade. Resolve [#6](https://github.com/thalysjuvenal/advpl-specialist/issues/6)
+- Validacao de nomes de campos v2 (data-driven): agent agora valida nomes de campos SX3 contra `sx3-common-fields.md` (21 tabelas, ~323 campos do SempreJu). Para campos nao encontrados na referencia local, busca automaticamente no SempreJu. So pergunta ao usuario como ultimo recurso. Nunca inventa nomes de campos.
+
+### Removido
+
+- Guardrail de validacao de contexto em pontos de entrada: removido — a abordagem comportamental com verificacoes defensivas `Type()` era muito generica e gerava codigo verboso sem resolver o problema real.
 
 ## [1.0.9] - 2026-04-13
 
