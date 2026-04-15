@@ -44,7 +44,7 @@ digraph lookup {
 
 1. **Local first:** Check supporting files (native-functions.md, sx-dictionary.md, rest-api-reference.md)
 2. **Online fallback:** Load skill `tdn-lookup` e seguir a estratégia de busca em 3 tiers (Tier 2: WebFetch API → Tier 3: Playwright API JSON → Tier 4: Playwright HTML visual). Consultar a tabela de CQL na seção "TDN API Reference" abaixo.
-3. **Field validation:** Para validar se um campo `ALIAS_CAMPO` existe em uma tabela padrão, usar CQL do tdn-lookup: `type=page AND title~"{TABLE_ALIAS}" AND text~"{FIELD_NAME}"`. Se o campo não for confirmado, perguntar ao usuário ou usar variável `cx*` com TODO.
+3. **Field validation:** Para validar campos SX3: (1) Verificar `sx3-common-fields.md` (referência local com ~15 campos das 21 tabelas principais). (2) Se não encontrar, WebFetch em `https://sempreju.com.br/tabelas_protheus/tabelas/tabela_{alias_lowercase}.html`. (3) Se não encontrar, perguntar ao usuário. NUNCA inventar campo.
 
 ## CRITICAL: Restricted Functions Check
 
