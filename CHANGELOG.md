@@ -23,10 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adicionada referencia `tdn-lookup` ao README (estava faltando na tabela de skills desde v1.0.9)
 
 ### Added / Adicionado
-- Field Name Validation guardrail: agent now validates SX3 field names against 3 confirmed sources (local reference examples, user prompt, TDN lookup) before emitting any `ALIAS_CAMPO` identifier. When uncertain, asks the user or generates a `cx*` placeholder variable with `// TODO: confirmar campo no SX3`
-- Guardrail de validacao de nomes de campos: agent agora valida nomes de campos SX3 contra 3 fontes confirmadas (exemplos em referencias locais, prompt do usuario, busca TDN) antes de emitir qualquer identificador `ALIAS_CAMPO`. Quando incerto, pergunta ao usuario ou gera variavel placeholder `cx*` com `// TODO: confirmar campo no SX3`
-- Entry Point Context Validation guardrail: agent now validates that context variables (Private/Public from caller), work areas (ALIAS->CAMPO), and memvars (M->CAMPO) are available before using them in entry point code. When uncertain, generates defensive code with `Type()` verification instead of assuming availability. Resolves #6.
-- Guardrail de validacao de contexto em pontos de entrada: agent agora valida que variaveis de contexto (Private/Public do caller), work areas (ALIAS->CAMPO) e memvars (M->CAMPO) estao disponiveis antes de usa-los em codigo de pontos de entrada. Quando incerto, gera codigo defensivo com verificacao `Type()` em vez de assumir disponibilidade. Resolve #6.
+- Field Name Validation v2 (data-driven): agent now validates SX3 field names against `sx3-common-fields.md` (21 tables, ~323 fields from SempreJu). For fields not in local reference, automatically fetches from SempreJu (`sempreju.com.br`). Only asks the user as last resort. Never invents field names, never generates placeholder variables.
+- Validacao de nomes de campos v2 (data-driven): agent agora valida nomes de campos SX3 contra `sx3-common-fields.md` (21 tabelas, ~323 campos do SempreJu). Para campos nao encontrados na referencia local, busca automaticamente no SempreJu (`sempreju.com.br`). So pergunta ao usuario como ultimo recurso. Nunca inventa nomes de campos, nunca gera variaveis placeholder.
+
+### Removed / Removido
+- Entry Point Context Validation guardrail: removed — the behavioral approach with `Type()` defensive checks was too generic and generated verbose code without solving the real problem.
+- Guardrail de validacao de contexto em pontos de entrada: removido — a abordagem comportamental com verificacoes defensivas `Type()` era muito generica e gerava codigo verboso sem resolver o problema real.
 
 ## [1.0.9] - 2026-04-13
 
