@@ -353,6 +353,55 @@ oView:EnableTitleView("VIEW_SA1", "Dados do Cliente")
 // oView:EnableTitleGroup("VIEW_SA1", "Dados do Cliente")
 ```
 
+## CRITICO: Validacao de Nomes de Campos
+
+**A regra:** NUNCA emitir um identificador no formato `ALIAS_XXXXXX` (ex: `E2_CCONTAB`, `A1_NOME`, `D1_TOTAL`, `C5_XRESP`) a menos que venha de UMA destas 3 fontes confirmadas:
+
+1. **Exemplos nas referencias do plugin** — o campo aparece em exemplos de codigo nos arquivos reference.md ou patterns-*.md
+2. **Fornecido pelo usuario** — o usuario citou o nome do campo explicitamente no prompt ou em resposta a uma pergunta
+3. **Confirmado via TDN** — o campo foi retornado por uma busca no TDN (CQL por alias da tabela)
+
+**Por que isso importa:** O plugin NAO contem um catalogo de campos SX3 por tabela. O LLM ira inferir nomes de campos plausiveis (ex: `E2_CCONTAB` para "conta contabil" em SE2) que podem nao existir no dicionario de dados do cliente.
+
+**Fallback obrigatorio:** Se o campo NAO foi confirmado, fazer UMA de duas coisas:
+
+- **(A) Perguntar ao usuario:** "O campo `{ALIAS_CAMPO}` nao consta na minha referencia. Confirma o nome exato na sua base?"
+- **(B) Gerar variavel placeholder** com convencao `cx*` (2a letra `x` indica nao confirmado) com comentario TODO:
+
+```c
+Local cxCContab := "" // TODO: confirmar campo E2_??? no SX3
+```
+
+**Excecao:** Campos que aparecem em exemplos de codigo dentro das referencias do plugin (ex: `A1_COD`, `A1_NOME` em exemplos de SA1) sao considerados confirmados.
+
+## CRITICO: Validacao de Contexto em Pontos de Entrada
+
+**A regra:** Ao gerar codigo para um ponto de entrada, NUNCA assumir que os seguintes estao disponiveis sem confirmacao:
+
+1. **Variaveis Private/Public do caller** — ex: `CNFISCAL`, `CNFSERIE`, `CCONDPAG`. Podem nao existir em todos os contextos ou versoes do Protheus.
+2. **Work areas (ALIAS->CAMPO)** — ex: `SF1->F1_DOC`, `SD1->D1_COD`. A tabela pode nao estar aberta ou o registro pode nao estar posicionado.
+3. **Memvars (M->CAMPO)** — ex: `M->F1_DOC`. O contexto do EnchoiceBar/MsGetDados pode nao estar ativo.
+
+**A UNICA fonte de dados garantida em um ponto de entrada e PARAMIXB** — e seu conteudo DEVE ser confirmado via busca no TDN antes do uso.
+
+**Fallback defensivo obrigatorio:** Se uma variavel de contexto ou work area NAO foi confirmada, gerar codigo com verificacao `Type()`:
+
+```c
+// Verificacao defensiva — variavel pode nao existir neste PE
+Local cNFiscal := ""
+If Type("CNFISCAL") == "C"
+    cNFiscal := CNFISCAL
+EndIf
+
+// Verificacao defensiva — work area pode nao estar posicionada
+Local cDoc := ""
+If Select("SF1") > 0
+    cDoc := SF1->F1_DOC
+EndIf
+```
+
+**PARAMIXB e seguro:** Parametros documentados no TDN via PARAMIXB podem ser acessados diretamente sem verificacao defensiva.
+
 ## Checklist de qualidade de codigo
 
 Antes de entregar qualquer codigo gerado, verificar:
@@ -379,3 +428,5 @@ Antes de entregar qualquer codigo gerado, verificar:
 - [ ] Metodos JsonObject sao validos (somente metodos da lista documentada no TDN)
 - [ ] Metodos TWsdlManager sao validos (sem GetSoapFault, sem ListServices)
 - [ ] FWFormView usa EnableTitleView (NAO EnableTitleGroup)
+- [ ] **Todo identificador `ALIAS_CAMPO` citado foi confirmado (usuario, referencia local ou TDN) — nenhum campo inventado**
+- [ ] **Em pontos de entrada: nenhuma variavel de contexto ou work area assumida sem confirmacao (TDN, usuario ou referencia local) — usar `Type()` para verificacao defensiva**

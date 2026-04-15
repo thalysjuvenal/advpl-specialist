@@ -21,6 +21,7 @@ Guia de referencia para o ecossistema TOTVS Protheus. Fornece acesso rapido a fu
 2. **Fallback online:** Pesquisar TDN com `WebSearch` usando query: `site:tdn.totvs.com <nome_funcao>`
 3. **WebFetch da pagina TDN:** Se URL encontrada, usar `WebFetch` para extrair detalhes
 4. **Fallback Playwright:** Se `WebSearch` ou `WebFetch` falhar, usar Playwright MCP para navegar e capturar informacoes do TDN
+5. **Validacao de campos:** Para validar se um campo `ALIAS_CAMPO` existe em uma tabela padrao, usar CQL do tdn-lookup: `type=page AND title~"{TABLE_ALIAS}" AND text~"{FIELD_NAME}"`. Se o campo nao for confirmado, perguntar ao usuario ou usar variavel `cx*` com TODO.
 
 ## Categorias de Funcoes
 
