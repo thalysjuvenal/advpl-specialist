@@ -60,6 +60,7 @@ Activate this agent when the user:
   - ProBat test -> Read `skills/probat-testing/reference.md`
 - Read `skills/protheus-reference/reference.md` if native function lookup is needed
 - Read `skills/embedded-sql/reference.md` if SQL queries are needed (prefer BeginSQL over TCQuery)
+- **For code that involves database tables (MVC, entry points, CRUD, REST with data access, TReport, Embedded SQL):** Read `skills/protheus-reference/sx3-common-fields.md` for field validation. Do NOT load this file for utility classes, helpers, or code without database operations.
 - **For TReport, FWFormBrowse, Jobs, and Workflow types:** If the user requests non-standard methods or class/function usage, validate against the TDN using the TDN API Lookup described below (Tier 2/3/4) to confirm correct signatures, parameters, and behavior.
 - **For entry points (MANDATORY):** ALWAYS search the TDN for the entry point name using the TDN API Lookup described below (Tier 2/3/4). Extract: PARAMIXB parameters (types, positions, descriptions), expected return type/value, which standard routine calls this entry point, and version-specific behavior. The local patterns-pontos-entrada.md file provides templates and common examples, but the TDN is the authoritative source for each specific entry point's contract.
 
@@ -642,49 +643,55 @@ oView:EnableTitleView("VIEW_SA1", "Dados do Cliente")
 
 ## CRITICAL: Field Name Validation
 
-**The rule:** NEVER emit an identifier in the format `ALIAS_XXXXXX` (e.g., `E2_CCONTAB`, `A1_NOME`, `D1_TOTAL`, `C5_XRESP`) unless it comes from ONE of these 3 confirmed sources:
+**The rule:** NEVER emit an identifier in the format `ALIAS_XXXXXX` (e.g., `E2_CCONTAB`, `A1_NOME`, `D1_TOTAL`) unless it has been confirmed by one of the 3 layers below. **NEVER invent a field name.**
 
-1. **Plugin reference examples** — the field appears in code examples inside this plugin's reference files (reference.md, patterns-*.md)
-2. **User-provided** — the user explicitly cited the field name in their prompt or in response to a question
-3. **TDN-confirmed** — the field was returned by a TDN lookup (CQL search by table alias)
+### Layer 1 — Local reference (instant, no cost)
 
-**Why this matters:** The plugin does NOT contain a catalog of SX3 fields per table. The LLM will infer plausible field names (e.g., `E2_CCONTAB` for "conta contábil" in SE2) that may not exist in the customer's data dictionary. This causes runtime errors (`Variable does not exist`, `Field not found`) that are hard to trace.
+Check `skills/protheus-reference/sx3-common-fields.md`. If the field appears there → use it directly.
 
-**Mandatory fallback:** If a field is NOT confirmed by any of the 3 sources above, you MUST do ONE of these:
+### Layer 2 — SempreJu lookup (automatic, ~500 tokens)
 
-- **(A) Ask the user:**
-  > "O campo `{ALIAS_CAMPO}` não consta na minha referência. Confirma o nome exato na sua base, ou deseja que eu use uma variável local e você preenche depois?"
+If the field is NOT in the local reference, automatically fetch:
+`https://sempreju.com.br/tabelas_protheus/tabelas/tabela_{alias_lowercase}.html`
 
-- **(B) Generate a placeholder local variable** using the `cx*` convention (2nd letter `x` indicates unconfirmed) with a TODO comment:
-  ```advpl
-  Local cxCContab := "" // TODO: confirmar campo E2_??? no SX3
-  ```
+Search the page for the field name. If found → use it. If the page does not load or the field is not found → proceed to Layer 3.
 
-**Exception:** Fields that appear in code examples within the plugin's reference files (e.g., `A1_COD`, `A1_NOME` in SA1 examples) are considered confirmed and do not require user confirmation.
+**Example:** For field `E2_PORTADO` in table SE2:
+1. Check sx3-common-fields.md → not found
+2. WebFetch `https://sempreju.com.br/tabelas_protheus/tabelas/tabela_se2.html`
+3. Search page for `E2_PORTADO` → found (C, 3, "Código do Portador") → use it
+
+### Layer 3 — Ask the user (last resort)
+
+If Layers 1 and 2 did not confirm the field, ask the user:
+> "O campo `{ALIAS_CAMPO}` não foi encontrado na minha referência local nem no SempreJu. Confirma o nome exato na sua base?"
+
+**NEVER generate a field that was not confirmed by any layer. No exceptions. No placeholder variables.**
 
 ### Forbidden patterns
 
 ```advpl
-// WRONG — field E2_CCONTAB was not confirmed by any source:
+// WRONG — field not confirmed by any layer:
 SE2->E2_CCONTAB := cContab
 
-// WRONG — field C5_XRESP inferred without confirmation:
-If Empty(SC5->C5_XRESP)
+// WRONG — placeholder variable instead of real field:
+Local cxCContab := "" // TODO: confirmar campo
 ```
 
 ### Correct patterns
 
 ```advpl
-// CORRECT — ask the user first:
-// Agent: "O campo E2_CCONTAB não consta na minha referência.
-//         Confirma o nome exato na sua base?"
-// User: "O campo correto é E2_CCONTAB sim, pode usar."
-SE2->E2_CCONTAB := cContab
+// CORRECT — field confirmed in sx3-common-fields.md (Layer 1):
+SE2->E2_VALOR := nValor
 
-// CORRECT — use placeholder variable with TODO:
-Local cxCContab := "" // TODO: confirmar campo E2_??? no SX3
-// ... later in code:
-SE2->(FieldGet(FieldPos(cxCContab)))
+// CORRECT — field confirmed via SempreJu WebFetch (Layer 2):
+// Agent fetched tabela_se2.html, found E2_PORTADO (C, 3, "Código do Portador")
+SE2->E2_PORTADO := cPortador
+
+// CORRECT — field confirmed by user (Layer 3):
+// Agent: "O campo E2_CCONTAB não foi encontrado. Confirma o nome?"
+// User: "Sim, E2_CCONTAB existe na minha base."
+SE2->E2_CCONTAB := cContab
 ```
 
 ## Code Quality Checklist
@@ -714,4 +721,4 @@ Before delivering any generated code, verify:
 - [ ] TWsdlManager methods are valid (no GetSoapFault, no ListServices)
 - [ ] FWFormView uses EnableTitleView (NOT EnableTitleGroup)
 - [ ] TLPP REST endpoints use `User Function` (or class+method) with annotations, matching `totvs/tlpp-sample-rest` samples
-- [ ] **Todo identificador `ALIAS_CAMPO` citado foi confirmado (usuário, reference local ou TDN) — nenhum campo inventado**
+- [ ] **Todo identificador `ALIAS_CAMPO` foi confirmado via sx3-common-fields.md, SempreJu (WebFetch), ou usuário — nenhum campo inventado, nenhum placeholder cx***
