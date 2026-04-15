@@ -44,6 +44,7 @@ digraph lookup {
 
 1. **Local first:** Check supporting files (native-functions.md, sx-dictionary.md, rest-api-reference.md)
 2. **Online fallback:** Load skill `tdn-lookup` e seguir a estratégia de busca em 3 tiers (Tier 2: WebFetch API → Tier 3: Playwright API JSON → Tier 4: Playwright HTML visual). Consultar a tabela de CQL na seção "TDN API Reference" abaixo.
+3. **Field validation:** Para validar se um campo `ALIAS_CAMPO` existe em uma tabela padrão, usar CQL do tdn-lookup: `type=page AND title~"{TABLE_ALIAS}" AND text~"{FIELD_NAME}"`. Se o campo não for confirmado, perguntar ao usuário ou usar variável `cx*` com TODO.
 
 ## CRITICAL: Restricted Functions Check
 

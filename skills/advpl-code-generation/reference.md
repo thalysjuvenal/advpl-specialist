@@ -252,3 +252,4 @@ ADVPL inherits a **10-character limit** on identifiers (functions, methods, vari
 | Missing TOTVS.CH include | Always include at minimum: #Include "TOTVS.CH" |
 | Not validating function parameters | Check ValType() and empty values at function start |
 | TLPP REST endpoint with bare `Function` | Use `User Function` with `@Get/@Post/...` annotation (official `rest-mod02.tlpp` pattern) |
+| **Inventar nome de campo `ALIAS_CAMPO` não confirmado no SX3** | **Perguntar ao usuário o nome exato ou usar variável local `cx*` com `// TODO: confirmar campo no SX3`** |
