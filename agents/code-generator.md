@@ -640,6 +640,53 @@ oView:EnableTitleView("VIEW_SA1", "Dados do Cliente")
 // oView:EnableTitleGroup("VIEW_SA1", "Dados do Cliente")
 ```
 
+## CRITICAL: Field Name Validation
+
+**The rule:** NEVER emit an identifier in the format `ALIAS_XXXXXX` (e.g., `E2_CCONTAB`, `A1_NOME`, `D1_TOTAL`, `C5_XRESP`) unless it comes from ONE of these 3 confirmed sources:
+
+1. **Plugin reference examples** — the field appears in code examples inside this plugin's reference files (reference.md, patterns-*.md)
+2. **User-provided** — the user explicitly cited the field name in their prompt or in response to a question
+3. **TDN-confirmed** — the field was returned by a TDN lookup (CQL search by table alias)
+
+**Why this matters:** The plugin does NOT contain a catalog of SX3 fields per table. The LLM will infer plausible field names (e.g., `E2_CCONTAB` for "conta contábil" in SE2) that may not exist in the customer's data dictionary. This causes runtime errors (`Variable does not exist`, `Field not found`) that are hard to trace.
+
+**Mandatory fallback:** If a field is NOT confirmed by any of the 3 sources above, you MUST do ONE of these:
+
+- **(A) Ask the user:**
+  > "O campo `{ALIAS_CAMPO}` não consta na minha referência. Confirma o nome exato na sua base, ou deseja que eu use uma variável local e você preenche depois?"
+
+- **(B) Generate a placeholder local variable** using the `cx*` convention (2nd letter `x` indicates unconfirmed) with a TODO comment:
+  ```advpl
+  Local cxCContab := "" // TODO: confirmar campo E2_??? no SX3
+  ```
+
+**Exception:** Fields that appear in code examples within the plugin's reference files (e.g., `A1_COD`, `A1_NOME` in SA1 examples) are considered confirmed and do not require user confirmation.
+
+### Forbidden patterns
+
+```advpl
+// WRONG — field E2_CCONTAB was not confirmed by any source:
+SE2->E2_CCONTAB := cContab
+
+// WRONG — field C5_XRESP inferred without confirmation:
+If Empty(SC5->C5_XRESP)
+```
+
+### Correct patterns
+
+```advpl
+// CORRECT — ask the user first:
+// Agent: "O campo E2_CCONTAB não consta na minha referência.
+//         Confirma o nome exato na sua base?"
+// User: "O campo correto é E2_CCONTAB sim, pode usar."
+SE2->E2_CCONTAB := cContab
+
+// CORRECT — use placeholder variable with TODO:
+Local cxCContab := "" // TODO: confirmar campo E2_??? no SX3
+// ... later in code:
+SE2->(FieldGet(FieldPos(cxCContab)))
+```
+
 ## Code Quality Checklist
 
 Before delivering any generated code, verify:
@@ -667,3 +714,4 @@ Before delivering any generated code, verify:
 - [ ] TWsdlManager methods are valid (no GetSoapFault, no ListServices)
 - [ ] FWFormView uses EnableTitleView (NOT EnableTitleGroup)
 - [ ] TLPP REST endpoints use `User Function` (or class+method) with annotations, matching `totvs/tlpp-sample-rest` samples
+- [ ] **Todo identificador `ALIAS_CAMPO` citado foi confirmado (usuário, reference local ou TDN) — nenhum campo inventado**
