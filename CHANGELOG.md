@@ -6,6 +6,22 @@ Todas as mudancas notaveis deste projeto serao documentadas neste arquivo.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-04-16
+
+### Fixed / Corrigido
+- Fixed version mismatch between `plugin.json` (1.1.0) and `marketplace.json` (1.0.9). Both now aligned to 1.1.1.
+- Corrigido desalinhamento de versao entre `plugin.json` (1.1.0) e `marketplace.json` (1.0.9). Ambos agora alinhados em 1.1.1.
+- Fixed broken cache cleanup path in `hooks/session-start` — was reading `marketplace.json` from two directories above the cache root, resulting in empty `CURRENT_VERSION` and cleanup never running. Now uses `$CLAUDE_PLUGIN_ROOT` correctly.
+- Corrigido path quebrado do cache cleanup em `hooks/session-start` — lia `marketplace.json` dois diretorios acima da raiz do cache, resultando em `CURRENT_VERSION` vazio e cleanup nunca rodando. Agora usa `$CLAUDE_PLUGIN_ROOT` corretamente.
+- Fixed `commands/process.md` `allowed-tools` listing `browser_*` tools without MCP namespace prefix. Now uses `mcp__playwright__browser_*`.
+- Corrigido `allowed-tools` de `commands/process.md` listando ferramentas `browser_*` sem prefixo MCP. Agora usa `mcp__playwright__browser_*`.
+
+### Changed / Alterado
+- Added explicit `tools:` and `model:` frontmatter to all 10 agents. Read-only agents (`code-reviewer`, `debugger`, `docs-reference`, `process-consultant`) now declare minimal toolsets, reducing attack surface and improving review quality.
+- Adicionado frontmatter `tools:` e `model:` explicitos em todos os 10 agents. Agents read-only (`code-reviewer`, `debugger`, `docs-reference`, `process-consultant`) agora declaram conjuntos minimos de ferramentas, reduzindo superficie de ataque e melhorando qualidade da revisao.
+- Added `version` field at root level of `marketplace.json` for better cache invalidation compatibility.
+- Adicionado campo `version` no nivel raiz de `marketplace.json` para melhor compatibilidade de invalidacao de cache.
+
 ## [1.1.0] - 2026-04-14
 
 ### Changed / Alterado

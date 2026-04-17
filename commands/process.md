@@ -1,6 +1,6 @@
 ---
 description: Consult Protheus ERP business processes, module workflows, routines and integrations
-allowed-tools: Read, Glob, Grep, WebSearch, WebFetch, Bash, EnterPlanMode, ExitPlanMode, browser_navigate, browser_snapshot, browser_take_screenshot, browser_fill_form, browser_click, browser_close
+allowed-tools: Read, Glob, Grep, WebSearch, WebFetch, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_fill_form, mcp__playwright__browser_click, mcp__playwright__browser_close
 argument-hint: "<process|routine|module> [--type process|routine|module|integration]"
 agent: process-consultant
 ---

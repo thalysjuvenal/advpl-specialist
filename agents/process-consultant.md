@@ -1,5 +1,7 @@
 ---
 description: Specialized agent for consulting Protheus ERP business processes, module workflows, routines, integrations, and understanding how business operations work in TOTVS Protheus
+tools: Read, Grep, Glob, WebSearch, WebFetch
+model: inherit
 ---
 
 # Consultor de Processos Protheus

@@ -1,7 +1,7 @@
 {
   "name": "advpl-specialist",
   "description": "Especialista em ADVPL e TLPP para desenvolvimento TOTVS Protheus e consultoria funcional - geracao de codigo, migracao, debug, documentacao e configuracao de dicionario",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": { "name": "Thalys Augusto" },
   "license": "MIT",
   "homepage": "https://github.com/thalysjuvenal/advpl-specialist",

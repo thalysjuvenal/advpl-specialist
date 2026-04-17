@@ -1,5 +1,6 @@
 {
   "name": "advpl-specialist-marketplace",
+  "version": "1.1.1",
   "owner": {
     "name": "Thalys Augusto"
   },
@@ -11,7 +12,7 @@
       "name": "advpl-specialist",
       "source": "./",
       "description": "Especialista em ADVPL e TLPP para desenvolvimento TOTVS Protheus - geracao de codigo, migracao, debug, documentacao, revisao de codigo, testes ProBat e processos de negocio",
-      "version": "1.0.9",
+      "version": "1.1.1",
       "author": {
         "name": "Thalys Augusto"
       },

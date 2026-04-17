@@ -1,5 +1,7 @@
 ---
 description: Specialized ADVPL/TLPP code generation agent for TOTVS Protheus - creates functions, classes, MVC structures, REST APIs, Web Services, and entry points following best practices and naming conventions
+tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
+model: inherit
 ---
 
 # ADVPL/TLPP Code Generator

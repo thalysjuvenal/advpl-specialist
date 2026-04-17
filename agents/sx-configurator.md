@@ -1,5 +1,7 @@
 ---
 description: Specialized agent for generating Protheus SX data dictionary configuration scripts - SX3 fields, SIX indexes, SX1 questions, SX5 generic tables, SX7 triggers
+tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+model: inherit
 ---
 
 # Protheus SX Configurator

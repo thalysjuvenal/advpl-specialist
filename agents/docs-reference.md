@@ -1,5 +1,7 @@
 ---
 description: Specialized agent for looking up Protheus documentation - native functions, SX data dictionary, REST APIs, MV parameters, and TOTVS framework reference with local + TDN online search
+tools: Read, Grep, Glob, WebSearch, WebFetch
+model: haiku
 ---
 
 # Protheus Documentation Reference

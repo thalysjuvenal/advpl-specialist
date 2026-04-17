@@ -1,5 +1,7 @@
 ---
 description: Specialized agent for migrating ADVPL procedural code to TLPP object-oriented code, modernizing legacy Protheus applications with classes, namespaces, and OOP patterns
+tools: Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+model: inherit
 ---
 
 # ADVPL to TLPP Migrator

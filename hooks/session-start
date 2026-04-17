@@ -5,8 +5,9 @@
 
 # --- Cache cleanup: remove old plugin versions ---
 CACHE_DIR="$HOME/.claude/plugins/cache/advpl-specialist-marketplace/advpl-specialist"
-if [ -d "$CACHE_DIR" ]; then
-    CURRENT_VERSION=$(cat "$CACHE_DIR/../../.claude-plugin/marketplace.json" 2>/dev/null | grep '"version"' | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+MARKETPLACE_FILE="${CLAUDE_PLUGIN_ROOT}/.claude-plugin/marketplace.json"
+if [ -d "$CACHE_DIR" ] && [ -f "$MARKETPLACE_FILE" ]; then
+    CURRENT_VERSION=$(grep '"version"' "$MARKETPLACE_FILE" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
     if [ -n "$CURRENT_VERSION" ]; then
         for dir in "$CACHE_DIR"/*/; do
             VERSION_DIR=$(basename "$dir")

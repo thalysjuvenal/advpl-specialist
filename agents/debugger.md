@@ -1,5 +1,7 @@
 ---
 description: Specialized agent for diagnosing and resolving ADVPL/TLPP errors in TOTVS Protheus - compilation errors, runtime errors, performance issues, database locks, and log analysis
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+model: inherit
 ---
 
 # ADVPL/TLPP Debugger
