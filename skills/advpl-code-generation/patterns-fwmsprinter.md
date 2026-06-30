@@ -160,7 +160,24 @@ oPrint:SayAlign(nLine, nColumn, cText, oFont, nWidth, nHeight, nColor, nAlign, n
 **Usage notes:**
 - `nColor` accepts `RGB()` integer directly (no brush needed).
 - Always pass `Nil` explicitly as the last parameter to avoid runtime errors.
-- `nWidth` defines the column boundary — text exceeding this width is clipped.
+- `nWidth` defines the column boundary — **when text exceeds `nWidth`, FWMSPrinter renders nothing (blank cell), NOT a truncated string.** See critical note below.
+
+> **CRITICAL — Text overflow = blank, not truncated**
+>
+> When the rendered string is wider than `nWidth`, `SayAlign` outputs **nothing** — the cell is completely invisible in the PDF. This is confirmed behavior verified in production (HIGESTW1, 2026-06-29): field `ZP_OP` ("06488601001", 11 chars) with Arial Bold -14px (~8.5px/char ≈ 93px) in a 65px column rendered blank. Widening the column to 95px restored the output.
+>
+> **Rule:** always validate `nWidth >= max_expected_chars × px_per_char` for the chosen font size and style.
+>
+> Reference — Arial Bold approximate width per character:
+>
+> | Font size | px/char (avg) | Safe width for 10 chars | Safe width for 12 chars |
+> |---|---|---|---|
+> | -7 (7px) | ~4px | 40px | 48px |
+> | -10 (10px) | ~6px | 60px | 72px |
+> | -12 (12px) | ~7px | 70px | 84px |
+> | -14 (14px) | ~8.5px | 85px | 102px |
+>
+> **Diagnosis:** if one column is blank while adjacent columns (same Y, color, font) render normally, replace the field value with a short literal (`"OK"`) to confirm overflow is the cause.
 
 ```advpl
 // Example: print text left-aligned, black, 7pt
@@ -681,3 +698,4 @@ nLin += nAltLin + 5
 | `argumento #1, parâmetro oBrush erro, previsto O->N` | `FillRect` second param is `RGB()` integer | Create `TBrush` object: `TBrush():New(, nColor)` |
 | Text displays centered instead of right-aligned | `PAD_RIGHT` and `PAD_CENTER` values swapped | Correct: `PAD_RIGHT=1`, `PAD_CENTER=2` |
 | PDF saved to unknown location | `cPathPDF` not set | Add `oPrint:cPathPDF := GetTempPath()` after `New()` |
+| **One column renders blank while adjacent columns show correctly** | Text string wider than `nWidth` at the given font size | Increase `nWidth` to fit the content, or reduce font size. See Section 4.1 critical note. |
