@@ -2,6 +2,8 @@
 
 Reference for the most commonly used entry points in TOTVS Protheus, organized by module.
 
+> **Rotina padrão em MVC?** Se a rotina alvo foi migrada para MVC (12.1.17+ migrou várias — ex.: MATA010, MATA020), os PEs legados de validação/botões **não disparam**. Use o PE único MVC descrito em **[patterns-pontos-entrada-mvc.md](patterns-pontos-entrada-mvc.md)** (User Function com o nome do ID do modelo, eventos via `PARAMIXB[2]`).
+
 ---
 
 ## Catálogo de PEs conhecidos (Tier 1 local)

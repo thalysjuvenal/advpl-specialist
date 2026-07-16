@@ -6,6 +6,12 @@ Todas as mudancas notaveis deste projeto serao documentadas neste arquivo.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added / Adicionado
+- New `skills/advpl-code-generation/patterns-pontos-entrada-mvc.md` — reference for entry points in standard routines built on MVC (single PE per routine named after the Model ID, called at multiple moments identified by `PARAMIXB[2]`). Covers the official event table from TDN "Ponto de Entrada Padrão do MVC" (MODELVLDACTIVE, MODELPRE/POS, FORMPRE/POS, FORMLINEPRE/POS, MODELCOMMITTTS/NTTS, FORMCOMMITTTSPRE/POS, MODELCANCEL, BUTTONBAR) with extra PARAMIXB positions, expected returns and transaction context; `GetOperation()` constants; the `SetErrorMessage` pattern (avoids the empty "Problema:" dialog caused by `MsgAlert` + `.F.`); known Model IDs (MATA010 → `ITEM`, MATA020 → `CUSTOMERVENDOR`, MNTA080); the TDN rule that the source file must not share the User Function name; a hub template and a real-world permission-check example validated on 12.1.2510. Includes the legacy-vs-MVC caveat (e.g. `MA020TOK` disabled since 12.1.17, `A020EOK` firing only on deletion) and a cross-reference note added to `patterns-pontos-entrada.md`.
+- Novo `skills/advpl-code-generation/patterns-pontos-entrada-mvc.md` — referência para pontos de entrada em rotinas padrão construídas em MVC (PE único por rotina, nomeado pelo ID do modelo, chamado em vários momentos identificados por `PARAMIXB[2]`). Cobre a tabela oficial de eventos do TDN "Ponto de Entrada Padrão do MVC" (MODELVLDACTIVE, MODELPRE/POS, FORMPRE/POS, FORMLINEPRE/POS, MODELCOMMITTTS/NTTS, FORMCOMMITTTSPRE/POS, MODELCANCEL, BUTTONBAR) com posições extras do PARAMIXB, retornos esperados e contexto transacional; constantes do `GetOperation()`; o padrão `SetErrorMessage` (evita o diálogo "Problema:" vazio causado por `MsgAlert` + `.F.`); IDs de modelo conhecidos (MATA010 → `ITEM`, MATA020 → `CUSTOMERVENDOR`, MNTA080); a regra do TDN de que o arquivo fonte não pode ter o mesmo nome da User Function; template hub e exemplo real de validação de permissão testado no 12.1.2510. Inclui o caveat legado-vs-MVC (ex.: `MA020TOK` desabilitado desde 12.1.17, `A020EOK` disparando apenas na exclusão) e nota de cross-reference adicionada ao `patterns-pontos-entrada.md`.
+
 ## [1.3.0] - 2026-06-18
 
 ### Added / Adicionado
