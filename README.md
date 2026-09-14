@@ -1,6 +1,6 @@
 # advpl-specialist
 
-![Version](https://img.shields.io/badge/version-1.5.1-blue)
+![Version](https://img.shields.io/badge/version-1.6.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Claude%20Code-blueviolet)
 ![TOTVS](https://img.shields.io/badge/TOTVS-Protheus-orange)
@@ -350,7 +350,7 @@ Contribuicoes sao bem-vindas! Leia o [CONTRIBUTING.md](CONTRIBUTING.md) para sab
 
 Obrigado a quem contribui com o projeto:
 
-- **Henrique Patriota** ([@suportem3](https://github.com/suportem3), M3 Case) — referencia FWMSPrinter para relatorios PDF por coordenadas ([PR #12](https://github.com/thalysjuvenal/advpl-specialist/pull/12)) e referencia de pontos de entrada em rotinas MVC ([PR #13](https://github.com/thalysjuvenal/advpl-specialist/pull/13)).
+- **Henrique Patriota** ([@suportem3](https://github.com/suportem3), M3 Case) — referencia FWMSPrinter para relatorios PDF por coordenadas ([PR #12](https://github.com/thalysjuvenal/advpl-specialist/pull/12)), referencia de pontos de entrada em rotinas MVC ([PR #13](https://github.com/thalysjuvenal/advpl-specialist/pull/13)) e a skill completa de Smart View com o comando `/smartview` ([PR #16](https://github.com/thalysjuvenal/advpl-specialist/pull/16)).
 
 ## Changelog
 
