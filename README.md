@@ -119,7 +119,7 @@ O `advpl-specialist` tambem funciona fora do Claude Code, em GitHub Copilot, Cur
 npx skills add thalysjuvenal/advpl-specialist
 ```
 
-Instala as 18 skills em Copilot CLI, Codex, Cursor, Gemini CLI, OpenCode e 70+ agentes.
+Instala as 19 skills em Copilot CLI, Codex, Cursor, Gemini CLI, OpenCode e 70+ agentes.
 
 ### Passo 2: Instrucoes de repositorio
 
@@ -155,6 +155,7 @@ Copie a pasta da sua plataforma para o seu repositorio:
 | `/advpl-specialist:sxgen` | Gerar scripts de dicionario SX a partir de descricao em linguagem natural |
 | `/advpl-specialist:advpr` | Gerar scripts de automacao de testes ADVPR (Advanced Protheus Robot) - TestSuite/TestGroup/TestCase para MVC, ExecAuto, relatorios, processamento, webservice, Smart View, TOTVS Message e SmartLink |
 | `/advpl-specialist:smartx` | Gerar ou migrar rotinas Smart X (telas web modernas a partir de metadados) - modelo, interface e launcher TLPP; conversao de mBrowse/FWMBrowse/MVC para Smart X |
+| `/advpl-specialist:smartview` | Gerar ou migrar objetos de negocio Smart View (Integrated Provider) - classe TLPP com getSchema/getData, fonte de menu callTReports e roteiro de publicacao do recurso .trp |
 
 ### Exemplos
 
@@ -240,6 +241,7 @@ Os agents e commands carregam automaticamente bases de conhecimento internas (`s
 | `probat-testing` | Framework ProBat para testes unitarios TLPP (annotations, assertions, patterns) |
 | `advpr-test-automation` | Automacao de testes ADVPR (FWTestHelper): TestSuite/Group/Case, MVC, ExecAuto, relatorios, webservice, SmartLink, Smart View |
 | `smartx-development` | Desenvolvimento Smart X: modelo/interface/launcher a partir de metadados, conversao de browse (SetSmartX), pontos de entrada, migracao de legado e troubleshooting |
+| `smartview-development` | Objetos de negocio Smart View (Integrated Provider): schema, parametros com lookup e combo, getData, migracao de relatorios (TReport/FWMSPrinter/TMSPrinter/FWMSExcel) e ciclo de publicacao do .trp |
 | `protheus-reference` | 190+ funcoes nativas, dicionario SX, referencia REST API, funcoes FW*, lista de funcoes restritas |
 | `protheus-business` | 8 modulos ERP com tabelas, rotinas, parametros MV_* e integracoes |
 | `embedded-sql` | BeginSQL/EndSQL, macros %table%, %notDel%, %xfilial%, %exp%, column types |
@@ -275,7 +277,7 @@ advpl-specialist/
 │   ├── doc-generator.md
 │   ├── changelog-generator.md
 │   └── sx-configurator.md
-├── commands/                      # 14 commands invocaveis
+├── commands/                      # 15 commands invocaveis
 │   ├── generate.md
 │   ├── migrate.md
 │   ├── diagnose.md
@@ -289,8 +291,9 @@ advpl-specialist/
 │   ├── changelog.md
 │   ├── sxgen.md
 │   ├── advpr.md
-│   └── smartx.md
-├── skills/                        # 18 referencias internas (reference.md + supporting files)
+│   ├── smartx.md
+│   └── smartview.md
+├── skills/                        # 19 referencias internas (reference.md + supporting files)
 │   ├── advpl-code-generation/     # Padroes MVC, REST, SOAP, PE, TReport, FWFormBrowse, Jobs, Workflow
 │   ├── advpl-to-tlpp-migration/   # Regras e checklist de migracao
 │   ├── advpl-debugging/           # Erros comuns e performance
@@ -298,6 +301,7 @@ advpl-specialist/
 │   ├── probat-testing/            # Testes unitarios ProBat (TLPP)
 │   ├── advpr-test-automation/     # Automacao de testes ADVPR: FWTestHelper, MVC, ExecAuto, relatorios, webservice, SmartLink, Smart View
 │   ├── smartx-development/        # Smart X: modelo/interface/launcher, conversao de browse, PEs, migracao
+│   ├── smartview-development/     # Smart View: objeto de negocio, schema, parametros, migracao de relatorios, ciclo do .trp
 │   ├── protheus-business/         # 8 modulos ERP (COM, EST, FAT, FIN, CTB, FIS, PCP, MNT)
 │   ├── embedded-sql/              # BeginSQL/EndSQL, macros, patterns
 │   ├── query-builder/             # Decisao Workarea vs SQL, FWPreparedStatement, indices SIX, cross-DB

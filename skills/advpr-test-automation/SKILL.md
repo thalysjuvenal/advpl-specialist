@@ -23,6 +23,6 @@ The referenced files are written in Brazilian Portuguese.
 | patterns-reports.md | Automating reports (TOTVS Report, R3, FWMSPrinter, Smart View) |
 | patterns-routine-prep.md | Adjusting a routine to bypass screens/alerts for official headless execution |
 | patterns-smartlink.md | Automating routines that integrate via SmartLink |
-| patterns-smartview.md | Automating Smart View-based routines |
+| patterns-smartview.md | Automating Smart View-based routines (to *build* a Smart View business object rather than test one, see `smartview-development`) |
 | patterns-totvs-message.md | Automating routines that use the single-message (TOTVS Message) pattern |
 | patterns-webservice.md | Automating REST, SOAP, or Portal Protheus webservice endpoints |

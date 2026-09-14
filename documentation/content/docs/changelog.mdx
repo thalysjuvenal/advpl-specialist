@@ -8,6 +8,12 @@ Todas as mudancas notaveis deste projeto sao documentadas neste arquivo.
 O formato e baseado no [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 e este projeto segue o [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Nao publicado]
+
+### Adicionado
+
+- Nova base de conhecimento `skills/smartview-development/`: objetos de negocio **Smart View** customizados (Integrated Provider) — contrato minimo e annotation, pre-requisitos de ambiente, identidade do objeto (nome do fonte = id do `callTReports` e prefixo do `.trp`), schema (tipos, datas por `stringToTimeStamp`, colunas calculadas e discriminadora), parametros (busca avancada pelo `genericLookupService` e combos com endpoint de opcoes proprio), `getData` (BeginSQL x `FWExecStatement` com bind, multi-filial, volume), migracao de relatorios (TReport/FWMSPrinter/TMSPrinter/FWMSExcel) e o ciclo de publicacao do `.trp`. Novo comando `/advpl-specialist:smartview` (`--mode generate|migrate`).
+
 ## [1.5.1] - 2026-08-19
 
 ### Adicionado

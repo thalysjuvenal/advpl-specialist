@@ -163,7 +163,7 @@ jobs:
             [ -n "$desc" ] || { echo "description vazia: $n"; fail=1; }
             [ ${#desc} -le 1024 ] || { echo "description > 1024: $n"; fail=1; }
           done
-          [ "$count" -eq 18 ] || { echo "esperado 18 skills, encontrado $count"; fail=1; }
+          [ "$count" -eq 19 ] || { echo "esperado 19 skills, encontrado $count"; fail=1; }
           # Templates
           [ "$(wc -c < AGENTS.md)" -le 32768 ] || { echo "AGENTS.md > 32 KiB"; fail=1; }
           head -1 CLAUDE.md | grep -qx '@AGENTS.md' || { echo "CLAUDE.md nao inicia com @AGENTS.md"; fail=1; }

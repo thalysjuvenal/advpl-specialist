@@ -1,0 +1,75 @@
+---
+title: /smartview
+description: Gera ou migra objetos de negocio Smart View (Integrated Provider) - classe TLPP com getSchema/getData, fonte de menu callTReports e roteiro de publicacao do recurso .trp
+---
+
+# /advpl-specialist:smartview
+
+Gera um novo objeto de negocio Smart View ou migra um relatorio existente (TReport, FWMSPrinter, TMSPrinter, FWMSExcel) para o Smart View no TOTVS Protheus.
+
+> **Smart View nao e Smart X.** Smart View e a ferramenta de analise de dados (TReports): o desenvolvedor entrega um objeto de negocio e o usuario monta a grade. Smart X e outro produto — telas PO-UI geradas a partir de metadados do dicionario. Para Smart X use [/smartx](/docs/comandos/smartx).
+
+## Uso
+
+```bash
+/advpl-specialist:smartview [options]
+```
+
+Descreva em linguagem natural o relatorio desejado (novo ou existente para migracao) apos o comando.
+
+## Opcoes
+
+| Flag | Descricao | Padrao |
+|------|-----------|--------|
+| `--mode` | Modo de operacao: `generate` (novo objeto) ou `migrate` (converter relatorio existente) | Inferir automaticamente: mencoes a fonte existente, TReport, FWMSPrinter, TMSPrinter, FWMSExcel, "converter" ou "migrar" indicam `migrate`; caso contrario `generate` |
+| `--type` | Tipo do recurso: `data-grid` (visao de dados), `reports` (relatorio) ou `pivot-table` (tabela dinamica) | `data-grid`; para origem FWMSPrinter/TMSPrinter, sugerir `reports` e confirmar |
+| `--output` | Caminho de saida dos fontes gerados | Diretorio atual |
+
+## Fluxo
+
+### Modo `generate`
+
+1. **Carregar referencia base** — Ler `skills/smartview-development/reference.md`, `patterns-schema.md`, `patterns-getdata.md` e `patterns-parameters.md`
+2. **Confirmar tabelas e colunas** — Identificar tabelas de origem e campos; validar o dicionario quando necessario
+3. **Delegar ao agent `code-generator`** — Gerar os fontes respeitando o padrao de nome `<area>.sv.<modulo>.<nome>`, o namespace terminado em `.treportsintegratedprovider`, `BeginSQL` para consulta estatica e as demais convencoes do repositorio
+4. **Entregar o roteiro de publicacao** — O ciclo do `.trp` de `skills/smartview-development/deploy-trp.md`
+
+### Modo `migrate`
+
+1. **Carregar referencia base** — Ler `reference.md`, `patterns-migration-reports.md` e `patterns-parameters.md`
+2. **Inventariar o fonte de origem** — Colunas, consulta, perguntas do SX1 e regras de negocio; identificar o gerador e decidir o tipo de recurso
+3. **Delegar ao agent `migrator`** — Converter apontando o que nao sobrevive (MSDIALOG, telas de marcacao, FWMsgRun, MsgInfo, MakeDir, MsExcel por OLE) e a eventual mudanca de escopo de empresa para filial
+4. **Entregar o checklist de homologacao** — Conferencia contra o original, mesmo periodo e filial, valores ao centavo
+
+### Mapeamento --mode para arquivos
+
+| Modo | Arquivos gerados/afetados |
+|------|---------------------------|
+| `generate` | `<area>.sv.<modulo>.<nome>.tlpp` (objeto de negocio), fonte de menu `.prw` com `callTReports` e, quando houver combo, o endpoint de opcoes `.tlpp` mais a funcao de opcoes em `.prw` sem namespace |
+| `migrate` | Os mesmos fontes derivados do relatorio de origem, mais o de/para coluna a coluna e o checklist de homologacao |
+
+## Exemplos
+
+```bash
+# Gerar um novo objeto de negocio
+/advpl-specialist:smartview --mode generate
+Visao de dados de titulos a receber (SE1) por faixa de vencimento e cliente.
+
+# Inferir o modo automaticamente
+/advpl-specialist:smartview
+Preciso migrar um relatorio que gera Excel de faturamento em tres abas.
+
+# Migrar explicitamente, escolhendo o tipo de recurso
+/advpl-specialist:smartview --mode migrate --type reports
+Converter o relatorio de comissoes feito em FWMSPrinter.
+
+# Salvar em caminho especifico
+/advpl-specialist:smartview --mode generate --output src/smartview
+```
+
+## Saida
+
+- **Modo `generate`**: a classe TLPP com a annotation `@totvsFrameworkTReportsIntegratedProvider`, `new()`, `getSchema()` e `getData()`; o fonte de menu com `callTReports`; e o roteiro de publicacao do `.trp`.
+- **Modo `migrate`**: os mesmos fontes derivados do relatorio de origem, o de/para coluna a coluna, a lista do que nao tem caminho de conversao e o checklist de homologacao.
+
+> **O `.trp` nao e gerado por codigo.** O arquivo `.trp` e o recurso (layout) do Smart View: ele e exportado do designer web, renomeado para o padrao `id.subtitulo.tipo.trp` e compilado no RPO. Nenhum dos modos gera esse arquivo — a skill documenta o ciclo, que inclui liberar a extensao `.TRP` no TDS e reiniciar o AppServer e o servico do Smart View.

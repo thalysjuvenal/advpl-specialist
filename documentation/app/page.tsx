@@ -59,7 +59,7 @@ export default function Home() {
           Comandos = arquivos .md em commands/ | Agentes = arquivos .md em agents/ | Skills = diretorios em skills/ */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto px-4 pb-12">
         <div className="flex flex-col items-center text-center rounded-xl border bg-fd-card p-6 gap-2">
-          <span className="text-3xl font-bold">14</span>
+          <span className="text-3xl font-bold">15</span>
           <span className="text-sm font-medium">Comandos</span>
           <span className="text-xs text-fd-muted-foreground">
             Invocaveis diretamente no Claude Code
@@ -73,7 +73,7 @@ export default function Home() {
           </span>
         </div>
         <div className="flex flex-col items-center text-center rounded-xl border bg-fd-card p-6 gap-2">
-          <span className="text-3xl font-bold">18</span>
+          <span className="text-3xl font-bold">19</span>
           <span className="text-sm font-medium">Skills</span>
           <span className="text-xs text-fd-muted-foreground">
             Bases de conhecimento e referencia

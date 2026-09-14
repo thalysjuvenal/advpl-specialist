@@ -4,7 +4,7 @@
 
 ## Project context
 
-**In this repository** (`advpl-specialist`): this is a knowledge plugin for AI coding agents working with TOTVS Protheus. It ships 14 slash commands (`commands/`), 4 specialized agents (`agents/`), and 18 reference skills (`skills/<name>/SKILL.md` + companion reference files) covering code generation, review, debugging, refactoring, TLPP migration, documentation, SQL, testing, locks, business processes, Smart X, and SX dictionary configuration. There is no application runtime here — the "code" is markdown reference material and prompt instructions.
+**In this repository** (`advpl-specialist`): this is a knowledge plugin for AI coding agents working with TOTVS Protheus. It ships 15 slash commands (`commands/`), 4 specialized agents (`agents/`), and 19 reference skills (`skills/<name>/SKILL.md` + companion reference files) covering code generation, review, debugging, refactoring, TLPP migration, documentation, SQL, testing, locks, business processes, Smart X, Smart View, and SX dictionary configuration. There is no application runtime here — the "code" is markdown reference material and prompt instructions.
 
 **In a Protheus source repository** where this file is copied: the project contains `.prw` (ADVPL) and/or `.tlpp` (TLPP) source files that run inside a Protheus AppServer, plus SX dictionary scripts and possibly REST/SOAP services. Apply the standards below to any file with those extensions.
 
@@ -58,6 +58,7 @@ Sourced from the SonarQube-aligned rule catalog (`skills/advpl-code-review/sonar
 | Diagnose or prevent record locks and deadlocks | `skills/protheus-locks-deadlocks/` |
 | Build, choose the pattern for, or optimize a SQL query | `skills/query-builder/` |
 | Build/migrate/troubleshoot a Smart X (metadata-driven PO-UI) routine | `skills/smartx-development/` |
+| Build/migrate/publish a Smart View business object (Integrated Provider, `.trp`) | `skills/smartview-development/` |
 | Generate/validate SX2/SX3/SIX/SXG/SXA/SX1/SX5/SXB/SX7 dictionary scripts | `skills/sx-configuration/` |
 | Escalate to TDN when local reference lacks an answer | `skills/tdn-lookup/` |
 
