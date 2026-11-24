@@ -40,9 +40,9 @@ Obrigado pelo interesse em contribuir com o **advpl-specialist**! Este guia expl
 
 ### Exemplos de codigo ADVPL/TLPP
 
-- Arquivos `.prw` usam `#Include "TOTVS.CH"` (nunca `Protheus.ch` — esta obsoleto)
-- Arquivos `.tlpp` usam includes `.th` (`tlpp-core.th`, `tlpp-rest.th`, etc.)
-- Nenhum `using namespace tlpp.*` nos exemplos — sempre usar includes `.th`
+- Arquivos `.prw` usam `#include "totvs.ch"` em minusculas (nunca `protheus.ch` — `totvs.ch` ja o inclui)
+- Arquivos `.tlpp` usam `#include "tlpp-core.th"` (recomendado) e tambem `#include "totvs.ch"` quando usam recursos do framework Protheus (PARAMIXB, MsExecAuto, BeginSQL, MVC...)
+- Nenhum `using namespace tlpp.*` nos exemplos (excecao documentada: `using namespace tlpp.probat` em testes ProBat)
 - `using namespace` e valido apenas para namespaces custom (ex: `custom.vendas`)
 - Variaveis sempre `Local` (nunca `Private`/`Public` em codigo novo)
 - Notacao Hungara em todas as variaveis (`cNome`, `nValor`, `lOk`, etc.)
@@ -70,8 +70,11 @@ Passos para publicar uma nova versao (executados pelo mantenedor, mas documentad
 1. **Alinhar a versao em 6 pontos** (o CI valida): `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` (raiz e `plugins[0]`), `documentation/app/page.tsx` (`PLUGIN_VERSION`), badge de versao do `README.md` e badge de `documentation/content/docs/index.mdx`.
 2. **Atualizar changelogs**: `CHANGELOG.md` (bilingue EN/PT, padrao Keep a Changelog) e `documentation/content/docs/changelog.mdx` (pt-BR).
 3. **Validar localmente**:
-   - `node scripts/build-ai-commands.mjs --check` — 42 saidas em sincronia com `ai-commands/src/`
-   - `npx skills add ./ --list` — 18 skills descobertas
+   - `bash tests/lint/run-tests.sh` — testes do lint de exemplos
+   - `bash scripts/lint-docs.sh skills commands agents AGENTS.md ai-commands` — 0 erros nos blocos ADVPL/TLPP da documentacao (anti-exemplos usam `<!-- advpl-lint: anti-exemplo -->` na ultima linha nao vazia antes da cerca)
+   - `node scripts/sync-lint-rules.mjs --check` — regras do lint em sincronia
+   - `node scripts/build-ai-commands.mjs --check` — 45 saidas em sincronia com `ai-commands/src/`
+   - `npx skills add ./ --list` — 19 skills descobertas
    - `cd documentation && npm run build` — site compila sem erros
 4. **Commit e merge**: commits convencionais em branch de feature, merge fast-forward na `main`, push (o workflow `validate-plugin.yml` revalida tudo no CI).
 5. **Release no GitHub**: `gh release create vX.Y.Z --title "..." --notes "..."` com notas derivadas do `CHANGELOG.md`. A release mais recente deve ficar marcada como Latest.

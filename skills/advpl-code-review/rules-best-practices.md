@@ -194,16 +194,17 @@ Return cNome
 
 ---
 
-## [BP-004] #Include "Protheus.ch" instead of #Include "TOTVS.CH"
+## [BP-004] #include "protheus.ch" instead of #include "totvs.ch"
 
 **Severity:** WARNING
 
-**Description:** The include `Protheus.ch` is obsolete. All `.prw` files should use `#Include "TOTVS.CH"` which is the current standard and includes all necessary definitions.
+**Description:** The include `protheus.ch` is obsolete. All `.prw` files should use `#include "totvs.ch"` (lowercase, per rule CA3001), which is the current standard and already includes `protheus.ch`.
 
-**What to look for:** Any line containing `#Include "Protheus.ch"` (case-insensitive).
+**What to look for:** Any line containing `#include "protheus.ch"` (case-insensitive).
 
 **Violation:**
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 #Include "Protheus.ch"
 
@@ -215,14 +216,14 @@ Return
 **Correct:**
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function MyFunc()
     // ...
 Return
 ```
 
-**Why it matters:** `Protheus.ch` is a legacy include that may not contain all current definitions and may be removed in future Protheus versions. `TOTVS.CH` is the officially supported include that aggregates all necessary header definitions.
+**Why it matters:** `Protheus.ch` is a legacy include that may not contain all current definitions and may be removed in future Protheus versions. `totvs.ch` is the officially supported include that aggregates all necessary header definitions.
 
 ---
 
@@ -272,12 +273,12 @@ User Function ProcessOrder(cOrder)
             MsUnlock()
         Else
             lRet := .F.
-            ConOut("[ProcessOrder] Could not lock SC5 for order: " + cOrder)
+            FWLogMsg("ERROR", , "ProcessOrder", "SC5", "LOCK", "001", "Could not lock SC5 for order: " + cOrder)
         EndIf
 
     Recover Using oError
         lRet := .F.
-        ConOut("[ProcessOrder] Error: " + oError:Description)
+        FWLogMsg("ERROR", , "ProcessOrder", "SC5", "ERR", "002", "Error: " + oError:Description)
 
     End Sequence
 
@@ -456,7 +457,7 @@ Return
 **Violation:**
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 // WRONG — bare Function in a customer .prw file
 Function CalcDiscount(nPrice, nPercent)
@@ -478,7 +479,7 @@ return oRest:setResponse(cData)
 **Correct:**
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} CalcDiscount
 Calcula o valor do desconto
@@ -554,7 +555,7 @@ Skip the check for variables and parameters during static review (too noisy) —
 **Violation:**
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 // WRONG — User Function with 14 chars (limit is 8)
 User Function ProcessaValidacao()
@@ -563,7 +564,7 @@ Return lRet
 ```
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 // WRONG — Static Function with 15 chars (limit is 10)
 Static Function ValidaCadastroItem()
@@ -584,7 +585,7 @@ return
 **Correct:**
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 // RIGHT — User Function with 7 chars (respects the 8-char limit)
 User Function FATA100()
@@ -593,7 +594,7 @@ Return lRet
 ```
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 // RIGHT — Static Function with 10 chars (at the limit)
 Static Function ValidaItem()

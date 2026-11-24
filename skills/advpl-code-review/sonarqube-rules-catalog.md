@@ -4,6 +4,7 @@ Complete catalog of the official TOTVS static-analysis rules for AdvPL/TLPP, use
 Protheus quality gate. Use this catalog to tag code-review findings with the canonical rule
 code so reviews speak the same language as the official SonarQube analysis.
 
+- **Attribution:** derived from the TOTVS EngPro "agent-skills" repository (MIT License, Copyright (c) 2026 TOTVS) — see `NOTICE` at the repository root.
 - **Source ruleset:** `https://sonar-rules.engpro.totvs.com.br`
 - **Rule code families:** `CA####` (code analysis), `BG####` (best-practice guideline),
   `CS####` (cloud/SmartERP).

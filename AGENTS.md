@@ -4,18 +4,18 @@
 
 ## Project context
 
-**In this repository** (`advpl-specialist`): this is a knowledge plugin for AI coding agents working with TOTVS Protheus. It ships 15 slash commands (`commands/`), 4 specialized agents (`agents/`), and 19 reference skills (`skills/<name>/SKILL.md` + companion reference files) covering code generation, review, debugging, refactoring, TLPP migration, documentation, SQL, testing, locks, business processes, Smart X, Smart View, and SX dictionary configuration. There is no application runtime here — the "code" is markdown reference material and prompt instructions.
+**In this repository** (`advpl-specialist`): this is a knowledge plugin for AI coding agents working with TOTVS Protheus. It ships 15 slash commands (`commands/`), 10 specialized agents (`agents/`), and 19 reference skills (`skills/<name>/SKILL.md` + companion reference files) covering code generation, review, debugging, refactoring, TLPP migration, documentation, SQL, testing, locks, business processes, Smart X, Smart View, and SX dictionary configuration. There is no application runtime here — the "code" is markdown reference material and prompt instructions.
 
 **In a Protheus source repository** where this file is copied: the project contains `.prw` (ADVPL) and/or `.tlpp` (TLPP) source files that run inside a Protheus AppServer, plus SX dictionary scripts and possibly REST/SOAP services. Apply the standards below to any file with those extensions.
 
 ## Coding standards
 
-- **Includes:** `.prw` files always use `#include "totvs.ch"` (lowercase). Never use `"protheus.ch"` — it is obsolete. `.tlpp` files use dedicated `.th` includes (`tlpp-core.th`, `tlpp-rest.th`, `tlpp-object.th`, `tlpp-probat.th`, etc.). Do not add `using namespace tlpp.*` — the `.th` includes already bring what is needed.
-- **Naming:** Hungarian notation for variables — `c` (character), `n` (numeric), `d` (date), `l` (logical), `a` (array), `o` (object), `b` (code block), `x` (indefinite). User Functions use a module prefix + descriptive name (e.g. `FATA001`, `COMA100`); TLPP classes are PascalCase, methods camelCase.
-- **Variable scope:** Always prefer `Local`. Pass data via parameters, never via `Private`/`Public`. All `Local` declarations must appear at the top of the function, before any executable statement.
-- **Database access:** Use Embedded SQL (`BeginSQL ... EndSQL`) with macros — `%table:TABLE%`, `%xFilial:TABLE%`, `%notDel%`, `%exp:EXPRESSION%`, `%Order:TABLE%` — instead of raw SQL strings or `TCQuery` concatenation. Use `TCSqlExec` for DML. Every function that changes the current WorkArea (`DbSelectArea`, `DbSetOrder`, `DbSeek`) must save/restore it with `GetArea()`/`RestArea()`.
+- **Includes:** `.prw` files always use `#include "totvs.ch"` (lowercase). Never use `"protheus.ch"` — it is obsolete (`totvs.ch` already includes it; TDN pages may still show `protheus.ch`). `.tlpp` files use `#include "tlpp-core.th"` (recommended; optional per TDN) and ALSO `#include "totvs.ch"` when the source uses Protheus framework features (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...). Do not add `using namespace tlpp.*`; the only documented exception is `using namespace tlpp.probat` in ProBat tests.
+- **Naming:** Hungarian notation for variables — `c` (character), `n` (numeric), `d` (date), `l` (logical), `a` (array), `o` (object), `b` (code block), `x` (indefinite); `j` (JsonObject) is a convention used in TOTVS examples, not part of the official table. User Functions use a module prefix + descriptive name (e.g. `FATA001`, `COMA100`); TLPP classes are PascalCase, methods camelCase.
+- **Variable scope:** Always prefer `Local`. Pass data via parameters, never via `Private`/`Public`. Exceptions the framework requires: `lMsErroAuto`, `lMsHelpAuto`, `lAutoErrNoFile` (MsExecAuto), `aRotina` and `cCadastro` (browse routines). All `Local` declarations must appear at the top of the function, before any executable statement.
+- **Database access:** Use Embedded SQL (`BeginSQL ... EndSQL`) with macros — `%table:TABLE%`, `%xFilial:TABLE%`, `%notDel%`, `%exp:EXPRESSION%`, `%Order:TABLE%` — for static queries and internal values; `%exp:` inserts the value into the SQL text, it is NOT parameter binding. Any user/external input must go through `FWPreparedStatement` (`SetString`/`SetNumeric`). Never concatenate input into SQL strings or `TCQuery`. Use `TCSqlExec` for DML. Every function that changes the current WorkArea (`DbSelectArea`, `DbSetOrder`, `DbSeek`) must save/restore it with `GetArea()`/`RestArea()`.
 - **Locking:** Every `RecLock` must have a corresponding `MsUnlock`, including on error paths.
-- **Automation:** Prefer `FWMVCRotAuto` to automate MVC routines; use `MsExecAuto` only for legacy non-MVC routines.
+- **Automation:** Use `MsExecAuto` following the routine's documented example. For MVC routines use the model API (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`) following documented examples. `FWMVCRotAuto` is restricted (internal TOTVS) — do not use.
 - **TLPP namespaces:** `custom.<agrupador>.<servico>` for customizations, `totvs.protheus.<segmento>.<agrupador>` for standard TOTVS namespaces — lowercase, dot-separated, no underscores.
 - **Custom fields:** Validate existence in SX3 before referencing any custom field. Custom fields follow `<table-prefix>_X*` (e.g. `A1_XCODIGO`). Custom user functions use the `U_` prefix.
 - **Error handling:** Use `BEGIN SEQUENCE ... RECOVER ... END SEQUENCE` (ADVPL) or `Try/Catch` (TLPP), never leave error paths silently swallowed.
@@ -30,7 +30,7 @@ Sourced from the SonarQube-aligned rule catalog (`skills/advpl-code-review/sonar
 - Assigning to `__cUserID` or `cEmpAnt` — these are read-only system variables.
 - Direct `DbSelectArea` on SX* / SM0 / SIX system tables — use the framework APIs instead (`FWSX3Util`, `GetMV`/`SuperGetMV`, `RetSqlName`, `Pergunte`, `X2Nome`, etc.).
 - `ConOut()` / `?` for logging — use `FWLogMsg()`.
-- `IIF()` / `IF()` inline ternaries — use `If/Else/EndIf` blocks.
+- `IIF()` / `IF()` inline ternaries — use `If/Else/EndIf` blocks. Exception: inside code blocks `{|| }` and dictionary expressions (field validation, triggers, `bValid`/`SetValid`) where no If/Else exists.
 - SQL injection via string concatenation (raw `TCQuery`, concatenated Embedded SQL) — use `FWPreparedStatement` for parameterized queries.
 - Hardcoded credentials in source code — use environment variables or AppServer configuration.
 - `#INCLUDE "TOTVS.CH"` uppercase — includes must be lowercase (`#include "totvs.ch"`).
