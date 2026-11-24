@@ -110,3 +110,7 @@ Return xRet
 	SA1->A1_NOMEX := "x" // expect: ADV018
 	SA1->A1_NOME := "x"
 	SA1->A1_XPROJ := "x"
+	FT_FUse("a.txt")
+	nLin := FT_FReadLn()
+	While !FT_FEof()
+	FT_FOOBAR(1) // expect: ADV018
