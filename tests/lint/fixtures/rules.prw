@@ -106,3 +106,7 @@ User Function LintR001()
 	nX := nModulo + 1
 	cMsg := "Local cFilAnt"
 Return xRet
+	MA410IMPOS(1) // expect: ADV017
+	SA1->A1_NOMEX := "x" // expect: ADV018
+	SA1->A1_NOME := "x"
+	SA1->A1_XPROJ := "x"

@@ -189,15 +189,25 @@ usage_case "--ignore-file is a directory" "cannot read ignore file: " --ignore-f
 echo "=== Ignore file ==="
 run_lint ign-valid --scope line --ignore-file "$IGNORE_DIR/valid.advpl-specialist-ignore" "$F"
 found_set ign-valid "$F" >"$TMP_DIR/ign-valid.got"
-grep -v -e ':ADV003$' -e ':ADV004$' "$TMP_DIR/base.got" >"$TMP_DIR/ign-valid.exp"
-want=$(( $(count_id base ADV003) + $(count_id base ADV004) ))
+grep -v -e ':ADV003$' -e ':ADV004$' -e ':ADV017$' "$TMP_DIR/base.got" >"$TMP_DIR/ign-valid.exp"
+want=$(( $(count_id base ADV003) + $(count_id base ADV004) + $(count_id base ADV017) ))
 begin_case
 expect_that "output contract" wellformed ign-valid
 expect_that "findings differ (< expected, > actual)" same_file "$TMP_DIR/ign-valid.exp" "$TMP_DIR/ign-valid.got"
 expect_that "suppressed $(suppressed_of ign-valid), want $want" [ "$(suppressed_of ign-valid)" = "$want" ]
 expect_that "nothing to suppress in baseline" [ "$want" -gt 0 ]
 expect_that "no stderr" no_stderr ign-valid
-end_case "valid: rule ADV003 and rule CA2022 (REF code) suppress ADV003/ADV004"
+end_case "valid: rule ADV003, rule CA2022 (REF code) and function MA410IMPOS suppress ADV003/ADV004/ADV017"
+
+# Generated rules (ADV017/ADV018): field/function directives act on the real rules file.
+printf 'MA410IMPOS(1)\nSA1->A1_NOMEX := "x"\n' >"$TMP_DIR/gen.prw"
+run_lint gen-base --scope line "$TMP_DIR/gen.prw"
+printf 'field a1_nomex\nfunction ma410impos\n' >"$TMP_DIR/gen.ignore"
+run_lint gen-ign --scope line --ignore-file "$TMP_DIR/gen.ignore" "$TMP_DIR/gen.prw"
+begin_case
+expect_that "baseline reports both generated rules" [ "$(found_set gen-base "$TMP_DIR/gen.prw" | tr '\n' ' ')" = "1:ADV017 2:ADV018 " ]
+expect_that "field A1_NOMEX + function MA410IMPOS suppress both" [ "$(cat "$TMP_DIR/gen-ign.out")" = "advpl-lint: 0 error(s), 0 warning(s), 2 suppressed" ]
+end_case "generated ADV017/ADV018 honour function/field ignore directives"
 
 mkdir -p "$TMP_DIR/proj"
 cp "$IGNORE_DIR/valid.advpl-specialist-ignore" "$TMP_DIR/proj/.advpl-specialist-ignore"
