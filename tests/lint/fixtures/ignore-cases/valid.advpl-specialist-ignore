@@ -1,0 +1,7 @@
+# Diretivas validas: rule por ID e por codigo do REF, field, function e path.
+
+rule ADV003
+  rule	CA2022
+field A1_XPROJ
+function MA410IMPOS
+path nao-existe/**

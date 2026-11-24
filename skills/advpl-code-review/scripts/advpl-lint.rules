@@ -1,0 +1,21 @@
+# advpl-lint.rules - single source of rules for advpl-lint.sh and advpl-lint.ps1.
+#
+# One rule per line, 11 TAB-separated fields; lines starting with "#" are comments:
+#   ID  SEVERITY  SCOPE  KIND  TARGET  CASE  EXTS  REGEX  REGEX2  MESSAGE  REF
+# SEVERITY error|warn (error only for patterns with no legitimate use)
+# SCOPE    line|file
+# KIND     forbid|require|balance|undeclared
+# TARGET   code (comments and literal contents blanked) | raw (original line)
+# CASE     i (REGEX/REGEX2 written in lowercase, matched against the lowercased line) | c
+# EXTS     comma list of prw,prx,tlpp,th or *
+# REGEX2   forbid: exception searched in the matched text after dropping its
+#          leading characters outside [A-Za-z0-9_#]; balance: counterpart regex
+# REGEX2 and REF are "-" when empty. MESSAGE in pt-BR saying what to use instead.
+# Regex subset: portable ERE, no \b, no [[:class:]], no {m,n}, no lookaround, no
+# backreference; use [ \t] and [A-Za-z0-9_]. Keep this file ASCII only.
+
+ADV001	error	line	forbid	raw	i	*	^[ \t]*#[ \t]*include[ \t]*["'<][ \t]*protheus\.ch[ \t]*["'>]	-	include obsoleto; use #include "totvs.ch" em vez de protheus.ch	-
+ADV002	error	line	forbid	raw	c	*	^[ \t]*#[ \t]*[Ii][Nn][Cc][Ll][Uu][Dd][Ee][ \t]*["'<][^"'>]*["'>]	^#[ \t]*include[ \t]*["'<][^"'<>A-Z]*["'>]$	include fora do padrao; use diretiva e nome em minusculas (#include "totvs.ch")	CA3001
+ADV003	error	line	forbid	code	i	*	(^|[^a-z0-9_:])(conout|outerr)[ \t]*\(|^[ \t]*\?\??	-	use FWLogMsg() em vez de ConOut()/OutErr()/?	CA1004
+ADV004	error	line	forbid	code	i	*	(^|[^a-z0-9_:])staticcall[ \t]*\(	-	funcao restrita; use FWLoadModel()/FWLoadMenuDef() ou chamada direta em vez de StaticCall()	CA2022
+ADV005	error	line	forbid	code	i	*	(^|[^a-z0-9_:])ptinternal[ \t]*\(	-	funcao restrita sem excecao; remova PTInternal()	CA2023
