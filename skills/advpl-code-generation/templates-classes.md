@@ -537,6 +537,8 @@ Method CriarCliente(cNome, cCNPJ, cEmail, cTelefone) Class ClienteService
     EndIf
 
     // Persiste (Try/Catch: erro de execucao no repositorio vira erro de negocio)
+    // Create() grava dentro de Begin Transaction: a confirmar no TDS o rollback de Begin Transaction
+    // quando a excecao escapa para o Catch (DisarmTransaction nao documentado para esse caso)
     If lRet
         Try
             lRet := ::oRepository:Create(cNome, cCNPJ, cEmail, cTelefone)
@@ -731,15 +733,24 @@ Method FindByCNPJ(cCNPJ) Class ClienteRepository
     Local oResult   := Nil
     Local aArea     := GetArea()
     Local cTmpAlias := GetNextAlias()
+    Local oStmt     := FWPreparedStatement():New()
+    Local cQuery    := ""
 
-    // Embedded SQL: %exp:% faz o binding do valor (sem concatenacao)
-    BeginSQL Alias cTmpAlias
-        SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL
-        FROM %table:SA1% SA1
-        WHERE SA1.%notDel%
-        AND SA1.A1_FILIAL = %xfilial:SA1%
-        AND SA1.A1_CGC = %exp:cCNPJ%
-    EndSQL
+    // cCNPJ vem de fora (servico/REST): vai como parametro ? do FWPreparedStatement.
+    // O %exp:% do BeginSQL NAO e bind: o valor e inserido no texto do comando (TDN Embedded SQL,
+    // PPO com ___SQLGetValue) - use %exp:% so com valores internos, nunca com entrada do usuario.
+    cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL"
+    cQuery += " FROM " + RetSqlName("SA1") + " SA1"
+    cQuery += " WHERE SA1.D_E_L_E_T_ = ' '"
+    cQuery += " AND SA1.A1_FILIAL = ?"
+    cQuery += " AND SA1.A1_CGC = ?"
+
+    oStmt:SetQuery(cQuery)
+    oStmt:SetString(1, xFilial("SA1"))
+    oStmt:SetString(2, cCNPJ)
+
+    DbUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cTmpAlias, .F., .T.)
+    oStmt:Destroy()
 
     If !(cTmpAlias)->(Eof())
         oResult := JsonObject():New()
@@ -761,25 +772,38 @@ Method FindAll(nPage, nPageSize, cFiltro) Class ClienteRepository
     Local aResult   := {}
     Local oItem     := Nil
     Local cTmpAlias := GetNextAlias()
-    Local cLike     := ""
+    Local oStmt     := FWPreparedStatement():New()
+    Local cQuery    := ""
     Local nSkip     := 0
 
     Default nPage     := 1
     Default nPageSize := 20
     Default cFiltro   := ""
 
-    // Curinga montado no ADVPL e enviado inteiro pelo %exp:%; filtro vazio vira "%%" (casa com tudo)
-    cLike := "%" + AllTrim(cFiltro) + "%"
-    nSkip := (nPage - 1) * nPageSize
+    cFiltro := AllTrim(cFiltro)
+    nSkip   := (nPage - 1) * nPageSize
 
-    BeginSQL Alias cTmpAlias
-        SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL, A1_MSBLQL
-        FROM %table:SA1% SA1
-        WHERE SA1.%notDel%
-        AND SA1.A1_FILIAL = %xfilial:SA1%
-        AND (SA1.A1_NOME LIKE %exp:cLike% OR SA1.A1_CGC LIKE %exp:cLike%)
-        ORDER BY A1_COD, A1_LOJA
-    EndSQL
+    // Filtro digitado pelo usuario: parametro ? do FWPreparedStatement (nunca %exp:% nem concatenado).
+    // Filtro vazio: nenhuma clausula LIKE.
+    cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL, A1_MSBLQL"
+    cQuery += " FROM " + RetSqlName("SA1") + " SA1"
+    cQuery += " WHERE SA1.D_E_L_E_T_ = ' '"
+    cQuery += " AND SA1.A1_FILIAL = ?"
+    If !Empty(cFiltro)
+        cQuery += " AND (SA1.A1_NOME LIKE ? OR SA1.A1_CGC LIKE ?)"
+    EndIf
+    cQuery += " ORDER BY A1_COD, A1_LOJA"
+
+    oStmt:SetQuery(cQuery)
+    oStmt:SetString(1, xFilial("SA1"))
+    If !Empty(cFiltro)
+        // Curinga montado no ADVPL; % e _ digitados continuam curingas do LIKE
+        oStmt:SetString(2, "%" + cFiltro + "%")
+        oStmt:SetString(3, "%" + cFiltro + "%")
+    EndIf
+
+    DbUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cTmpAlias, .F., .T.)
+    oStmt:Destroy()
 
     // Paginacao no cursor (portavel). OFFSET/FETCH varia por SGBD: ver query-builder/cross-database.md
     While nSkip > 0 .And. !(cTmpAlias)->(Eof())

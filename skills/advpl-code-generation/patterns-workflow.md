@@ -307,6 +307,9 @@ Static Function fGetPendentes(cAprovador)
     Local cStatus := "02" // CR_STATUS: 01 = aguardando nivel anterior, 02 = pendente de aprovacao
     Local aResult := {}
 
+    // %exp:% insere o valor no texto do comando (nao e bind): so valores internos.
+    // cAprovador = codigo do aprovador lido da SAK (AK_COD), nunca texto digitado;
+    // valor vindo do usuario/REST -> FWPreparedStatement (ver query-builder)
     BeginSQL Alias cAlias
         column CR_EMISSAO as Date
         column CR_TOTAL   as Numeric(14,2)
@@ -553,6 +556,7 @@ Static Function fTotalPC(cNumPC)
     Local cAlias := GetNextAlias()
     Local nTotal := 0
 
+    // cNumPC ja foi localizado na SC7 por zAprovPC (DbSeek) antes desta chamada: valor interno no %exp:%
     BeginSQL Alias cAlias
         column TOTAL as Numeric(16,2)
 

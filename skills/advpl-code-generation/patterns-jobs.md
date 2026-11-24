@@ -258,6 +258,7 @@ User Function zJobLote()
     EndIf
 
     // Executa o processamento: ErrorBlock desvia erros de execucao para o Recover
+    // A confirmar no TDS: rollback do Begin Transaction de fProcessaLote quando o erro desvia para o Recover
     bOldError := ErrorBlock({|e| Break(e)})
     Begin Sequence
         fProcessaLote()

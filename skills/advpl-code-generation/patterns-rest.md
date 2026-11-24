@@ -358,7 +358,7 @@ Rules applied below (TDN, tlppCore REST):
 - **Routes:** `@Get("/rota")`, `@Post(...)`, `@Put(...)`, `@Delete(...)` directly on the `User Function`; path params are declared as `:nome` and read with `oRest:getPathParamsRequest()`.
 - **`oRest` methods (official names):** `getQueryRequest()` and `getPathParamsRequest()` return a `JsonObject` (read `jQuery['page']`; never modify it — it is a reference to the REST server object), `getBodyRequest()` returns the raw body string, `setStatusCode(nCode)` sets the HTTP status, `setResponse(cBody)` sets the body, `setFault(cBody)` sets the body **and** forces HTTP 500. There is no `setStatus`, `getQueryString` or `getBody`.
 - **Error body:** `{"code", "message", "detailedMessage"}` (TOTVS API guide; `code` is an identifier listed in the API documentation). 4xx: `setStatusCode(4xx)` + `setResponse(...)`; unexpected error: `setFault(...)` inside `Catch`.
-- **Error handling:** each endpoint wraps its work in `Try` / `Catch oError` / `Finally` / `EndTry`.
+- **Error handling:** each endpoint wraps its work in `Try` / `Catch oError` / `Finally` / `EndTry`. (a confirmar no TDS: rollback de `Begin Transaction` quando a exceção escapa para o `Catch` — the TDN does not document whether the transaction is undone or needs `DisarmTransaction()` in this case.)
 
 ```tlpp
 #include "tlpp-core.th"
@@ -505,6 +505,7 @@ User Function createProduct()
     // getBodyRequest() devolve o corpo bruto; FromJson retorna Nil no sucesso ou a descricao do erro
     cErroJson := jBody:FromJson(oRest:getBodyRequest())
 
+    // A confirmar no TDS: rollback de Begin Transaction quando a excecao escapa para o Catch
     Try
         If ValType(cErroJson) == "C"
             oRest:setStatusCode(400)
@@ -1090,14 +1091,15 @@ Static Function SendSuccess(oSelf, nStatus, xData, cMessage)
 Return Nil
 ```
 
-### 6.5 Query with Embedded SQL (BeginSQL)
+### 6.5 Query with FWPreparedStatement (request values)
 
-For more efficient queries, use Embedded SQL (`BeginSQL`/`EndSQL`) instead of navigating records. Values from the request go through `%exp:%`, never concatenated into the SQL — and never accept a raw `WHERE` fragment from the caller (SQL injection). See `skills/embedded-sql/` and, for dynamic SQL, `skills/query-builder/patterns-fwpreparedstatement.md`.
+For more efficient queries, use SQL instead of navigating records. Values that come from the request go as `?` parameters of `FWPreparedStatement` (`SetString` treats a `'` as part of the value — TDN), never concatenated and never through `%exp:%`: in Embedded SQL the `%exp:%` value is inserted into the statement text (the TDN "Embedded SQL" page shows the precompiled code concatenating `___SQLGetValue(...)`), it is not a bind parameter. TDN sources also wrap a raw SQL fragment as `"%" + cFragmento + "%"`, so a value like `"%" + cFiltro + "%"` may reach the SQL unquoted (a confirmar no TDS) — another reason to keep user input out of `%exp:%`. Never accept a raw `WHERE` fragment from the caller either. See `skills/query-builder/patterns-fwpreparedstatement.md`.
 
 ```advpl
 Static Function QueryCustomers(cNome, nPage, nPageSize)
     Local cAlias  := GetNextAlias()
-    Local cLike   := ""
+    Local oStmt   := FWPreparedStatement():New()
+    Local cQuery  := ""
     Local nSkip   := 0
     Local aResult := {}
     Local oItem   := Nil
@@ -1106,18 +1108,28 @@ Static Function QueryCustomers(cNome, nPage, nPageSize)
     Default nPage     := 1
     Default nPageSize := 20
 
-    // Curinga montado no ADVPL e enviado inteiro pelo %exp:%; nome vazio vira "%%" (casa com tudo)
-    cLike := "%" + Upper(AllTrim(cNome)) + "%"
+    cNome := Upper(AllTrim(cNome))
     nSkip := (nPage - 1) * nPageSize
 
-    BeginSQL Alias cAlias
-        SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL
-        FROM %table:SA1% SA1
-        WHERE SA1.%notDel%
-        AND SA1.A1_FILIAL = %xfilial:SA1%
-        AND SA1.A1_NOME LIKE %exp:cLike%
-        ORDER BY A1_COD, A1_LOJA
-    EndSQL
+    // Nome vazio: nenhuma clausula LIKE
+    cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL"
+    cQuery += " FROM " + RetSqlName("SA1") + " SA1"
+    cQuery += " WHERE SA1.D_E_L_E_T_ = ' '"
+    cQuery += " AND SA1.A1_FILIAL = ?"
+    If !Empty(cNome)
+        cQuery += " AND SA1.A1_NOME LIKE ?"
+    EndIf
+    cQuery += " ORDER BY A1_COD, A1_LOJA"
+
+    oStmt:SetQuery(cQuery)
+    oStmt:SetString(1, xFilial("SA1"))
+    If !Empty(cNome)
+        // Curinga montado no ADVPL; % e _ digitados continuam curingas do LIKE
+        oStmt:SetString(2, "%" + cNome + "%")
+    EndIf
+
+    DbUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+    oStmt:Destroy()
 
     // Paginacao no cursor (portavel). OFFSET/FETCH varia por SGBD: ver query-builder/cross-database.md
     While nSkip > 0 .And. !(cAlias)->(Eof())
