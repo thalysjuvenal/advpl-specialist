@@ -536,7 +536,7 @@ Return
 
 SX7 defines automatic field triggers. A trigger fires when a source field changes value, evaluating an expression and writing the result into a target field. Triggers are used to auto-fill related fields -- for example, when the user enters a customer code, a trigger can automatically fill the customer name, address, and tax ID.
 
-> **Note**: SX7 is less commonly accessed programmatically. Triggers are typically managed through the Configurador module (SIGACFG). There is no dedicated TOTVS framework class for SX7 operations.
+> **Note**: SX7 is less commonly accessed programmatically. Triggers are typically managed through the Configurador module (SIGACFG). No dedicated TOTVS framework class was found for SX7 operations.
 
 ### Key Fields
 
@@ -555,7 +555,7 @@ SX7 defines automatic field triggers. A trigger fires when a source field change
 
 ### Programmatic Access
 
-> **Warning**: no framework class is documented for SX7, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SX7 through the Configurador (SIGACFG) or the UPDDISTR update process.
+> **Warning**: no framework class is documented for SX7, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SX7 through the Configurador (SIGACFG) or the UPDDISTR update process. No documented API was found for SX7 (the SonarQube rules CA2005/CA2008 only mention "standard APIs (indirect)").
 
 <!-- advpl-lint: anti-exemplo -->
 ```advpl
@@ -606,7 +606,7 @@ Return
 
 SX9 defines relationships between tables, similar to foreign key constraints in relational databases. These relationships are used by the system for referential integrity checks, automatic joins in queries, and documentation of the data model.
 
-> **Note**: SX9 is less commonly accessed programmatically. Relationships are typically managed through the Configurador module (SIGACFG). There is no dedicated TOTVS framework class for SX9 operations.
+> **Note**: SX9 is less commonly accessed programmatically. Relationships are typically managed through the Configurador module (SIGACFG). The only documented framework class for SX9 is `FWSX9Util` (see below); it is not a generic field reader.
 
 ### Key Fields
 
@@ -630,7 +630,7 @@ SX9 defines relationships between tables, similar to foreign key constraints in 
 
 ### Programmatic Access
 
-> **Warning**: no framework class is documented for SX9, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SX9 through the Configurador (SIGACFG) or the UPDDISTR update process.
+> **Warning**: the only documented API for SX9 is `FWSX9Util():SearchX9Paths(cParentAlias, cChildAlias, @aRelations)` (see `native-functions.md`), which finds the relationship paths between a parent and a child table, up to 3 levels deep. It is not a generic SX9 field reader, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`) as a structure illustration only. This is the discouraged direct-access pattern (see the note at the top of this file).
 
 <!-- advpl-lint: anti-exemplo -->
 ```advpl
@@ -685,7 +685,7 @@ Return
 
 SXB defines the standard queries (Consultas Padrao) used for F3 lookups. When a user presses F3 on a field, the system reads SXB to determine which table to query, which columns to display, how to search, and how to return the selected value. Each query is identified by an alias/code and can have multiple configuration rows (column definitions, search criteria, etc.).
 
-> **Note**: SXB is less commonly accessed programmatically. Standard queries are typically managed through the Configurador module (SIGACFG). There is no dedicated TOTVS framework class for SXB operations.
+> **Note**: SXB is less commonly accessed programmatically. Standard queries are typically managed through the Configurador module (SIGACFG). No dedicated TOTVS framework class was found for SXB operations.
 
 ### Key Fields
 
@@ -703,7 +703,7 @@ SXB defines the standard queries (Consultas Padrao) used for F3 lookups. When a 
 
 ### Programmatic Access
 
-> **Warning**: no framework class is documented for SXB, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SXB through the Configurador (SIGACFG) or the UPDDISTR update process.
+> **Warning**: no framework class is documented for SXB, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SXB through the Configurador (SIGACFG) or the UPDDISTR update process. No documented API was found for SXB (the SonarQube rules CA2005/CA2008 only mention "standard APIs (indirect)").
 
 <!-- advpl-lint: anti-exemplo -->
 ```advpl

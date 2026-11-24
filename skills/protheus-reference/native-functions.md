@@ -2510,26 +2510,28 @@ FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgI
 
 ### FWLogMsg
 
-Writes a message to the Protheus application log with level and context.
+Writes a message to the Protheus application log (console.log) with severity and context.
 
-**Syntax:** `FWLogMsg( cLevel, cGroup, cCategory, cSource, cDetail, cLogId, cMessage ) --> NIL`
+**Syntax:** `FWLogMsg( cSeverity, [cTransactionId], cGroup, [cCategory], [cStep], [cMsgId], [cMessage], [nMensure], [nElapseTime], [aMessage] ) --> NIL`
 
 | Param | Type | Description |
 |-------|------|-------------|
-| cLevel | C | Log level: "INFO", "WARNING", "ERROR" |
-| cGroup | C | Group identifier |
-| cCategory | C | Category identifier |
-| cSource | C | Source function/class |
-| cDetail | C | Detailed description |
-| cLogId | C | Unique log ID |
-| cMessage | C | Log message |
+| cSeverity | C | Required. Severity: "INFO", "WARN", "ERROR", "FATAL" or "DEBUG" ("DEBUG" is only written when the environment has `FWLOGMSG_DEBUG=1`) |
+| cTransactionId | C | Optional. Transaction identifier; default `FWUUIDV1()` ("LAST" reuses the previous one) |
+| cGroup | C | Required. Group identifier |
+| cCategory | C | Optional. Category identifier |
+| cStep | C | Optional. Step identifier |
+| cMsgId | C | Optional. Message identifier |
+| cMessage | C | Optional. Log message (limited to 10K) |
+| nMensure | N | Optional. Measure value |
+| nElapseTime | N | Optional. Elapsed time |
+| aMessage | A | Optional. Array of key/value pairs `{ {"Key","Value"} }`; when informed, the console omits `cMessage` |
 
 **Return:** NIL
 
 **Example:**
 ```advpl
-FWLogMsg("ERROR", "FATURAMENTO", "NF", "MATA461", ;
-    "Error generating invoice", "001", ;
+FWLogMsg("ERROR", /*cTransactionId*/, "FATURAMENTO", "NF", /*cStep*/, /*cMsgId*/, ;
     "Invoice generation failed for order " + cOrder)
 ```
 

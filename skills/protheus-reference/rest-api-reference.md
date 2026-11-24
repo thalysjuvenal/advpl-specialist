@@ -1439,7 +1439,8 @@ WsMethod POST WsService CustomerService
     EndIf
 
     If Len(aErrors) > 0
-        RestError(Self, 422, "VALIDATION_ERROR", "One or more fields failed validation", aErrors)
+        RestError(Self, 422, "VALIDATION_ERROR", "One or more fields failed validation", ;
+            "Check the entries in details", aErrors)
         FreeObj(oJson)
         Return .F.
     EndIf
