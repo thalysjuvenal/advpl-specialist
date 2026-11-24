@@ -14,12 +14,11 @@ Key functions:
 - **RpcClearEnv()**: Closes/releases the environment and connections opened by `RpcSetEnv`.
 - **LockByName()**: Creates a named semaphore on the license server for concurrency control.
 - **UnlockByName()**: Releases a named semaphore created by `LockByName`.
-- **ConOut()**: Writes messages to the AppServer console log.
-- **FWLogMsg()**: Standardized logging API (recommended replacement for `ConOut` in newer versions).
+- **FWLogMsg()**: Standardized logging API — the only logging used in these templates (`ConOut()` is rejected by the plugin's review, rule CA1004).
 
 Required includes:
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 ```
 
 ---
@@ -128,7 +127,8 @@ lRet := RpcSetEnv(cCodEmp, cCodFil, cUsuario, cSenha, cModulo, cFunName, aTables
 ### 4.2 Basic Usage
 
 ```advpl
-If RpcSetEnv("99", "01", "admin", " ", "FAT")
+// Usuario e senha sao opcionais: nunca fixe credenciais no fonte
+If RpcSetEnv("99", "01", /*cUsuario*/, /*cSenha*/, "FAT")
     // Ambiente preparado, executar logica de negocio
     // ...
     RpcClearEnv()
@@ -185,7 +185,7 @@ If LockByName("PROC_LOTE_001", .F., .F.)
     // Libera o semaforo
     UnlockByName("PROC_LOTE_001", .F., .F.)
 Else
-    ConOut("Processamento ja em execucao por outra thread.")
+    FWLogMsg("WARN", /*cTransactionId*/, "PROC_LOTE", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Processamento ja em execucao por outra thread.")
 EndIf
 ```
 
@@ -193,36 +193,32 @@ EndIf
 
 ## 7. Logging
 
-### 7.1 ConOut
+### 7.1 FWLogMsg - Usage in Jobs
 
-Writes a message to the Application Server console log:
-
-```advpl
-ConOut("Inicio do processamento: " + DToC(Date()) + " " + Time())
-ConOut("Registro processado: " + cCodigo)
-ConOut("Erro: " + cMsgErro)
-```
-
-### 7.2 FWLogMsg (Recommended)
-
-Standardized logging API that replaces `ConOut` in newer Protheus versions:
+Jobs run without a console in sight: every message goes through `FWLogMsg()` (never `ConOut()`), with the job name as the group so the log can be filtered. The templates log after `RpcSetEnv`; the behavior of `FWLogMsg` before an environment is open (e.g. when `RpcSetEnv` fails) is not stated on TDN (a confirmar no TDS).
 
 ```advpl
-FWLogMsg("INFO",  /*cTransactionId*/, "MYJOB", /*cCategory*/, /*cStep*/, "001", "Inicio do processamento", /*aMessage*/, /*nLogLevel*/)
-FWLogMsg("ERROR", /*cTransactionId*/, "MYJOB", /*cCategory*/, /*cStep*/, "002", "Erro no processamento: " + cMsgErro, /*aMessage*/, /*nLogLevel*/)
+FWLogMsg("INFO",  /*cTransactionId*/, "MYJOB", /*cCategory*/, /*cStep*/, "001", "Inicio do processamento: " + DToC(Date()) + " " + Time())
+FWLogMsg("INFO",  /*cTransactionId*/, "MYJOB", /*cCategory*/, /*cStep*/, "002", "Registro processado: " + cCodigo)
+FWLogMsg("ERROR", /*cTransactionId*/, "MYJOB", /*cCategory*/, /*cStep*/, "003", "Erro no processamento: " + cMsgErro)
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| 1st | Severity: `"INFO"`, `"ERROR"`, `"WARNING"` |
-| 2nd | Transaction ID (optional) |
-| 3rd | Message grouper/module ID |
-| 4th | Category (optional) |
-| 5th | Step (optional) |
-| 6th | Message code |
-| 7th | Message text |
-| 8th | Array of additional messages (optional) |
-| 9th | Log level (optional) |
+### 7.2 FWLogMsg - Signature (TDN)
+
+`FWLogMsg(cSeverity, [cTransactionId], cGroup, [cCategory], [cStep], [cMsgId], [cMessage], [nMensure], [nElapseTime], [aMessage])`
+
+| # | Parameter | Description |
+|---|-----------|-------------|
+| 1 | `cSeverity` | **Mandatory.** `"INFO"`, `"WARN"`, `"ERROR"`, `"FATAL"` or `"DEBUG"` (`DEBUG` only logged with `FWLOGMSG_DEBUG=1` in the environment) |
+| 2 | `cTransactionId` | Optional; default `FWUUIDV1()`; `"LAST"` reuses the previous one |
+| 3 | `cGroup` | **Mandatory.** Message group (e.g. job/routine name) |
+| 4 | `cCategory` | Optional category |
+| 5 | `cStep` | Optional step |
+| 6 | `cMsgId` | Optional message id |
+| 7 | `cMessage` | Message text (up to 10K) |
+| 8 | `nMensure` | Optional measure |
+| 9 | `nElapseTime` | Optional elapsed time |
+| 10 | `aMessage` | Optional `{ {"Chave", "Valor"} }`; when informed, the console omits `cMessage` |
 
 ---
 
@@ -231,7 +227,7 @@ FWLogMsg("ERROR", /*cTransactionId*/, "MYJOB", /*cCategory*/, /*cStep*/, "002", 
 This example implements a job that processes pending records in batches, with environment setup, semaphore control, and logging.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} zJobLote
 Job de processamento em lote
@@ -241,36 +237,39 @@ Job de processamento em lote
 @version 1.0
 /*/
 User Function zJobLote()
-    Local cCodEmp := "99"
-    Local cCodFil := "01"
+    Local cCodEmp   := "99"
+    Local cCodFil   := "01"
+    Local oError
+    Local bOldError := Nil
 
-    ConOut("[zJobLote] Iniciando job: " + DToC(Date()) + " " + Time())
-
-    // Prepara o ambiente
-    If !RpcSetEnv(cCodEmp, cCodFil, "admin", " ", "FAT", "zJobLote")
-        ConOut("[zJobLote] ERRO: Falha ao preparar ambiente.")
+    // Prepara o ambiente (usuario/senha opcionais: nunca fixos no fonte)
+    If !RpcSetEnv(cCodEmp, cCodFil, /*cUsuario*/, /*cSenha*/, "FAT", "zJobLote")
+        FWLogMsg("ERROR", /*cTransactionId*/, "zJobLote", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Falha ao preparar ambiente.")
         Return Nil
     EndIf
 
+    FWLogMsg("INFO", /*cTransactionId*/, "zJobLote", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Iniciando job: " + DToC(Date()) + " " + Time())
+
     // Controle de concorrencia via semaforo
     If !LockByName("JOB_PROC_LOTE", .F., .F.)
-        ConOut("[zJobLote] Job ja em execucao por outra thread. Saindo.")
+        FWLogMsg("WARN", /*cTransactionId*/, "zJobLote", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Job ja em execucao por outra thread. Saindo.")
         RpcClearEnv()
         Return Nil
     EndIf
 
-    // Executa o processamento
+    // Executa o processamento: ErrorBlock desvia erros de execucao para o Recover
+    bOldError := ErrorBlock({|e| Break(e)})
     Begin Sequence
         fProcessaLote()
-    Recover
-        ConOut("[zJobLote] ERRO: Excecao durante processamento.")
+    Recover Using oError
+        FWLogMsg("ERROR", /*cTransactionId*/, "zJobLote", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Excecao durante processamento: " + oError:Description)
     End Sequence
+    ErrorBlock(bOldError)
 
-    // Libera semaforo e ambiente
+    // Libera semaforo e ambiente (executa mesmo apos erro)
     UnlockByName("JOB_PROC_LOTE", .F., .F.)
+    FWLogMsg("INFO", /*cTransactionId*/, "zJobLote", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Job finalizado: " + DToC(Date()) + " " + Time())
     RpcClearEnv()
-
-    ConOut("[zJobLote] Job finalizado: " + DToC(Date()) + " " + Time())
 
 Return Nil
 
@@ -316,7 +315,7 @@ Static Function fProcessaLote()
         DbSkip()
     EndWh
 
-    ConOut("[zJobLote] Processados: " + cValToChar(nCount) + " | Erros: " + cValToChar(nErrors))
+    FWLogMsg("INFO", /*cTransactionId*/, "zJobLote", "fProcessaLote", /*cStep*/, /*cMsgId*/, "Processados: " + cValToChar(nCount) + " | Erros: " + cValToChar(nErrors))
 
     RestArea(aArea)
 
@@ -329,7 +328,7 @@ Static Function fProcessaRegistro(cCodigo)
     Local lRet := .T.
 
     // Logica de negocio especifica
-    ConOut("[zJobLote] Processando registro: " + cCodigo)
+    FWLogMsg("INFO", /*cTransactionId*/, "zJobLote", "fProcessaRegistro", /*cStep*/, /*cMsgId*/, "Processando registro: " + cCodigo)
 
     // ... implementar logica aqui ...
 
@@ -345,7 +344,7 @@ Return lRet
 A common pattern is to have a dispatcher function that creates multiple worker threads:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} zDispatcher
 Dispatcher que cria multiplas threads de processamento
@@ -358,18 +357,18 @@ User Function zDispatcher()
     Local nThreads := 5
     Local nI       := 0
 
-    ConOut("[zDispatcher] Iniciando " + cValToChar(nThreads) + " threads")
-
-    // Prepara ambiente para o dispatcher
-    If !RpcSetEnv("99", "01", "admin", " ", "FAT", "zDispatcher")
-        ConOut("[zDispatcher] ERRO: Falha ao preparar ambiente.")
+    // Prepara ambiente para o dispatcher (usuario/senha opcionais: nunca fixos no fonte)
+    If !RpcSetEnv("99", "01", /*cUsuario*/, /*cSenha*/, "FAT", "zDispatcher")
+        FWLogMsg("ERROR", /*cTransactionId*/, "zDispatcher", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Falha ao preparar ambiente.")
         Return Nil
     EndIf
+
+    FWLogMsg("INFO", /*cTransactionId*/, "zDispatcher", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Iniciando " + cValToChar(nThreads) + " threads")
 
     // Inicia threads de processamento
     For nI := 1 To nThreads
         StartJob("U_zWorker", GetEnvServer(), .F., cValToChar(nI))
-        ConOut("[zDispatcher] Thread " + cValToChar(nI) + " iniciada.")
+        FWLogMsg("INFO", /*cTransactionId*/, "zDispatcher", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Thread " + cValToChar(nI) + " iniciada.")
     Next nI
 
     RpcClearEnv()
@@ -386,20 +385,19 @@ Worker thread para processamento paralelo
 User Function zWorker(cThreadId)
     Default cThreadId := "0"
 
-    ConOut("[zWorker-" + cThreadId + "] Inicio: " + Time())
-
     // Cada thread prepara seu proprio ambiente
-    If !RpcSetEnv("99", "01", "admin", " ", "FAT", "zWorker")
-        ConOut("[zWorker-" + cThreadId + "] ERRO: Falha ao preparar ambiente.")
+    If !RpcSetEnv("99", "01", /*cUsuario*/, /*cSenha*/, "FAT", "zWorker")
+        FWLogMsg("ERROR", /*cTransactionId*/, "zWorker", cThreadId, /*cStep*/, /*cMsgId*/, "Falha ao preparar ambiente.")
         Return Nil
     EndIf
+
+    FWLogMsg("INFO", /*cTransactionId*/, "zWorker", cThreadId, /*cStep*/, /*cMsgId*/, "Inicio: " + Time())
 
     // Processamento da thread
     fWorkerProcess(cThreadId)
 
+    FWLogMsg("INFO", /*cTransactionId*/, "zWorker", cThreadId, /*cStep*/, /*cMsgId*/, "Fim: " + Time())
     RpcClearEnv()
-
-    ConOut("[zWorker-" + cThreadId + "] Fim: " + Time())
 
 Return Nil
 
@@ -409,7 +407,7 @@ Static Function fWorkerProcess(cThreadId)
     // Exemplo: cada thread processa um lote de registros
     For nI := 1 To 100
         // Processamento individual
-        ConOut("[zWorker-" + cThreadId + "] Processando item " + cValToChar(nI))
+        FWLogMsg("DEBUG", /*cTransactionId*/, "zWorker", cThreadId, /*cStep*/, /*cMsgId*/, "Processando item " + cValToChar(nI))
     Next nI
 
 Return Nil
@@ -422,7 +420,7 @@ Return Nil
 Pattern for a job that runs periodically and processes data in intervals:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} zJobLoop
 Job com processamento em intervalo (controlado por OnStart/RefreshRate)
@@ -433,16 +431,16 @@ Job com processamento em intervalo (controlado por OnStart/RefreshRate)
 /*/
 User Function zJobLoop()
 
-    ConOut("[zJobLoop] Executando ciclo: " + DToC(Date()) + " " + Time())
-
-    If !RpcSetEnv("99", "01", "admin", " ", "FAT", "zJobLoop")
-        ConOut("[zJobLoop] ERRO: Falha ao preparar ambiente.")
+    If !RpcSetEnv("99", "01", /*cUsuario*/, /*cSenha*/, "FAT", "zJobLoop")
+        FWLogMsg("ERROR", /*cTransactionId*/, "zJobLoop", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Falha ao preparar ambiente.")
         Return Nil
     EndIf
 
+    FWLogMsg("INFO", /*cTransactionId*/, "zJobLoop", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Executando ciclo: " + DToC(Date()) + " " + Time())
+
     // Controle de concorrencia
     If !LockByName("JOB_LOOP", .F., .F.)
-        ConOut("[zJobLoop] Outra instancia em execucao.")
+        FWLogMsg("WARN", /*cTransactionId*/, "zJobLoop", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Outra instancia em execucao.")
         RpcClearEnv()
         Return Nil
     EndIf
@@ -451,29 +449,28 @@ User Function zJobLoop()
     fProcessaPendencias()
 
     UnlockByName("JOB_LOOP", .F., .F.)
+    FWLogMsg("INFO", /*cTransactionId*/, "zJobLoop", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Ciclo finalizado: " + DToC(Date()) + " " + Time())
     RpcClearEnv()
-
-    ConOut("[zJobLoop] Ciclo finalizado: " + DToC(Date()) + " " + Time())
     // O RefreshRate do appserver.ini controlara a proxima execucao
 
 Return Nil
 
 Static Function fProcessaPendencias()
-    Local cQuery  := ""
     Local cAlias  := GetNextAlias()
+    Local cStatus := "1" // Pendente
     Local nCount  := 0
 
-    cQuery := "SELECT ZA9_CODIGO, ZA9_DESCRI "
-    cQuery += "FROM " + RetSqlName("ZA9") + " ZA9 "
-    cQuery += "WHERE ZA9.D_E_L_E_T_ = ' ' "
-    cQuery += "AND ZA9_FILIAL = '" + xFilial("ZA9") + "' "
-    cQuery += "AND ZA9_STATUS = '1' "
-    cQuery += "ORDER BY ZA9_CODIGO "
-
-    TCQuery cQuery New Alias (cAlias)
+    BeginSQL Alias cAlias
+        SELECT ZA9_CODIGO, ZA9_DESCRI
+        FROM %table:ZA9% ZA9
+        WHERE ZA9.%notDel%
+        AND ZA9.ZA9_FILIAL = %xfilial:ZA9%
+        AND ZA9.ZA9_STATUS = %exp:cStatus%
+        ORDER BY ZA9_CODIGO
+    EndSQL
 
     While !(cAlias)->(Eof())
-        ConOut("[zJobLoop] Processando: " + AllTrim((cAlias)->ZA9_CODIGO))
+        FWLogMsg("INFO", /*cTransactionId*/, "zJobLoop", "fProcessaPendencias", /*cStep*/, /*cMsgId*/, "Processando: " + AllTrim((cAlias)->ZA9_CODIGO))
         // ... logica de processamento ...
         nCount++
         (cAlias)->(DbSkip())
@@ -481,7 +478,7 @@ Static Function fProcessaPendencias()
 
     (cAlias)->(DbCloseArea())
 
-    ConOut("[zJobLoop] Total processado: " + cValToChar(nCount))
+    FWLogMsg("INFO", /*cTransactionId*/, "zJobLoop", "fProcessaPendencias", /*cStep*/, /*cMsgId*/, "Total processado: " + cValToChar(nCount))
 
 Return Nil
 ```
@@ -492,9 +489,10 @@ Return Nil
 
 ### 11.1 Environment Management
 
-- **Always** call `RpcClearEnv()` after `RpcSetEnv()`, even if an error occurs (use `Begin Sequence` / `Recover`).
+- **Always** call `RpcClearEnv()` after `RpcSetEnv()`, even if an error occurs (use `ErrorBlock` + `Begin Sequence` / `Recover`, see 11.4).
 - **Never** call `RpcSetEnv()` or `RpcClearEnv()` in routines executed from the Protheus menu (the environment is already managed by the system).
 - Each thread started by `StartJob` must call its own `RpcSetEnv()` to prepare its environment.
+- Never hardcode user/password in `RpcSetEnv()`; they are optional.
 
 ### 11.2 Concurrency Control
 
@@ -503,17 +501,24 @@ Return Nil
 
 ### 11.3 Logging
 
-- Use `ConOut()` for basic console logging.
-- Prefer `FWLogMsg()` for standardized, structured logging in production environments.
+- Log with `FWLogMsg()` only (section 7); never `ConOut()` (rule CA1004 of the plugin's review).
+- Use the job name as `cGroup` and the step/thread as `cCategory`, so the log can be filtered.
 - Include timestamps and identifiers in log messages for easier debugging.
 
 ### 11.4 Error Handling
 
+`Begin Sequence` only reaches `Recover` on `Break`; the `ErrorBlock` turns runtime errors into `Break(e)`:
+
 ```advpl
+Local oError
+Local bOldError := ErrorBlock({|e| Break(e)})
+
 Begin Sequence
     // Logica de negocio
     fProcessa()
-Recover
-    ConOut("[JOB] Erro critico durante processamento: " + DToC(Date()) + " " + Time())
+Recover Using oError
+    FWLogMsg("FATAL", /*cTransactionId*/, "JOB", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro critico durante processamento: " + oError:Description)
 End Sequence
+
+ErrorBlock(bOldError)
 ```

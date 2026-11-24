@@ -8,8 +8,12 @@ Templates for creating classes in TLPP (TOTVS Language Plus Plus) for TOTVS Prot
 
 A TLPP class declaration includes the class name, properties (`data`), and methods. Every generated `.tlpp` file must also declare a `namespace` — see section 7 for the rule and inference.
 
+- **Includes:** `#include "tlpp-core.th"` first; add `#include "totvs.ch"` whenever the source uses Protheus framework commands or functions (`Default`, `BeginSQL`, `Begin Transaction`, `RecLock`, `FWLogMsg`, MVC...) — TDN: the `.th` does not replace `totvs.ch`.
+- **Method prototypes:** the prototype inside `Class ... EndClass` declares the same parameter list as the implementation (and the same `as <type>` when the method is typed) — TDN "Tipagem de Dados" / "Tipando Métodos". A method without parameters stays `Method New()`.
+
 ```tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
+#include "totvs.ch"
 
 // Namespace is MANDATORY for generated customer TLPP files
 // Convention: custom.<agrupador>.<servico> (see section 7)
@@ -66,7 +70,7 @@ Return Nil
 
 Method Process() Class MinhaClasse
     // Business logic
-    Conout("Processing: " + ::cNome)
+    FWLogMsg("INFO", /*cTransactionId*/, "MinhaClasse", "Process", /*cStep*/, /*cMsgId*/, "Processando: " + ::cNome)
 Return .T.
 ```
 
@@ -129,7 +133,7 @@ Method AddItem(cProduto, nQuantidade, nPreco) Class PedidoVenda
     Local aItem := {}
 
     If ::lFinalizado
-        Conout("Pedido ja finalizado. Nao e possivel adicionar itens.")
+        FWLogMsg("WARN", /*cTransactionId*/, "PedidoVenda", "AddItem", /*cStep*/, /*cMsgId*/, "Pedido ja finalizado. Nao e possivel adicionar itens.")
         Return .F.
     EndIf
 
@@ -145,7 +149,7 @@ Return .T.
 
 Method Finalizar() Class PedidoVenda
     If Len(::aItens) == 0
-        Conout("Pedido sem itens.")
+        FWLogMsg("WARN", /*cTransactionId*/, "PedidoVenda", "Finalizar", /*cStep*/, /*cMsgId*/, "Pedido sem itens.")
         Return .F.
     EndIf
 
@@ -247,7 +251,7 @@ Public Method Sacar(nValor) Class ContaBancaria
     EndIf
 
     If (nValor + nTarifa) > ::nSaldo
-        Conout("Saldo insuficiente")
+        FWLogMsg("WARN", /*cTransactionId*/, "ContaBancaria", "Sacar", /*cStep*/, /*cMsgId*/, "Saldo insuficiente")
         Return .F.
     EndIf
 
@@ -265,14 +269,14 @@ Return {}
 
 Private Method ValidarValor(nValor) Class ContaBancaria
     If nValor <= 0
-        Conout("Valor deve ser positivo")
+        FWLogMsg("WARN", /*cTransactionId*/, "ContaBancaria", "ValidarValor", /*cStep*/, /*cMsgId*/, "Valor deve ser positivo")
         Return .F.
     EndIf
 Return .T.
 
 Private Method RegistrarMovimento(cTipo, nValor) Class ContaBancaria
     // Gravar movimentacao no banco de dados
-    Conout("Movimento: " + cTipo + " Valor: " + cValToChar(nValor))
+    FWLogMsg("INFO", /*cTransactionId*/, "ContaBancaria", "RegistrarMovimento", /*cStep*/, /*cMsgId*/, "Movimento: " + cTipo + " Valor: " + cValToChar(nValor))
 Return Nil
 
 Protected Method CalcularTarifa(nValor) Class ContaBancaria
@@ -307,7 +311,7 @@ Method New(cNome, cEspecie) Class Animal
 Return Self
 
 Method EmitirSom() Class Animal
-    Conout("...")
+    FWLogMsg("INFO", /*cTransactionId*/, "Animal", "EmitirSom", /*cStep*/, /*cMsgId*/, "...")
 Return Nil
 
 Method GetInfo() Class Animal
@@ -330,15 +334,17 @@ Method New(cNome, cRaca) Class Cachorro
 Return Self
 
 Method EmitirSom() Class Cachorro
-    Conout(::cNome + " diz: Au Au!")
+    FWLogMsg("INFO", /*cTransactionId*/, "Cachorro", "EmitirSom", /*cStep*/, /*cMsgId*/, ::cNome + " diz: Au Au!")
 Return Nil
 ```
 
 **Usage:**
 ```tlpp
 Local oCachorro := Cachorro():New("Rex", "Labrador")
+Local cInfo     := ""
+
 oCachorro:EmitirSom()          // "Rex diz: Au Au!"
-Conout(oCachorro:GetInfo())    // "Rex (Canino) - Idade: 0" (inherited method)
+cInfo := oCachorro:GetInfo()   // "Rex (Canino) - Idade: 0" (inherited method)
 ```
 
 ---
@@ -358,10 +364,16 @@ Class MathHelper
 EndClass
 
 Static Method Max(nA, nB) Class MathHelper
-Return IIf(nA > nB, nA, nB)
+    If nA > nB
+        Return nA
+    EndIf
+Return nB
 
 Static Method Min(nA, nB) Class MathHelper
-Return IIf(nA < nB, nA, nB)
+    If nA < nB
+        Return nA
+    EndIf
+Return nB
 
 Static Method Clamp(nValue, nMin, nMax) Class MathHelper
     If nValue < nMin
@@ -398,12 +410,13 @@ Every generated `.tlpp` file for customer code **must** declare a `namespace`. T
 If `--module` is not provided, the generator must **ask the user** for the namespace agrupador before producing the file. Never silently omit the namespace.
 
 ```tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
 
 // Namespace inferred from --module fat + class name PedidoService
 namespace custom.fat.pedidoservice
 
-// For REST annotations, also add: #Include "tlpp-rest.th"
+// For REST annotations, also add: #include "tlpp-rest.th"
+// Using Protheus framework commands/functions? Also add: #include "totvs.ch"
 // Do NOT use "using namespace tlpp.*" -- use .th includes instead
 // "using namespace" is only for custom/project namespaces (see example below)
 
@@ -449,7 +462,8 @@ oService:CriarPedido(oData)
 A Service class encapsulates business logic, keeping it separate from controllers and data access.
 
 ```tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
+#include "totvs.ch"
 
 // Namespace inferred from --module fat + class name ClienteService
 namespace custom.fat.clienteservice
@@ -522,23 +536,30 @@ Method CriarCliente(cNome, cCNPJ, cEmail, cTelefone) Class ClienteService
         EndIf
     EndIf
 
-    // Persiste
+    // Persiste (Try/Catch: erro de execucao no repositorio vira erro de negocio)
     If lRet
-        lRet := ::oRepository:Create(cNome, cCNPJ, cEmail, cTelefone)
-        If !lRet
-            ::AddError("Erro ao gravar cliente no banco de dados")
-        EndIf
+        Try
+            lRet := ::oRepository:Create(cNome, cCNPJ, cEmail, cTelefone)
+            If !lRet
+                ::AddError("Erro ao gravar cliente no banco de dados")
+            EndIf
+        Catch oError
+            lRet := .F.
+            ::AddError("Falha ao gravar cliente: " + oError:description)
+            FWLogMsg("ERROR", /*cTransactionId*/, "ClienteService", "CriarCliente", /*cStep*/, /*cMsgId*/, oError:description)
+        EndTry
     EndIf
 
 Return lRet
 
 Method AtualizarCliente(cCodigo, cLoja, oData) Class ClienteService
-    Local lRet := .T.
+    Local lRet     := .T.
+    Local oCliente := Nil
 
     ::ClearErrors()
 
     // Verifica se cliente existe
-    Local oCliente := ::oRepository:FindById(cCodigo, cLoja)
+    oCliente := ::oRepository:FindById(cCodigo, cLoja)
     If oCliente == Nil
         ::AddError("Cliente nao encontrado: " + cCodigo + "/" + cLoja)
         Return .F.
@@ -557,7 +578,8 @@ Method AtualizarCliente(cCodigo, cLoja, oData) Class ClienteService
 Return lRet
 
 Method InativarCliente(cCodigo, cLoja) Class ClienteService
-    Local lRet := .T.
+    Local lRet  := .T.
+    Local aArea := GetArea()
 
     ::ClearErrors()
 
@@ -565,14 +587,15 @@ Method InativarCliente(cCodigo, cLoja) Class ClienteService
     DbSelectArea("SC5")
     DbSetOrder(3) // Cliente + Loja
     If DbSeek(xFilial("SC5") + cCodigo + cLoja)
-        While !Eof() .And. SC5->C5_CLIENTE == cCodigo .And. SC5->C5_LOJACLI == cLoja
+        While lRet .And. !Eof() .And. SC5->C5_CLIENTE == cCodigo .And. SC5->C5_LOJACLI == cLoja
             If Empty(SC5->C5_NOTA)
                 ::AddError("Cliente possui pedidos em aberto. Nao e possivel inativar.")
-                Return .F.
+                lRet := .F.
             EndIf
             DbSkip()
         EndWh
     EndIf
+    RestArea(aArea)
 
     If lRet
         lRet := ::oRepository:Inactivate(cCodigo, cLoja)
@@ -623,14 +646,15 @@ Return Nil
 ```tlpp
 Local oRepo    := ClienteRepository():New()
 Local oService := ClienteService():New(oRepo)
+Local aErros   := {}
+Local nI       := 0
 
 If oService:CriarCliente("Empresa Teste", "12345678000199", "teste@email.com", "11999999999")
-    Conout("Cliente criado com sucesso")
+    FWLogMsg("INFO", /*cTransactionId*/, "ClienteService", "CriarCliente", /*cStep*/, /*cMsgId*/, "Cliente criado com sucesso")
 Else
-    Local aErros := oService:GetErrors()
-    Local nI := 0
+    aErros := oService:GetErrors()
     For nI := 1 To Len(aErros)
-        Conout("Erro: " + aErros[nI])
+        FWLogMsg("WARN", /*cTransactionId*/, "ClienteService", "CriarCliente", /*cStep*/, /*cMsgId*/, "Erro: " + aErros[nI])
     Next nI
 EndIf
 
@@ -647,7 +671,8 @@ FreeObj(oRepo)
 A Repository class encapsulates data access, providing CRUD operations and query methods.
 
 ```tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
+#include "totvs.ch"
 
 // Namespace inferred from --module fat + class name ClienteRepository
 namespace custom.fat.clienterepository
@@ -675,8 +700,7 @@ Class ClienteRepository
     Method Delete(cCodigo, cLoja)
     Method Inactivate(cCodigo, cLoja)
 
-    // Query helpers
-    Private Method BuildQuery(cWhere, cOrderBy, nLimit, nOffset)
+    // Helpers
     Private Method RecordToJson()
 
 EndClass
@@ -704,18 +728,18 @@ Return oResult
 
 // Find customer by CNPJ
 Method FindByCNPJ(cCNPJ) Class ClienteRepository
-    Local oResult := Nil
-    Local aArea   := GetArea()
-    Local cQuery  := ""
+    Local oResult   := Nil
+    Local aArea     := GetArea()
     Local cTmpAlias := GetNextAlias()
 
-    cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL "
-    cQuery += "FROM " + RetSqlName("SA1") + " "
-    cQuery += "WHERE D_E_L_E_T_ = ' ' "
-    cQuery += "AND A1_FILIAL = '" + xFilial("SA1") + "' "
-    cQuery += "AND A1_CGC = '" + cCNPJ + "' "
-
-    TCQuery cQuery New Alias (cTmpAlias)
+    // Embedded SQL: %exp:% faz o binding do valor (sem concatenacao)
+    BeginSQL Alias cTmpAlias
+        SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL
+        FROM %table:SA1% SA1
+        WHERE SA1.%notDel%
+        AND SA1.A1_FILIAL = %xfilial:SA1%
+        AND SA1.A1_CGC = %exp:cCNPJ%
+    EndSQL
 
     If !(cTmpAlias)->(Eof())
         oResult := JsonObject():New()
@@ -736,29 +760,34 @@ Return oResult
 Method FindAll(nPage, nPageSize, cFiltro) Class ClienteRepository
     Local aResult   := {}
     Local oItem     := Nil
-    Local cQuery    := ""
     Local cTmpAlias := GetNextAlias()
+    Local cLike     := ""
+    Local nSkip     := 0
 
     Default nPage     := 1
     Default nPageSize := 20
     Default cFiltro   := ""
 
-    cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL, A1_MSBLQL "
-    cQuery += "FROM " + RetSqlName("SA1") + " "
-    cQuery += "WHERE D_E_L_E_T_ = ' ' "
-    cQuery += "AND A1_FILIAL = '" + xFilial("SA1") + "' "
+    // Curinga montado no ADVPL e enviado inteiro pelo %exp:%; filtro vazio vira "%%" (casa com tudo)
+    cLike := "%" + AllTrim(cFiltro) + "%"
+    nSkip := (nPage - 1) * nPageSize
 
-    If !Empty(cFiltro)
-        cQuery += "AND (A1_NOME LIKE '%" + cFiltro + "%' OR A1_CGC LIKE '%" + cFiltro + "%') "
-    EndIf
+    BeginSQL Alias cTmpAlias
+        SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL, A1_MSBLQL
+        FROM %table:SA1% SA1
+        WHERE SA1.%notDel%
+        AND SA1.A1_FILIAL = %xfilial:SA1%
+        AND (SA1.A1_NOME LIKE %exp:cLike% OR SA1.A1_CGC LIKE %exp:cLike%)
+        ORDER BY A1_COD, A1_LOJA
+    EndSQL
 
-    cQuery += "ORDER BY A1_COD, A1_LOJA "
-    cQuery += "OFFSET " + cValToChar((nPage - 1) * nPageSize) + " ROWS "
-    cQuery += "FETCH NEXT " + cValToChar(nPageSize) + " ROWS ONLY"
+    // Paginacao no cursor (portavel). OFFSET/FETCH varia por SGBD: ver query-builder/cross-database.md
+    While nSkip > 0 .And. !(cTmpAlias)->(Eof())
+        (cTmpAlias)->(DbSkip())
+        nSkip--
+    EndWh
 
-    TCQuery cQuery New Alias (cTmpAlias)
-
-    While !(cTmpAlias)->(Eof())
+    While !(cTmpAlias)->(Eof()) .And. Len(aResult) < nPageSize
         oItem := JsonObject():New()
         oItem["codigo"]   := AllTrim((cTmpAlias)->A1_COD)
         oItem["loja"]     := AllTrim((cTmpAlias)->A1_LOJA)
@@ -780,6 +809,9 @@ Method Create(cNome, cCNPJ, cEmail, cTelefone) Class ClienteRepository
     Local lRet  := .T.
     Local aArea := GetArea()
 
+    Default cEmail    := ""
+    Default cTelefone := ""
+
     Begin Transaction
         DbSelectArea(::cAlias)
         RecLock(::cAlias, .T.)
@@ -788,8 +820,8 @@ Method Create(cNome, cCNPJ, cEmail, cTelefone) Class ClienteRepository
             SA1->A1_LOJA   := "01"
             SA1->A1_NOME   := cNome
             SA1->A1_CGC    := cCNPJ
-            SA1->A1_EMAIL  := IIf(!Empty(cEmail), cEmail, "")
-            SA1->A1_TEL    := IIf(!Empty(cTelefone), cTelefone, "")
+            SA1->A1_EMAIL  := cEmail
+            SA1->A1_TEL    := cTelefone
         MsUnlock()
         ConfirmSX8()
     End Transaction
@@ -847,7 +879,7 @@ Method Delete(cCodigo, cLoja) Class ClienteRepository
 
     Begin Transaction
         RecLock(::cAlias, .F.)
-            SA1->D_E_L_E_T_ := "*"
+            (::cAlias)->(DbDelete()) // Exclusao logica: DbDelete() marca o D_E_L_E_T_
         MsUnlock()
     End Transaction
 
@@ -878,32 +910,6 @@ Method Inactivate(cCodigo, cLoja) Class ClienteRepository
 
 Return lRet
 
-// Build query string helper
-Private Method BuildQuery(cWhere, cOrderBy, nLimit, nOffset) Class ClienteRepository
-    Local cQuery := ""
-
-    Default cWhere   := ""
-    Default cOrderBy := "A1_COD, A1_LOJA"
-    Default nLimit   := 0
-    Default nOffset  := 0
-
-    cQuery := "SELECT * FROM " + RetSqlName(::cAlias) + " "
-    cQuery += "WHERE D_E_L_E_T_ = ' ' "
-    cQuery += "AND A1_FILIAL = '" + xFilial(::cAlias) + "' "
-
-    If !Empty(cWhere)
-        cQuery += "AND " + cWhere + " "
-    EndIf
-
-    cQuery += "ORDER BY " + cOrderBy + " "
-
-    If nLimit > 0
-        cQuery += "OFFSET " + cValToChar(nOffset) + " ROWS "
-        cQuery += "FETCH NEXT " + cValToChar(nLimit) + " ROWS ONLY"
-    EndIf
-
-Return cQuery
-
 // Convert current SA1 record to JsonObject
 Private Method RecordToJson() Class ClienteRepository
     Local oJson := JsonObject():New()
@@ -926,7 +932,8 @@ Return oJson
 A DTO class carries data between layers. It includes serialization (toJson/fromJson) and validation.
 
 ```tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
+#include "totvs.ch"
 
 // Namespace inferred from --module fat + class name ClienteDTO
 namespace custom.fat.clientedto
@@ -1092,18 +1099,23 @@ Return oDTO
 
 **Usage:**
 ```tlpp
-// From JSON (API request)
-Local oJson := JsonObject():New()
-oJson:FromJson(cBody)
+// Locals first (declarations before any executable statement)
+Local oJson      := JsonObject():New()
+Local oDTO       := ClienteDTO():New()
+Local oDTOFromDB := Nil
+Local oRespJson  := Nil
+Local aErros     := {}
+Local cResponse  := ""
 
-Local oDTO := ClienteDTO():New()
+// From JSON (API request)
+oJson:FromJson(cBody)
 oDTO:FromJson(oJson)
 
 If oDTO:Validate()
     // Use oDTO data
     oService:CriarCliente(oDTO:cNome, oDTO:cCNPJ, oDTO:cEmail, oDTO:cTelefone)
 Else
-    Local aErros := oDTO:GetErrors()
+    aErros := oDTO:GetErrors()
     // Return validation errors
 EndIf
 
@@ -1111,8 +1123,35 @@ EndIf
 DbSelectArea("SA1")
 DbSetOrder(1)
 If DbSeek(xFilial("SA1") + cCodigo + cLoja)
-    Local oDTOFromDB := ClienteDTO():FromRecord("SA1")
-    Local oRespJson  := oDTOFromDB:ToJson()
-    cResponse := oRespJson:ToJson()
+    oDTOFromDB := ClienteDTO():FromRecord("SA1")
+    oRespJson  := oDTOFromDB:ToJson()
+    cResponse  := oRespJson:ToJson()
 EndIf
 ```
+
+---
+
+## 11. Error Handling in Methods (Try/Catch)
+
+TLPP methods handle errors with `Try` / `Catch` / `EndTry` (TDN "Try...Catch", AppServer 20.3.0.0+). `Finally` is optional and always runs, with or without an exception; `Throw` raises an `ErrorClass` (or subclass) explicitly. `.prw` code keeps `Begin Sequence` + `ErrorBlock` (see `reference.md`, "Error Handling Pattern").
+
+```tlpp
+Method Processar(cCodigo) Class PedidoService
+    Local lRet  := .T.
+    Local aArea := GetArea()
+
+    Try
+        // Regra de negocio que pode falhar
+        lRet := ::Gravar(cCodigo)
+    Catch oError
+        lRet := .F.
+        FWLogMsg("ERROR", /*cTransactionId*/, "PedidoService", "Processar", /*cStep*/, /*cMsgId*/, "Erro " + cValToChar(oError:genCode) + ": " + oError:description)
+    Finally
+        RestArea(aArea)
+    EndTry
+
+Return lRet
+```
+
+- The `Catch` object is an `ErrorClass`; the TDN examples read `description` and `genCode`. Other properties (`ErrorStack`, `SubSystem`, `Operation`...) are not on the TDN page (a confirmar no TDS).
+- The TDN example does not declare the `Catch` variable as `Local`.

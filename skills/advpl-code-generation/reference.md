@@ -36,7 +36,9 @@ Patterns and templates for generating clean, standardized ADVPL and TLPP code fo
 | a | Array | `aItens`, `aCampos` |
 | o | Object | `oModel`, `oView` |
 | b | Code Block | `bBloco`, `bCondic` |
-| x | Indefinido (any) | `xRetorno`, `xParam` |
+| u | Indefinido (any) — official TDN table | `uRetorno`, `uParam` |
+| x | Indefinido (any) — variant used by the plugin | `xRetorno`, `xParam` |
+| j | JsonObject — convention of the official TLPP examples (not in the TDN table) | `jBody`, `jResponse` |
 
 **Module prefixes:**
 | Prefix | Module |
@@ -57,8 +59,7 @@ Patterns and templates for generating clean, standardized ADVPL and TLPP code fo
 Every User Function MUST follow this pattern:
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
 
 /*/{Protheus.doc} FATA001
 Descricao breve da funcao
@@ -72,11 +73,11 @@ Descricao breve da funcao
     u_FATA001("001")
 /*/
 User Function FATA001(cParam1)
-    Local lRet := .T.
-    Local cAlias := "SA1"
-
-    // Salva area de trabalho
-    Local aArea := GetArea()
+    Local lRet      := .T.
+    Local cAlias    := "SA1"
+    Local aArea     := GetArea() // Salva area de trabalho
+    Local oError
+    Local bOldError := ErrorBlock({|e| Break(e)})
 
     Begin Sequence
 
@@ -93,10 +94,11 @@ User Function FATA001(cParam1)
 
     Recover Using oError
         lRet := .F.
-        Conout("Erro em FATA001: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "FATA001", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro em FATA001: " + oError:Description)
     End Sequence
 
-    // Restaura area
+    // Restaura o tratamento de erro e a area
+    ErrorBlock(bOldError)
     RestArea(aArea)
 
 Return lRet
@@ -115,23 +117,38 @@ Return lRet
 
 ## Error Handling Pattern
 
+**ADVPL (`.prw`)** — `Begin Sequence` only reaches `Recover` on an explicit `Break`, so install an `ErrorBlock` that turns runtime errors into `Break(e)` and restore the previous one at the end:
+
 ```advpl
 Local oError
-Local bErrorOld := ErrorBlock({|e| oError := e, Break(e)})
+Local bOldError := ErrorBlock({|e| Break(e)})
 
 Begin Sequence
 
     // Codigo que pode falhar
 
 Recover Using oError
-    Conout("Erro: " + oError:Description)
-    Conout("Linha: " + cValToChar(oError:GenCode))
-    // Tratar erro ou re-raise
+    FWLogMsg("ERROR", /*cTransactionId*/, "MinhaRotina", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro: " + oError:Description)
+    // Tratar o erro (retorno .F., DisarmTransaction(), etc.)
 
 End Sequence
 
-ErrorBlock(bErrorOld)
+ErrorBlock(bOldError)
 ```
+
+**TLPP (`.tlpp`)** — `Try`/`Catch`/`EndTry` (TDN "Try...Catch", AppServer 20.3.0.0+); `Finally` is optional and always runs. The caught object is an `ErrorClass`; the TDN example reads `description` and `genCode` (other properties: a confirmar no TDS):
+
+```tlpp
+Try
+    // Codigo que pode falhar
+Catch oError
+    FWLogMsg("ERROR", /*cTransactionId*/, "MinhaClasse", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro: " + oError:description)
+Finally
+    // Executa sempre (opcional): liberar objetos, restaurar area
+EndTry
+```
+
+`FWLogMsg(cSeverity, [cTransactionId], cGroup, [cCategory], [cStep], [cMsgId], [cMessage], [nMensure], [nElapseTime], [aMessage])` (TDN): `cSeverity` is `INFO`, `WARN`, `ERROR`, `FATAL` or `DEBUG`; `cSeverity` and `cGroup` are mandatory. Never log with `ConOut()`.
 
 ## Quick Reference - Code Types
 
@@ -170,7 +187,9 @@ namespace custom.fat.customersapi
 
 @Get("/api/v1/customers")
 User Function getCustomers()
-    // implementation
+    Local cData := ""
+
+    // implementation: build cData (JSON)
 return oRest:setResponse(cData)
 ```
 
@@ -202,10 +221,13 @@ Every generated `.tlpp` file for customer code **must** declare a `namespace` im
 3. No underscores inside segments — `purchaseorder` not `purchase_order`
 4. Only `custom.*` prefix for customer code (`totvs.protheus.*` is reserved for TOTVS)
 5. Exactly one `namespace` line per file, after the includes, before the Protheus.doc header
+6. Functions keep a simple name: `namespace custom.fat.pedidos` + `user function calcTotal(...)`. Never put the dotted name in the declaration (`function custom.fat.pedidos.calcTotal()` is not a form documented on TDN); callers use `custom.fat.pedidos.u_calcTotal()` or `using namespace custom.fat.pedidos`
+
+**Includes in `.tlpp`:** `#include "tlpp-core.th"` (TDN: recommended for every TLPP source) brings the TLPP language features; `#include "totvs.ch"` brings the Protheus framework commands. A `.tlpp` that uses the framework (`Default`, `BeginSQL`, `Begin Transaction`, `PARAMIXB`, `MsExecAuto`, MVC) includes **both**, `tlpp-core.th` first. Whether `BeginSQL` compiles in a `.tlpp` without `totvs.ch` is not documented (a confirmar no TDS) — keep `totvs.ch`.
 
 **When `--module` is missing:** ask the user during the Planning Phase for the agrupador. Never silently omit the namespace and never invent a default like `custom.geral.xxx`.
 
-**Do NOT use `using namespace tlpp.*`:** `tlpp.core`, `tlpp.rest`, `tlpp.log`, `tlpp.data` are provided by the `.th` includes. `using namespace` is only valid to consume **other custom namespaces** in consumer files (e.g., `using namespace custom.fat.pedidoservice`).
+**Do NOT use `using namespace tlpp.*`:** `tlpp.core`, `tlpp.rest`, `tlpp.log`, `tlpp.data` are provided by the `.th` includes. `using namespace` is only valid to consume **other custom namespaces** in consumer files (e.g., `using namespace custom.fat.pedidoservice`). Exception: ProBat test sources declare `using namespace tlpp.probat` (TDN: needed to call the asserts unqualified; the alternative is `tlpp.probat.assertEquals(...)`).
 
 ## Identifier Length Limits (CRITICAL)
 
@@ -247,10 +269,12 @@ ADVPL inherits a **10-character limit** on identifiers (functions, methods, vari
 | **`Static Function` with more than 10 characters in the name** | **Shorten to ≤ 10 chars (ADVPL legacy limit from DBF) or switch to TLPP with `namespace` (supports up to 255 chars)** |
 | Using Private instead of Local | Always declare as Local, pass via parameters |
 | Not saving/restoring area (GetArea/RestArea) | Always wrap DB operations with area save/restore |
-| Missing error handling | Always use Begin Sequence / Recover / End Sequence |
+| Missing error handling | `.prw`: `ErrorBlock({\|e\| Break(e)})` + `Begin Sequence` / `Recover Using oError` / `End Sequence` + `ErrorBlock(bOldError)`; `.tlpp`: `Try` / `Catch oError` / `EndTry` |
+| Logging with `ConOut()` | Use `FWLogMsg()` (see "Error Handling Pattern") |
+| Automating a routine with `FWMVCRotAuto` | Restricted to TOTVS internal use since 2019 — use `MsExecAuto` per the routine's documented example; for MVC, the model API (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`) per the documented examples (see `patterns-workflow.md`) |
 | Not closing RecLock | Always use MsUnlock() after RecLock() |
 | Hardcoded branch (filial) | Use xFilial(cAlias) for multi-branch compatibility |
-| Missing TOTVS.CH include | Always include at minimum: #Include "TOTVS.CH" |
+| Missing `totvs.ch` include | `.prw`: always `#include "totvs.ch"` (lowercase); `.tlpp` using the framework: `#include "tlpp-core.th"` + `#include "totvs.ch"` |
 | Not validating function parameters | Check ValType() and empty values at function start |
 | TLPP REST endpoint with bare `Function` | Use `User Function` with `@Get/@Post/...` annotation (official `rest-mod02.tlpp` pattern) |
 | **Inventar nome de campo `ALIAS_CAMPO` não confirmado no SX3** | **Verificar em `sx3-common-fields.md` → se não encontrar, buscar via WebFetch no SempreJu → se não encontrar, perguntar ao usuário. NUNCA inventar.** |

@@ -6,11 +6,12 @@ Complete reference for implementing approval workflows, automatic routines (MsEx
 
 ## 1. Overview
 
-TOTVS Protheus provides built-in support for document approval workflows through the approval control system (Alcada), automatic routine execution (MsExecAuto/FWMVCRotAuto), and email notifications.
+TOTVS Protheus provides built-in support for document approval workflows through the approval control system (Alcada), automatic routine execution (MsExecAuto, or the MVC model API for MVC routines), and email notifications.
 
 Key components:
-- **MsExecAuto**: Executes standard Protheus routines (ExecAuto) programmatically without user interface.
-- **FWMVCRotAuto**: Executes MVC-based routines programmatically.
+- **MsExecAuto**: Executes standard Protheus routines (ExecAuto) programmatically without user interface — always following the routine's documented ExecAuto example.
+- **MVC model API** (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`): automates MVC routines, following the routine's documented example.
+- **`FWMVCRotAuto` is restricted**: TOTVS lists it among the internal-use resources without support, and since 2019 it is for TOTVS internal use only — customer code must not use it (TOTVS Help Center, "Funções, classes e variáveis de propriedade interna" and "Problemas em rotina automática (EXECAUTO)").
 - **SCR Table**: Stores documents pending approval (Documentos com Alcada).
 - **SAK Table**: Stores approver definitions and limits.
 - **TMailManager**: Email server communication class (SMTP/POP3).
@@ -18,13 +19,13 @@ Key components:
 
 Required includes:
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 ```
 
 For MVC operations:
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 ```
 
 ---
@@ -44,32 +45,47 @@ MsExecAuto({|x,y,z| ROUTINE(x,y,z)}, aCabec, aItens, nOpc)
 | `aItens` | Array | Item lines array (for master-detail routines) |
 | `nOpc` | Numeric | Operation: `3`=Include, `4`=Update, `5`=Delete |
 
+The block signature and the arrays vary per routine — copy them from the routine's documented ExecAuto example on TDN, never infer them.
+
 ### 2.2 Standard Variables
 
-Before calling MsExecAuto, declare these Private variables:
+Before calling MsExecAuto, declare these Private variables (TDN "Variáveis de Controle - MsExecAuto"):
 
 ```advpl
-Private lMsErroAuto    := .F.  // Error flag
-Private lMsHelpAuto    := .T.  // Suppress Help dialogs
-Private lAutoErrNoFile := .T.  // Errors to memory (not file)
+Private lMsErroAuto    := .F.  // Indica se houve erro nao fatal na execucao
+Private lMsHelpAuto    := .T.  // Habilita a captura das mensagens de erro
+Private lAutoErrNoFile := .T.  // Desabilita o arquivo de log padrao; o log fica em GetAutoGRLog()
 ```
 
 ### 2.3 Error Handling
 
+With `lAutoErrNoFile := .T.`, `GetAutoGRLog()` returns the error log as an array of lines (TDN). `MostraErro()` shows the log on screen (or, with a path, writes it to a file) — not usable in jobs/REST. Helper reused by the examples below:
+
+```advpl
+Static Function fErroAuto()
+    Local aLog  := GetAutoGRLog() // Linhas do log da rotina automatica
+    Local cErro := ""
+    Local nI    := 0
+
+    For nI := 1 To Len(aLog)
+        cErro += aLog[nI] + CRLF
+    Next nI
+
+Return cErro
+```
+
 ```advpl
 If lMsErroAuto
-    // Erro ocorreu
-    Local cErro := MostraErro(.F.)  // .F. retorna string em vez de exibir dialog
-    ConOut("Erro na rotina automatica: " + cErro)
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXECAUTO", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro na rotina automatica: " + fErroAuto())
 Else
-    ConOut("Rotina executada com sucesso.")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXECAUTO", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Rotina executada com sucesso.")
 EndIf
 ```
 
 ### 2.4 Include Purchase Request (MATA110)
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} zIncSC
 Inclusao de Solicitacao de Compras via MsExecAuto
@@ -115,9 +131,9 @@ User Function zIncSC()
     MsExecAuto({|x, y, z| MATA110(x, y, z)}, aCabec, aItens, 3)
 
     If lMsErroAuto
-        ConOut("Erro na inclusao da SC: " + MostraErro(.F.))
+        FWLogMsg("ERROR", /*cTransactionId*/, "zIncSC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro na inclusao da SC: " + fErroAuto()) // fErroAuto(): secao 2.3
     Else
-        ConOut("Solicitacao de compras incluida com sucesso.")
+        FWLogMsg("INFO", /*cTransactionId*/, "zIncSC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Solicitacao de compras incluida com sucesso.")
     EndIf
 
     RestArea(aArea)
@@ -159,9 +175,9 @@ User Function zIncPV()
     MsExecAuto({|x, y, z| MATA410(x, y, z)}, aCabec, aItens, 3)
 
     If lMsErroAuto
-        ConOut("Erro na inclusao do PV: " + MostraErro(.F.))
+        FWLogMsg("ERROR", /*cTransactionId*/, "zIncPV", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro na inclusao do PV: " + fErroAuto()) // fErroAuto(): secao 2.3
     Else
-        ConOut("Pedido de venda incluido com sucesso.")
+        FWLogMsg("INFO", /*cTransactionId*/, "zIncPV", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Pedido de venda incluido com sucesso.")
     EndIf
 
     RestArea(aArea)
@@ -171,61 +187,69 @@ Return Nil
 
 ---
 
-## 3. FWMVCRotAuto - MVC Automatic Execution
+## 3. MVC Routines - Model API (no FWMVCRotAuto)
 
-### 3.1 Syntax
+`FWMVCRotAuto` is restricted (TOTVS internal use since 2019, see section 1). To automate an MVC routine, load its model and fill it through the model API, following the routine's documented example — the TDN ExecAuto pages of MVC routines (e.g. MATA094, MDTA007) use exactly this flow. The templates use `#include "totvs.ch"`: o `totvs.ch` inclui o `protheus.ch`; o TDN ainda grafa `protheus.ch` em alguns exemplos (MATA094).
+
+### 3.1 Flow
+
+| Step | Call |
+|------|------|
+| Load the model of the source that holds the `ModelDef` | `oModel := FWLoadModel("FONTE")` |
+| Set the operation | `oModel:SetOperation(MODEL_OPERATION_INSERT)` (`UPDATE`/`DELETE` with the record positioned) |
+| Activate | `oModel:Activate()` |
+| Fill fields | `oModel:SetValue("MODEL_ID", "CAMPO", xValor)` — for a grid, the current line; the grid starts with one line and `oModel:GetModel("GRID_ID"):AddLine()` adds (and positions on) the next one |
+| Validate and save | `oModel:VldData()`, then `oModel:CommitData()` |
+| On failure | `aErro := oModel:GetErrorMessage()` — `aErro[6]` error message, `aErro[7]` suggested solution |
+| Release | `oModel:DeActivate()` and `oModel:Destroy()` |
+
+### 3.2 Include via Model API
 
 ```advpl
-lRet := FWMVCRotAuto(oModel, cSource, nOperation, aParams)
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `oModel` | Object | Model object (usually Nil, framework creates internally) |
-| `cSource` | Character | Source program name with ModelDef |
-| `nOperation` | Numeric | Operation constant (MODEL_OPERATION_INSERT, etc.) |
-| `aParams` | Array | Data array: `{{"ModelId", aFieldValues}, {"GridId", aGridLines}}` |
-| **Return** | Logical | `.T.` if operation succeeded |
-
-### 3.2 Include via FWMVCRotAuto
-
-```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
 User Function zIncMVC()
-    Local aHeader := {}
-    Local aItems  := {}
-    Local aLine   := {}
-    Local lRet    := .F.
-    Local oModel  := Nil
+    Local oModel := Nil
+    Local aErro  := {}
+    Local lRet   := .F.
+
+    oModel := FWLoadModel("FATA090") // Fonte que contem o ModelDef de ZA1/ZA2
+    oModel:SetOperation(MODEL_OPERATION_INSERT)
+    oModel:Activate()
 
     // Cabecalho
-    aAdd(aHeader, {"ZA1_NUM",    "000001",  Nil})
-    aAdd(aHeader, {"ZA1_CLIENT", "000001",  Nil})
-    aAdd(aHeader, {"ZA1_LOJA",   "01",      Nil})
-    aAdd(aHeader, {"ZA1_EMISSA", Date(),    Nil})
+    oModel:SetValue("ZA1MASTER", "ZA1_NUM",    "000001")
+    oModel:SetValue("ZA1MASTER", "ZA1_CLIENT", "000001")
+    oModel:SetValue("ZA1MASTER", "ZA1_LOJA",   "01")
+    oModel:SetValue("ZA1MASTER", "ZA1_EMISSA", Date())
 
-    // Item 1
-    aLine := {}
-    aAdd(aLine, {"ZA2_ITEM",   "01",     Nil})
-    aAdd(aLine, {"ZA2_PROD",   "000001", Nil})
-    aAdd(aLine, {"ZA2_QUANT",  10,       Nil})
-    aAdd(aLine, {"ZA2_PRCUNI", 25.50,    Nil})
-    aAdd(aItems, aLine)
+    // Item 1 (o grid ja nasce com uma linha)
+    oModel:SetValue("ZA2DETAIL", "ZA2_ITEM",   "01")
+    oModel:SetValue("ZA2DETAIL", "ZA2_PROD",   "000001")
+    oModel:SetValue("ZA2DETAIL", "ZA2_QUANT",  10)
+    oModel:SetValue("ZA2DETAIL", "ZA2_PRCUNI", 25.50)
 
-    // Executa
-    lRet := FWMVCRotAuto(oModel, "FATA090", MODEL_OPERATION_INSERT, {;
-        {"ZA1MASTER", aHeader}, ;
-        {"ZA2DETAIL", aItems}   ;
-    })
+    // Item 2: AddLine() inclui a linha e posiciona nela
+    oModel:GetModel("ZA2DETAIL"):AddLine()
+    oModel:SetValue("ZA2DETAIL", "ZA2_ITEM",   "02")
+    oModel:SetValue("ZA2DETAIL", "ZA2_PROD",   "000002")
+    oModel:SetValue("ZA2DETAIL", "ZA2_QUANT",  5)
+    oModel:SetValue("ZA2DETAIL", "ZA2_PRCUNI", 12.00)
+
+    If oModel:VldData()
+        lRet := oModel:CommitData()
+    EndIf
 
     If lRet
-        ConOut("Registro incluido com sucesso!")
+        FWLogMsg("INFO", /*cTransactionId*/, "zIncMVC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Registro incluido com sucesso!")
     Else
-        ConOut("Erro na inclusao.")
-        MostraErro()
+        aErro := oModel:GetErrorMessage()
+        FWLogMsg("ERROR", /*cTransactionId*/, "zIncMVC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro na inclusao: " + AllToChar(aErro[6]) + " | Solucao: " + AllToChar(aErro[7]))
     EndIf
+
+    oModel:DeActivate()
+    oModel:Destroy()
 
 Return lRet
 ```
@@ -279,19 +303,22 @@ The SAK table stores approver definitions.
 
 ```advpl
 Static Function fGetPendentes(cAprovador)
-    Local cQuery  := ""
     Local cAlias  := GetNextAlias()
+    Local cStatus := "02" // CR_STATUS: 01 = aguardando nivel anterior, 02 = pendente de aprovacao
     Local aResult := {}
 
-    cQuery := "SELECT CR_NUM, CR_TIPO, CR_TOTAL, CR_EMISSAO, CR_USER "
-    cQuery += "FROM " + RetSqlName("SCR") + " SCR "
-    cQuery += "WHERE SCR.D_E_L_E_T_ = ' ' "
-    cQuery += "AND CR_FILIAL = '" + xFilial("SCR") + "' "
-    cQuery += "AND CR_APROV  = '" + cAprovador + "' "
-    cQuery += "AND CR_STATUS = '01' "  // Pendente de aprovacao
-    cQuery += "ORDER BY CR_EMISSAO, CR_NUM "
+    BeginSQL Alias cAlias
+        column CR_EMISSAO as Date
+        column CR_TOTAL   as Numeric(14,2)
 
-    TCQuery cQuery New Alias (cAlias)
+        SELECT CR_NUM, CR_TIPO, CR_TOTAL, CR_EMISSAO, CR_USER
+        FROM %table:SCR% SCR
+        WHERE SCR.%notDel%
+        AND SCR.CR_FILIAL = %xfilial:SCR%
+        AND SCR.CR_APROV  = %exp:cAprovador%
+        AND SCR.CR_STATUS = %exp:cStatus%
+        ORDER BY CR_EMISSAO, CR_NUM
+    EndSQL
 
     While !(cAlias)->(Eof())
         aAdd(aResult, { ;
@@ -354,7 +381,7 @@ Return aResult
 ### 5.3 Complete Email Sending Example
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} zSendMail
 Envia email via SMTP usando TMailManager e TMailMessage
@@ -367,9 +394,10 @@ User Function zSendMail(cDestinatario, cAssunto, cCorpo)
     Local oServer  := Nil
     Local oMessage := Nil
     Local nRet     := 0
-    Local cSmtp    := "smtp.empresa.com"
-    Local cUser    := "sistema@empresa.com"
-    Local cPass    := "senha123"
+    // Credenciais nunca fixas no fonte: parametros de e-mail do Protheus (TDN: MV_RELSERV, MV_RELACNT, MV_RELPSW)
+    Local cSmtp    := AllTrim(SuperGetMV("MV_RELSERV", .F., ""))
+    Local cUser    := AllTrim(SuperGetMV("MV_RELACNT", .F., ""))
+    Local cPass    := AllTrim(SuperGetMV("MV_RELPSW", .F., ""))
     Local nPort    := 587
     Local lRet     := .F.
 
@@ -380,7 +408,7 @@ User Function zSendMail(cDestinatario, cAssunto, cCorpo)
     // Inicializa com dados do servidor SMTP
     nRet := oServer:Init("", cSmtp, cUser, cPass, 0, nPort)
     If nRet <> 0
-        ConOut("Erro ao inicializar email: " + oServer:GetErrorString(nRet))
+        FWLogMsg("ERROR", /*cTransactionId*/, "zSendMail", "Init", /*cStep*/, /*cMsgId*/, "Erro ao inicializar email: " + oServer:GetErrorString(nRet))
         Return .F.
     EndIf
 
@@ -390,14 +418,14 @@ User Function zSendMail(cDestinatario, cAssunto, cCorpo)
     // Conecta ao servidor SMTP
     nRet := oServer:SmtpConnect()
     If nRet <> 0
-        ConOut("Erro ao conectar SMTP: " + oServer:GetErrorString(nRet))
+        FWLogMsg("ERROR", /*cTransactionId*/, "zSendMail", "SmtpConnect", /*cStep*/, /*cMsgId*/, "Erro ao conectar SMTP: " + oServer:GetErrorString(nRet))
         Return .F.
     EndIf
 
     // Autentica
     nRet := oServer:SmtpAuth(cUser, cPass)
     If nRet <> 0
-        ConOut("Erro na autenticacao SMTP: " + oServer:GetErrorString(nRet))
+        FWLogMsg("ERROR", /*cTransactionId*/, "zSendMail", "SmtpAuth", /*cStep*/, /*cMsgId*/, "Erro na autenticacao SMTP: " + oServer:GetErrorString(nRet))
         oServer:SmtpDisconnect()
         Return .F.
     EndIf
@@ -413,9 +441,9 @@ User Function zSendMail(cDestinatario, cAssunto, cCorpo)
     // Envia
     nRet := oMessage:Send(oServer)
     If nRet <> 0
-        ConOut("Erro ao enviar email: " + oServer:GetErrorString(nRet))
+        FWLogMsg("ERROR", /*cTransactionId*/, "zSendMail", "Send", /*cStep*/, /*cMsgId*/, "Erro ao enviar email: " + oServer:GetErrorString(nRet))
     Else
-        ConOut("Email enviado com sucesso para: " + cDestinatario)
+        FWLogMsg("INFO", /*cTransactionId*/, "zSendMail", "Send", /*cStep*/, /*cMsgId*/, "Email enviado com sucesso para: " + cDestinatario)
         lRet := .T.
     EndIf
 
@@ -464,7 +492,7 @@ TMailMng is the newer replacement for TMailManager, offering greater configurati
 This example implements a complete approval workflow: creating a purchase order, checking approval requirements, and sending email notifications.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} zAprovPC
 Fluxo de aprovacao de Pedido de Compras
@@ -475,7 +503,6 @@ Fluxo de aprovacao de Pedido de Compras
 /*/
 User Function zAprovPC(cNumPC)
     Local aArea    := GetArea()
-    Local lAprov   := .F.
     Local cAprov   := ""
     Local nTotal   := 0
 
@@ -484,7 +511,7 @@ User Function zAprovPC(cNumPC)
     DbSetOrder(1)
 
     If !DbSeek(xFilial("SC7") + cNumPC)
-        ConOut("[zAprovPC] Pedido nao encontrado: " + cNumPC)
+        FWLogMsg("WARN", /*cTransactionId*/, "zAprovPC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Pedido nao encontrado: " + cNumPC)
         RestArea(aArea)
         Return .F.
     EndIf
@@ -495,14 +522,14 @@ User Function zAprovPC(cNumPC)
     cAprov := fGetAprovador(nTotal)
 
     If Empty(cAprov)
-        ConOut("[zAprovPC] Nenhum aprovador encontrado para o valor: " + cValToChar(nTotal))
+        FWLogMsg("WARN", /*cTransactionId*/, "zAprovPC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Nenhum aprovador encontrado para o valor: " + cValToChar(nTotal))
         RestArea(aArea)
         Return .F.
     EndIf
 
     // Verifica se ja existe aprovacao pendente na SCR
     If fTemAprovPendente(cNumPC, "PC")
-        ConOut("[zAprovPC] Pedido ja possui aprovacao pendente.")
+        FWLogMsg("WARN", /*cTransactionId*/, "zAprovPC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Pedido ja possui aprovacao pendente.")
         RestArea(aArea)
         Return .F.
     EndIf
@@ -513,7 +540,7 @@ User Function zAprovPC(cNumPC)
     // Envia notificacao por email ao aprovador
     fNotificaAprovador(cAprov, cNumPC, nTotal)
 
-    ConOut("[zAprovPC] Solicitacao de aprovacao registrada para PC: " + cNumPC)
+    FWLogMsg("INFO", /*cTransactionId*/, "zAprovPC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Solicitacao de aprovacao registrada para PC: " + cNumPC)
 
     RestArea(aArea)
 
@@ -523,17 +550,18 @@ Return .T.
 // Calcula o valor total do pedido de compras
 // =============================================================
 Static Function fTotalPC(cNumPC)
-    Local cQuery := ""
     Local cAlias := GetNextAlias()
     Local nTotal := 0
 
-    cQuery := "SELECT SUM(C7_QUANT * C7_PRECO) AS TOTAL "
-    cQuery += "FROM " + RetSqlName("SC7") + " SC7 "
-    cQuery += "WHERE SC7.D_E_L_E_T_ = ' ' "
-    cQuery += "AND C7_FILIAL = '" + xFilial("SC7") + "' "
-    cQuery += "AND C7_NUM = '" + cNumPC + "' "
+    BeginSQL Alias cAlias
+        column TOTAL as Numeric(16,2)
 
-    TCQuery cQuery New Alias (cAlias)
+        SELECT SUM(C7_QUANT * C7_PRECO) AS TOTAL
+        FROM %table:SC7% SC7
+        WHERE SC7.%notDel%
+        AND SC7.C7_FILIAL = %xfilial:SC7%
+        AND SC7.C7_NUM = %exp:cNumPC%
+    EndSQL
 
     If !(cAlias)->(Eof())
         nTotal := (cAlias)->TOTAL
@@ -547,18 +575,17 @@ Return nTotal
 // Busca aprovador com alcada suficiente
 // =============================================================
 Static Function fGetAprovador(nValor)
-    Local cQuery  := ""
     Local cAlias  := GetNextAlias()
     Local cAprov  := ""
 
-    cQuery := "SELECT AK_COD, AK_NOME, AK_LIMITE "
-    cQuery += "FROM " + RetSqlName("SAK") + " SAK "
-    cQuery += "WHERE SAK.D_E_L_E_T_ = ' ' "
-    cQuery += "AND AK_FILIAL = '" + xFilial("SAK") + "' "
-    cQuery += "AND AK_LIMITE >= " + cValToChar(nValor) + " "
-    cQuery += "ORDER BY AK_LIMITE "
-
-    TCQuery cQuery New Alias (cAlias)
+    BeginSQL Alias cAlias
+        SELECT AK_COD, AK_NOME, AK_LIMITE
+        FROM %table:SAK% SAK
+        WHERE SAK.%notDel%
+        AND SAK.AK_FILIAL = %xfilial:SAK%
+        AND SAK.AK_LIMITE >= %exp:nValor%
+        ORDER BY AK_LIMITE
+    EndSQL
 
     If !(cAlias)->(Eof())
         cAprov := AllTrim((cAlias)->AK_COD)
@@ -596,9 +623,9 @@ Static Function fRegistraAprovacao(cNumDoc, cTipoDoc, cAprov, nTotal)
         SCR->CR_FILIAL  := xFilial("SCR")
         SCR->CR_NUM     := cNumDoc
         SCR->CR_TIPO    := cTipoDoc
-        SCR->CR_USER    := cUserID  // Usuario logado
+        SCR->CR_USER    := RetCodUsr() // Codigo do usuario logado
         SCR->CR_APROV   := cAprov
-        SCR->CR_STATUS  := "01"     // Pendente
+        SCR->CR_STATUS  := "02"        // 02 = pendente de aprovacao (01 = aguardando nivel anterior)
         SCR->CR_EMISSAO := Date()
         SCR->CR_TOTAL   := nTotal
     MsUnlock()
@@ -622,7 +649,7 @@ Static Function fNotificaAprovador(cAprov, cNumPC, nTotal)
     EndIf
 
     If Empty(cEmail)
-        ConOut("[zAprovPC] Email do aprovador nao encontrado: " + cAprov)
+        FWLogMsg("WARN", /*cTransactionId*/, "zAprovPC", "fNotificaAprovador", /*cStep*/, /*cMsgId*/, "Email do aprovador nao encontrado: " + cAprov)
         Return Nil
     EndIf
 
@@ -642,26 +669,10 @@ Return Nil
 
 // =============================================================
 // Busca email de um usuario
+// UsrRetMail(cCodUsr) e a funcao documentada (TDN) - sem SQL na tabela de usuarios
 // =============================================================
 Static Function fGetEmailUsuario(cUserId)
-    Local cEmail := ""
-    Local cQuery := ""
-    Local cAlias := GetNextAlias()
-
-    cQuery := "SELECT USR_EMAIL "
-    cQuery += "FROM " + RetSqlName("SYS_USR") + " "
-    cQuery += "WHERE D_E_L_E_T_ = ' ' "
-    cQuery += "AND USR_ID = '" + cUserId + "' "
-
-    TCQuery cQuery New Alias (cAlias)
-
-    If !(cAlias)->(Eof())
-        cEmail := AllTrim((cAlias)->USR_EMAIL)
-    EndIf
-
-    (cAlias)->(DbCloseArea())
-
-Return cEmail
+Return AllTrim(UsrRetMail(cUserId))
 ```
 
 ---
@@ -672,69 +683,89 @@ When a document requires approval, MsExecAuto may block the operation if the app
 
 ```advpl
 // Antes do MsExecAuto, verificar se o documento necessita aprovacao
-// e tratar o retorno adequadamente
+// e tratar o retorno adequadamente.
+// Bloco e parametros do MATA120: copie do exemplo documentado de ExecAuto da rotina (a confirmar no TDS)
+Static Function fIncPC(aCabec, aItens)
+    Local cErro := ""
 
-Private lMsErroAuto    := .F.
-Private lMsHelpAuto    := .T.
-Private lAutoErrNoFile := .T.
+    Private lMsErroAuto    := .F.
+    Private lMsHelpAuto    := .T.
+    Private lAutoErrNoFile := .T.
 
-MsExecAuto({|x, y, z| MATA120(x, y, z)}, aCabec, aItens, 3)
+    MsExecAuto({|x, y, z| MATA120(x, y, z)}, aCabec, aItens, 3)
 
-If lMsErroAuto
-    Local cErro := MostraErro(.F.)
+    If lMsErroAuto
+        cErro := fErroAuto() // Log de GetAutoGRLog() - secao 2.3
 
-    // Verifica se o erro e relacionado a aprovacao/alcada
-    If "ALCADA" $ Upper(cErro) .Or. "APROV" $ Upper(cErro)
-        ConOut("Documento gerado e encaminhado para aprovacao.")
-    Else
-        ConOut("Erro na geracao do documento: " + cErro)
+        // Verifica se o erro e relacionado a aprovacao/alcada
+        If "ALCADA" $ Upper(cErro) .Or. "APROV" $ Upper(cErro)
+            FWLogMsg("WARN", /*cTransactionId*/, "fIncPC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Retorno relacionado a alcada/aprovacao: " + cErro)
+        Else
+            FWLogMsg("ERROR", /*cTransactionId*/, "fIncPC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro na geracao do documento: " + cErro)
+        EndIf
     EndIf
-EndIf
+
+Return !lMsErroAuto
 ```
 
 ---
 
-## 9. FWMVCRotAuto with Approver Validation
+## 9. MVC Model API with Approver Validation
 
-Example of using FWMVCRotAuto with pre-validation that checks approver permissions:
+Example of updating an MVC routine through the model API (section 3) with pre-validation that checks approver permissions:
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
 User Function zMVCAprov()
-    Local aHeader := {}
-    Local lRet    := .F.
-    Local oModel  := Nil
+    Local aArea  := GetArea()
+    Local oModel := Nil
+    Local aErro  := {}
+    Local lRet   := .F.
+    Local cUser  := RetCodUsr() // Codigo do usuario logado
 
     // Verifica se o usuario atual e aprovador
-    If !fIsAprovador(cUserID)
-        ConOut("Usuario nao possui permissao de aprovador.")
+    If !fIsAprovador(cUser)
+        FWLogMsg("WARN", /*cTransactionId*/, "zMVCAprov", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Usuario nao possui permissao de aprovador.")
+        RestArea(aArea)
         Return .F.
     EndIf
 
-    // Posiciona no registro a ser aprovado
+    // Posiciona no registro a ser aprovado (UPDATE exige o registro posicionado)
     DbSelectArea("ZA1")
     DbSetOrder(1)
-    DbSeek(xFilial("ZA1") + "000001")
+    If !DbSeek(xFilial("ZA1") + "000001")
+        FWLogMsg("WARN", /*cTransactionId*/, "zMVCAprov", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Documento nao encontrado.")
+        RestArea(aArea)
+        Return .F.
+    EndIf
+
+    oModel := FWLoadModel("FATA090") // Fonte que contem o ModelDef de ZA1
+    oModel:SetOperation(MODEL_OPERATION_UPDATE)
+    oModel:Activate()
 
     // Campos de aprovacao
-    aAdd(aHeader, {"ZA1_STATUS", "A", Nil})  // A = Aprovado
-    aAdd(aHeader, {"ZA1_DTAPRO", Date(), Nil})
-    aAdd(aHeader, {"ZA1_USRAPR", cUserID, Nil})
+    oModel:SetValue("ZA1MASTER", "ZA1_STATUS", "A") // A = Aprovado
+    oModel:SetValue("ZA1MASTER", "ZA1_DTAPRO", Date())
+    oModel:SetValue("ZA1MASTER", "ZA1_USRAPR", cUser)
 
-    lRet := FWMVCRotAuto(oModel, "FATA090", MODEL_OPERATION_UPDATE, {;
-        {"ZA1MASTER", aHeader} ;
-    })
+    If oModel:VldData()
+        lRet := oModel:CommitData()
+    EndIf
 
     If lRet
-        ConOut("Documento aprovado com sucesso!")
+        FWLogMsg("INFO", /*cTransactionId*/, "zMVCAprov", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Documento aprovado com sucesso!")
         // Notifica solicitante
         fNotificaSolicitante("000001", "APROVADO")
     Else
-        ConOut("Erro na aprovacao.")
-        MostraErro()
+        aErro := oModel:GetErrorMessage()
+        FWLogMsg("ERROR", /*cTransactionId*/, "zMVCAprov", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro na aprovacao: " + AllToChar(aErro[6]) + " | Solucao: " + AllToChar(aErro[7]))
     EndIf
+
+    oModel:DeActivate()
+    oModel:Destroy()
+    RestArea(aArea)
 
 Return lRet
 
@@ -763,8 +794,11 @@ Return lAprov
 
 ### 10.1 MsExecAuto
 - Always declare `lMsErroAuto`, `lMsHelpAuto`, and `lAutoErrNoFile` as Private before calling.
+- Copy the ExecAuto call (block signature, arrays, options) from the routine's documented example on TDN.
 - Always check `lMsErroAuto` after execution.
-- Use `MostraErro(.F.)` to capture error messages as strings.
+- With `lAutoErrNoFile := .T.`, read the error log with `GetAutoGRLog()` (array of lines, see 2.3); `MostraErro()` only shows the log on screen or writes it to a file.
+- For MVC routines use the model API (section 3); never `FWMVCRotAuto` (restricted to TOTVS internal use).
+- Log with `FWLogMsg()`, never `ConOut()`.
 - Use `GetArea()` / `RestArea()` to preserve table positioning.
 
 ### 10.2 Approval Flows
