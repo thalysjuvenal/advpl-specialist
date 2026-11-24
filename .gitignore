@@ -24,5 +24,8 @@ linkedin-post.txt
 *.png
 !documentation/public/og-image.png
 
+# Archives
+*.zip
+
 # Superpowers SDD scratch
 /.superpowers/

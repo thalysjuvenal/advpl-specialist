@@ -1,0 +1,6 @@
+* text=auto
+hooks/** text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+examples/encoding-tests/fixtures/** -text
+tests/**/fixtures/** -text
