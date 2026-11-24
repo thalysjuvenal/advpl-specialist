@@ -94,7 +94,11 @@ User Function LintR001()
 	cQueryAux += " AND A1_COD = " + cCod
 	Local cFilAnt := "01" // expect: ADV016
 	Local nY, cFilAnt // expect: ADV016
-	Local nZ := 1, cModulo := "SIGAFAT" // expect: ADV016
+	Local nZ, cModulo := "SIGAFAT" // expect: ADV016
+	Local cX := xFilial("SA1", cFilAnt)
+	Local nA := Max(1, nModulo)
+	Local aX := {1, cEmpAnt}
+	Local nB := 1, cFilAnt := "02"
 	Local dDataBase, nW // expect: ADV016
 	Local __cUserID, cUserName, nModulo // expect: ADV016
 	Local cEmpAntX := "1", nModuloX := 2
