@@ -736,6 +736,136 @@ usage_case "FILE is a directory" "cannot read FILE: " "$TMP_DIR"
 usage_case "option after the first FILE is a FILE" "cannot read FILE: --scope" "$F" --scope line
 usage_case "--lines-file is a directory" "cannot read lines file: " --lines-file "$PAR" "$F"
 
+echo "=== lint-docs.sh (ADVPL/TLPP blocks in .md/.mdx) ==="
+# The extractor has no PowerShell twin: it hands the blocks to advpl-lint.sh,
+# whose parity is covered above. "// expect:" annotations in the fixtures are
+# ADVPL comments, so the expected lines are lines of the .md/.mdx itself.
+LINT_DOCS="$PLUGIN_ROOT/scripts/lint-docs.sh"
+DOCS="$TMP_DIR/docs"
+mkdir -p "$DOCS/tree/sub" "$DOCS/tree/node_modules/pkg"
+DOC_MD="$FIXTURES_DIR/docs-sample.md"
+DOC_MDX="$FIXTURES_DIR/docs-sample.mdx"
+run_docs() {   # NAME ARGS... -> $TMP_DIR/NAME.{out,err,rc}
+  local name="$1"
+  shift
+  (cd "$RUN_DIR" && "$SH" "$LINT_DOCS" "$@") >"$TMP_DIR/$name.out" 2>"$TMP_DIR/$name.err"
+  echo "$?" >"$TMP_DIR/$name.rc"
+}
+check_docs() {   # LABEL NAME FILE EXPECT_SOURCE [OPTIONS...]
+  local label="$1" name="$2" file="$3" src="$4"
+  shift 4
+  run_docs "$name" "$@" "$file"
+  expected_set "$src" >"$TMP_DIR/$name.exp"
+  found_set "$name" "$file" >"$TMP_DIR/$name.got"
+  begin_case
+  expect_that "output contract" wellformed "$name"
+  expect_that "findings differ (< expected, > actual)" same_file "$TMP_DIR/$name.exp" "$TMP_DIR/$name.got"
+  expect_that "no stderr" no_stderr "$name"
+  end_case "$label ($(wc -l <"$TMP_DIR/$name.exp" | tr -d ' ') expected findings)"
+}
+for fixture in "$DOC_MD" "$DOC_MDX"; do
+  base="$(basename "$fixture")"
+  check_docs "lint-docs $base" "docs-$base" "$fixture" "$fixture"
+  LC_ALL=C awk '{ printf "%s\r\n", $0 }' "$fixture" >"$TMP_DIR/crlf/$base"
+  check_docs "lint-docs $base (CRLF copy)" "docs-crlf-$base" "$TMP_DIR/crlf/$base" "$fixture"
+done
+
+run_docs docs-two "$DOC_MDX" "$DOC_MD"
+begin_case
+expect_that "output contract" wellformed docs-two
+expect_that "first finding is not from the first PATH" [ "$(parse_findings docs-two | head -n 1 | cut -f 1)" = "$DOC_MDX" ]
+expect_that "last finding is not from the second PATH" [ "$(parse_findings docs-two | tail -n 1 | cut -f 1)" = "$DOC_MD" ]
+expect_that "findings are not the sum of both files" [ "$(parse_findings docs-two | wc -l | tr -d ' ')" = "$(( $(wc -l <"$TMP_DIR/docs-docs-sample.md.exp") + $(wc -l <"$TMP_DIR/docs-docs-sample.mdx.exp") ))" ]
+end_case "lint-docs: several PATHs in argument order, summed summary"
+
+# --summary: per-file counts ordered by errors then warnings (descending), per-
+# rule counts, the engine-style total as the last line and the same exit code.
+run_docs docs-sum --summary "$DOC_MDX" "$DOC_MD"
+sum_rows() {   # data rows of the per-file section: "ERRORS WARNINGS FILE"
+  LC_ALL=C awk '/^#/ { sec++; next } sec == 1 && /^ *[0-9]/ { e = $1; w = $2; sub(/^ *[0-9]+ +[0-9]+  /, ""); print e " " w " " $0 }' "$TMP_DIR/$1.out"
+}
+begin_case
+expect_that "exit $(rc_of docs-sum), want 1" [ "$(rc_of docs-sum)" = 1 ]
+expect_that "row 1 is not '8 0 docs-sample.md'" [ "$(sum_rows docs-sum | sed -n 1p)" = "8 0 $DOC_MD" ]
+expect_that "row 2 is not '1 1 docs-sample.mdx'" [ "$(sum_rows docs-sum | sed -n 2p)" = "1 1 $DOC_MDX" ]
+expect_that "more than 2 rows" [ "$(sum_rows docs-sum | wc -l | tr -d ' ')" = 2 ]
+expect_that "per-rule ADV003 row" grep -qx 'ADV003 error 7' "$TMP_DIR/docs-sum.out"
+expect_that "per-rule ADV009 row" grep -qx 'ADV009 warning 1' "$TMP_DIR/docs-sum.out"
+expect_that "no finding lines" [ -z "$(parse_findings docs-sum)" ]
+expect_that "bad last line" [ "$(tail -n 1 "$TMP_DIR/docs-sum.out")" = "advpl-lint: 9 error(s), 1 warning(s), 0 suppressed" ]
+expect_that "no stderr" no_stderr docs-sum
+end_case "lint-docs --summary: per file (descending), per rule, total"
+
+# Directories: *.md/*.mdx in any case, sorted, node_modules and .git pruned;
+# other extensions are only linted when named explicitly.
+cp "$DOC_MDX" "$DOCS/tree/a.mdx"
+cp "$DOC_MD" "$DOCS/tree/sub/b.MD"
+printf '~~~advpl\nConOut("x")\n~~~\n' >"$DOCS/tree/c.txt"
+cp "$DOCS/tree/c.txt" "$DOCS/tree/node_modules/pkg/d.md"
+run_docs docs-dir "$DOCS/tree"
+found_set docs-dir "$DOCS/tree/a.mdx" >"$TMP_DIR/docs-dir-a.got"
+found_set docs-dir "$DOCS/tree/sub/b.MD" >"$TMP_DIR/docs-dir-b.got"
+begin_case
+expect_that "output contract" wellformed docs-dir
+expect_that "files reported" [ "$(parse_findings docs-dir | cut -f 1 | uniq | tr '\n' '|')" = "$DOCS/tree/a.mdx|$DOCS/tree/sub/b.MD|" ]
+expect_that ".mdx findings differ" same_file "$TMP_DIR/docs-docs-sample.mdx.exp" "$TMP_DIR/docs-dir-a.got"
+expect_that ".MD findings differ" same_file "$TMP_DIR/docs-docs-sample.md.exp" "$TMP_DIR/docs-dir-b.got"
+end_case "lint-docs DIR: .md/.mdx in any case, sorted, node_modules pruned"
+run_docs docs-dir-slash "$DOCS/tree//"
+begin_case
+expect_that "output differs from DIR without the trailing slashes" same_file "$TMP_DIR/docs-dir.out" "$TMP_DIR/docs-dir-slash.out"
+end_case "lint-docs DIR/: trailing slashes do not change the reported paths"
+run_docs docs-txt "$DOCS/tree/c.txt"
+begin_case
+expect_that "findings" [ "$(found_set docs-txt "$DOCS/tree/c.txt")" = "2:ADV003" ]
+expect_that "exit 1" [ "$(rc_of docs-txt)" = 1 ]
+end_case "lint-docs FILE: an explicit file is linted whatever its extension"
+
+# A fence left open runs to the end of the file (CommonMark).
+printf 'texto\n\n```advpl\nReturn\nConOut("x")\n' >"$DOCS/unclosed.md"
+run_docs docs-unclosed "$DOCS/unclosed.md"
+begin_case
+expect_that "findings" [ "$(found_set docs-unclosed "$DOCS/unclosed.md")" = "5:ADV003" ]
+end_case "lint-docs: unclosed fence runs to the end of the file"
+
+# Block extension: .tlpp for language tlpp or a "namespace " line, else .prw
+# (observed through --rules with a rule restricted to EXTS=tlpp). The fence's
+# indentation, and only it, is removed from the block lines (TST002 is
+# anchored at the line start).
+printf 'TST001\twarn\tline\tforbid\tcode\ti\ttlpp\tmarcatlpp\t-\tso tlpp\t-\n' >"$DOCS/tlpp.rules"
+printf 'TST002\twarn\tline\tforbid\traw\tc\t*\t^recuo\t-\tsem recuo\t-\n' >>"$DOCS/tlpp.rules"
+printf '~~~tlpp\nmarcatlpp\n~~~\n~~~advpl\nNamespace custom.docs\nmarcatlpp\n~~~\n~~~advpl\nmarcatlpp\n~~~\n~~~c\nReturn\nmarcatlpp\n~~~\n' >"$DOCS/ext.md"
+printf -- '- item\n\n  ~~~advpl\n  recuo\n    recuo\n  ~~~\n' >>"$DOCS/ext.md"
+run_docs docs-ext --rules "$DOCS/tlpp.rules" "$DOCS/ext.md"
+begin_case
+expect_that "findings" [ "$(found_set docs-ext "$DOCS/ext.md" | tr '\n' ' ')" = "18:TST002 2:TST001 6:TST001 " ]
+expect_that "exit 0 with warnings only" [ "$(rc_of docs-ext)" = 0 ]
+expect_that "output contract" wellformed docs-ext
+end_case "lint-docs: .tlpp for tlpp or namespace, .prw otherwise; fence indent removed"
+
+printf '# sem codigo\n\n~~~bash\necho ok\n~~~\n' >"$DOCS/none.md"
+run_docs docs-none "$DOCS/none.md"
+begin_case
+expect_that "output" [ "$(cat "$TMP_DIR/docs-none.out")" = "advpl-lint: 0 error(s), 0 warning(s), 0 suppressed" ]
+expect_that "exit 0" [ "$(rc_of docs-none)" = 0 ]
+expect_that "no stderr" no_stderr docs-none
+end_case "lint-docs: file without ADVPL blocks"
+
+docs_usage() {   # LABEL STDERR_FRAGMENT ARGS...
+  local label="$1" fragment="$2"
+  shift 2
+  run_docs docs-usage "$@"
+  begin_case
+  expect_that "exit $(rc_of docs-usage), want 2" [ "$(rc_of docs-usage)" = 2 ]
+  expect_that "stdout not empty" [ ! -s "$TMP_DIR/docs-usage.out" ]
+  expect_that "stderr lacks '$fragment'" grep -q -e "$fragment" "$TMP_DIR/docs-usage.err"
+  end_case "lint-docs usage error: $label"
+}
+docs_usage "no PATH" "no PATH given"
+docs_usage "unknown option" "unknown option: --bogus" --bogus "$DOC_MD"
+docs_usage "nonexistent PATH" "cannot read PATH: " "$DOCS/missing.md"
+docs_usage "engine error (unreadable --rules)" "cannot read rules file: " --rules "$DOCS/missing.rules" "$DOC_MD"
+
 echo ""
 echo "============================="
 if [ -n "$PS_BIN" ]; then

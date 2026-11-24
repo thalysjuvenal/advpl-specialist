@@ -1,0 +1,35 @@
+---
+title: docs-sample.mdx
+description: fixture de scripts/lint-docs.sh para blocos c do site
+---
+
+{/* Cada linha anotada com o comentario expect e o ID dentro de um bloco ADVPL deve gerar o achado na linha correspondente deste arquivo. */}
+
+Bloco c com ADVPL (acusado):
+
+```c
+User Function DocC()
+    Local xVal := IIf(.T., 1, 2) // expect: ADV009
+    ConOut("acusado") // expect: ADV003
+Return
+```
+
+Bloco c com C de verdade (ignorado; acusaria ADV002 se fosse ADVPL):
+
+```c
+#include <Windows.h>
+
+int main(void)
+{
+    return 0;
+}
+```
+
+Bloco c marcado como anti-exemplo (ignorado):
+
+{/* advpl-lint: anti-exemplo */}
+```c
+User Function DocD()
+    ConOut("ignorado")
+Return
+```
