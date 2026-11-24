@@ -7,6 +7,17 @@
 # Scope per fixture (C17): file-scope.* runs with --scope all; the others
 # (rules.*, fffd.*) run with --scope line. Fixture sets ignore repeated
 # findings, so finding COUNTS are checked by dedicated cases (found_list).
+#
+# PowerShell parity: when pwsh or powershell exists (LINT_PS=BINARY forces
+# one), every engine run is repeated with advpl-lint.ps1, which must print the
+# same stdout byte for byte, exit with the same code and write the same stderr
+# (its usage line names advpl-lint.ps1). Without PowerShell those checks are
+# skipped and reported as skipped. Linux check (bash + mawk + pwsh 7):
+#   docker run --rm -v "$PWD":/w -w /w mcr.microsoft.com/powershell \
+#     bash tests/lint/run-tests.sh                       (x86_64 hosts)
+#   docker run --rm -v "$PWD":/w -w /w mcr.microsoft.com/dotnet/sdk:8.0 \
+#     bash tests/lint/run-tests.sh                       (arm64 hosts: the
+#   powershell image has no arm64 variant and pwsh crashes under emulation)
 
 set -u
 
@@ -16,6 +27,10 @@ LINT="$PLUGIN_ROOT/skills/advpl-code-review/scripts/advpl-lint.sh"
 FIXTURES_DIR="$SCRIPT_DIR/fixtures"
 IGNORE_DIR="$FIXTURES_DIR/ignore-cases"
 SH="${BASH:-bash}"            # run the engine with the same bash as this runner
+# A locale the system lacks (LC_ALL=en_US.UTF-8 in the PowerShell Docker image)
+# makes every child bash warn on stderr; fall back to C so that the stderr
+# checks only see the engines' own messages.
+if [ -n "$("$SH" -c : 2>&1)" ]; then export LC_ALL=C; fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 RUN_DIR="$TMP_DIR/cwd"        # empty cwd: no stray ./.advpl-specialist-ignore
@@ -35,11 +50,14 @@ expect_that() {   # DESCRIPTION COMMAND...
 end_case() { if [ -z "$PROB" ]; then pass "$1"; else fail "$1:${PROB#;}"; fi; }
 
 # run_lint_in DIR NAME [ARGS...] -> $TMP_DIR/NAME.{out,err,rc}
+# Every run is followed by the advpl-lint.ps1 parity check (see parity_check);
+# NO_PARITY=1 skips it (timed runs call parity_check themselves).
 run_lint_in() {
   local dir="$1" name="$2"
   shift 2
   (cd "$dir" && "$SH" "$LINT" "$@") >"$TMP_DIR/$name.out" 2>"$TMP_DIR/$name.err"
   echo "$?" >"$TMP_DIR/$name.rc"
+  [ -n "${NO_PARITY:-}" ] || parity_check "$dir" "$name" "$@"
 }
 run_lint() { run_lint_in "$RUN_DIR" "$@"; }
 rc_of() { cat "$TMP_DIR/$1.rc"; }
@@ -102,6 +120,92 @@ wellformed() {
 }
 same_file() { cmp -s "$1" "$2" || { diff "$1" "$2" | head -20; return 1; }; }
 no_stderr() { [ ! -s "$TMP_DIR/$1.err" ] || { head -5 "$TMP_DIR/$1.err"; return 1; }; }
+
+# ---- advpl-lint.ps1 parity ---------------------------------------------------
+LINT_PS1="$PLUGIN_ROOT/skills/advpl-code-review/scripts/advpl-lint.ps1"
+PS_WIN=0
+case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) PS_WIN=1 ;; esac
+PS_BIN="${LINT_PS:-}"
+if [ -z "$PS_BIN" ]; then
+  # Windows prefers powershell (5.1, the compatibility floor), elsewhere pwsh.
+  if [ "$PS_WIN" = 1 ]; then ps_candidates="powershell pwsh"; else ps_candidates="pwsh powershell"; fi
+  for c in $ps_candidates; do
+    if command -v "$c" >/dev/null 2>&1; then PS_BIN="$c"; break; fi
+  done
+fi
+PARITY_RUNS=0
+
+# Windows (Git Bash; not exercised locally): absolute POSIX paths are handed
+# to PowerShell as C:/... (cygpath -m) with MSYS path conversion off, and the
+# converted paths in its output are mapped back before comparing.
+to_win_args() {   # ARGS... -> WIN_ARGS, $TMP_DIR/winmap ("WINPATH<TAB>PATH")
+  local a w
+  WIN_ARGS=()
+  : >"$TMP_DIR/winmap"
+  for a in "$@"; do
+    case "$a" in
+      /*) w="$(cygpath -m "$a")"; printf '%s\t%s\n' "$w" "$a" >>"$TMP_DIR/winmap" ;;
+      *) w="$a" ;;
+    esac
+    WIN_ARGS[${#WIN_ARGS[@]}]="$w"
+  done
+}
+from_win() {   # FILE: replace every converted path listed in winmap
+  [ -s "$TMP_DIR/winmap" ] || return 0
+  LC_ALL=C awk -F '\t' '
+    NR == FNR { from[NR] = $1; to[NR] = $2; n = NR; next }
+    {
+      s = $0
+      for (i = 1; i <= n; i++) {
+        out = ""
+        while ((k = index(s, from[i])) > 0) {
+          out = out substr(s, 1, k - 1) to[i]
+          s = substr(s, k + length(from[i]))
+        }
+        s = out s
+      }
+      print s
+    }' "$TMP_DIR/winmap" "$1" >"$1.map" && mv "$1.map" "$1"
+}
+
+# parity_check DIR NAME ARGS...: run advpl-lint.ps1 like run NAME and compare
+# stdout (bytes), exit code and stderr (usage line normalized).
+parity_check() {
+  [ -n "$PS_BIN" ] || return 0
+  local dir="$1" name="$2" script="$LINT_PS1" ps="$2.ps" a label=""
+  shift 2
+  for a in "$@"; do
+    a="${a#"$TMP_DIR"/}"
+    a="${a#"$FIXTURES_DIR"/}"
+    label="$label $a"
+  done
+  if [ "$PS_WIN" = 1 ]; then
+    to_win_args "$@"
+    set -- ${WIN_ARGS[@]+"${WIN_ARGS[@]}"}
+    script="$(cygpath -w "$LINT_PS1")"
+  fi
+  (cd "$dir" && MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
+    "$PS_BIN" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$script" "$@") \
+    >"$TMP_DIR/$ps.out" 2>"$TMP_DIR/$ps.err"
+  echo "$?" >"$TMP_DIR/$ps.rc"
+  if [ "$PS_WIN" = 1 ]; then
+    from_win "$TMP_DIR/$ps.out"
+    from_win "$TMP_DIR/$ps.err"
+  fi
+  LC_ALL=C sed 's/advpl-lint\.ps1/advpl-lint.sh/' "$TMP_DIR/$ps.err" >"$TMP_DIR/$ps.errn"
+  PARITY_RUNS=$((PARITY_RUNS + 1))
+  begin_case
+  expect_that "exit $(rc_of "$ps"), bash $(rc_of "$name")" [ "$(rc_of "$ps")" = "$(rc_of "$name")" ]
+  expect_that "stdout differs (< bash, > ps1)" same_file "$TMP_DIR/$name.out" "$TMP_DIR/$ps.out"
+  expect_that "stderr differs (< bash, > ps1)" same_file "$TMP_DIR/$name.err" "$TMP_DIR/$ps.errn"
+  end_case "parity [$name]:$label"
+}
+
+if [ -n "$PS_BIN" ]; then
+  echo "PowerShell parity: on ($PS_BIN)"
+else
+  echo "PowerShell parity: skipped (no pwsh/powershell found; advpl-lint.ps1 not exercised)"
+fi
 
 check_fixture() {   # LABEL NAME FILE EXPECT_SOURCE SCOPE
   local label="$1" name="$2" file="$3" src="$4" scope="$5"
@@ -359,6 +463,23 @@ count_case "boundary 'ab' on 'x ab ab' (2)" i '(^|[^a-z0-9_])ab' - 'x ab ab' 2
 count_case "boundary 'ab' on 'abab ab xab ab_ab' (3)" i '(^|[^a-z0-9_])ab' - 'abab ab xab ab_ab' 3
 count_case "CASE=c boundary 'Ab(' on 'Ab(Ab( xAb( _Ab(' (2)" c '(^|[^A-Za-z0-9_])Ab\(' - 'Ab(Ab( xAb( _Ab(' 2
 count_case "REGEX2 sees the core text, not the '#' context char: '#ab_ok' excepted, 'ab_no' reported (1)" i '(^|[^a-z0-9_])ab_[a-z]+' '^ab_ok$' '#ab_ok ab_no' 1
+# awk returns the leftmost-LONGEST match (a backtracking engine such as .NET
+# would stop at the first alternative): the matched text decides the REGEX2
+# exception and where the next search starts.
+count_case "longest match: 'x(a|ab)' on 'xab' is 'xab', not excepted by '^xa\$' (1)" i 'x(a|ab)' '^xa$' 'xab' 1
+count_case "longest match: '(a|aa)' on 'aaa' = 'aa' + 'a' (2)" i '(a|aa)' - 'aaa' 2
+count_case "longest match: 'a+(ab)?' on 'aab' is 'aab', not excepted by '^aa\$' (1)" i 'a+(ab)?' '^aa$' 'aab' 1
+count_case "longest match: 'a(b|bc\$)?' on 'abcd abc': '\$' only at the line end (1)" i 'a(b|bc$)?' '^ab$' 'abcd abc' 1
+count_case "longest match: '(a|^ab)' on 'xab' is 'a' ('^' only at the line start), excepted by '^a\$' (0)" i '(a|^ab)' '^a$' 'xab' 0
+# awk regex escapes and bracket expressions (the PowerShell engine translates them)
+count_case "escape: '\\t' in REGEX is a TAB (1)" i 'a\tb' - "$(printf 'a\tb')" 1
+count_case "escape: '\\/' is a slash (1)" i '\/x' - '/x' 1
+count_case "escape: octal '\\101' is 'A' (CASE=c) (1)" c '\101b' - 'Ab' 1
+count_case "bracket: ']' first is literal in '[]x]' (2)" i '[]x]' - ']x' 2
+count_case "bracket: '[-[]' holds '-' and '[' (2)" i '[-[]' - '-[' 2
+# CASE=i lowercases ASCII only (awk tolower under LC_ALL=C): byte 0xC7 stays.
+count_case "CASE=i keeps Latin-1 0xC7: '\\307' matches (1)" i '\307' - "$(printf 'x\307y')" 1
+count_case "CASE=i keeps Latin-1 0xC7: '\\347' does not match (0)" i '\347' - "$(printf 'x\307y')" 0
 
 echo "=== File-scope rules (ADV019-ADV021) ==="
 # --scope line, and --lines-file even when it lists every line, turn SCOPE=file
@@ -477,7 +598,9 @@ LC_ALL=C awk 'BEGIN {
   }
 }' >"$TMP_DIR/big.prw"
 TIMEFORMAT='%R'
+NO_PARITY=1
 { time run_lint big --scope all "$TMP_DIR/big.prw"; } 2>"$TMP_DIR/big.time"
+NO_PARITY=
 secs="$(tail -n 1 "$TMP_DIR/big.time")"
 begin_case
 expect_that "output contract" wellformed big
@@ -488,8 +611,137 @@ expect_that "ADV009 $(count_id big ADV009), want 50" [ "$(count_id big ADV009)" 
 expect_that "$(parse_findings big | wc -l | tr -d ' ') findings, want 150" [ "$(parse_findings big | wc -l | tr -d ' ')" = 150 ]
 expect_that "took ${secs}s, want < 2s" awk -v s="$secs" 'BEGIN { exit !(s + 0 < 2) }'
 end_case "arquivo-grande: 5001 lines, --scope all, ${secs}s (< 2 s)"
+parity_check "$RUN_DIR" big --scope all "$TMP_DIR/big.prw"
+
+echo "=== Parity matrix (every fixture and edge file, every mode) ==="
+# Each run checks the output contract of the bash engine; with PowerShell,
+# run_lint also compares advpl-lint.ps1 (stdout, exit code, stderr). Edge
+# files: Latin-1 bytes (uppercase accented letters must survive CASE=i), a CR
+# inside a line, "\r\r\n", a last line without newline or with a lone CR, an
+# empty file, a blank .tlpp, extensions in any case, a skipped .txt, a path
+# with spaces and a non-ASCII (UTF-8) path.
+PAR="$TMP_DIR/par"
+mkdir -p "$PAR/dir with space" "$PAR/ação"
+LC_ALL=C awk 'BEGIN {
+  n = 0
+  L[++n] = "#INCLUDE \"TOTVS.CH\""
+  L[++n] = "#include \047Protheus.ch\047"
+  L[++n] = "  #  include <totvs.ch>"
+  L[++n] = "User Function EdgeA(cPar, ;"
+  L[++n] = "   nPar)"
+  L[++n] = "\tLocal cX := \"\307\303O\" + \047it\047\047s\047 // \311 coment\341rio"
+  L[++n] = "\tLocal nOk := 0, aL[2, 3], bB := {|x| x := 1}"
+  L[++n] = "\tConOut(\"a\") ; nSem := 1 ; ConOut( \"b\" )"
+  L[++n] = "\t/* bloco ConOut(\"no\")"
+  L[++n] = "\t   */ ConOut(\"yes\") /* inline */ IIf(.T., 1, 2) /*/ ConOut(\"in comment\")"
+  L[++n] = "\tstill comment */ nPos := 2"
+  L[++n] = "\t* comentario ConOut(\"no\")"
+  L[++n] = "\tcQuery := \"SELECT \" + cTab + \" WHERE \" + cWhere"
+  L[++n] = "\tcSql += cX"
+  L[++n] = "\tIIf(.T., 1, 2) && ConOut(\"x\")"
+  L[++n] = "\tA\307\303O := 1"
+  L[++n] = "\t\303\307 := 2 ; CONOUT(\"\311\") ; conout(\"\351\")"
+  L[++n] = "\tabcd := abc + ab"
+  L[++n] = "\tRecLock(\"SA1\", .F.)"
+  L[++n] = "\tRecLock(\"SA2\", .F.)"
+  L[++n] = "\tSA2->(MsUnlock())"
+  L[++n] = "\tDbSelectArea(\"SX3\") ; DbSelectArea(\047SM0\047)"
+  L[++n] = "\tcSel := \"SELECT * FROM SA1 WITH (NOLOCK)\""
+  L[++n] = "\tStaticCall(MATA010, x) ; PTInternal(1)"
+  L[++n] = "\t__cUserID := \"x\" ; cEmpAnt := \"01\""
+  L[++n] = "\tLocal cEmpAnt, cFilAnt"
+  L[++n] = "\tDbCreate(x) ; MsCreate(y) ; CriaTrab(nil, .F.)"
+  L[++n] = "\tusing namespace tlpp.core ; using namespace tlpp.probat"
+  L[++n] = "\tMA410IMPOS(1) ; SA1->A1_NOMEX := 1 ; FT_FUse(\"x\") ; SA1->A1_XPROJ := 2"
+  L[++n] = "\tx\ry := 1"
+  L[++n] = "\tFor nI := 1 To 10 ; Next"
+  L[++n] = "\tcStr := \"unterminated"
+  L[++n] = "\tnZ := 1\r\r"
+  L[++n] = "\t? \"x\""
+  L[++n] = "\t?? \"y\""
+  L[++n] = "Return"
+  L[++n] = "Static Function EdgeB()"
+  L[++n] = "Class EdgeC"
+  L[++n] = "  Method New() Constructor"
+  L[++n] = "EndClass"
+  L[++n] = "Method New(nArg) Class EdgeC"
+  L[++n] = "\tnArg := 1 ; nW := 1"
+  L[++n] = "Return Self"
+  L[++n] = "ConOut(\"\357\277\275 last line, no newline\")"
+  for (i = 1; i < n; i++) print L[i]
+  printf "%s", L[n]
+}' >"$PAR/edge.prw"
+printf 'IIf(a, b, c)\n\r' >"$PAR/lone-cr.PRX"
+printf 'ConOut("x")\r\r\nnA := 1\n' >"$PAR/crcr.Th"
+: >"$PAR/empty.prw"
+printf '\n' >"$PAR/blank.tlpp"
+cp "$PAR/edge.prw" "$PAR/skip.txt"
+cp "$F" "$PAR/dir with space/rules copy.prw"
+cp "$FIXTURES_DIR/rules.tlpp" "$PAR/ação/regras.TLPP"
+PAR_FILES=("$FIXTURES_DIR"/*.prw "$FIXTURES_DIR"/*.tlpp "$TMP_DIR"/crlf/* "$PAR/edge.prw" \
+  "$PAR/lone-cr.PRX" "$PAR/crcr.Th" "$PAR/empty.prw" "$PAR/blank.tlpp" "$PAR/skip.txt" \
+  "$PAR/dir with space/rules copy.prw" "$PAR/ação/regras.TLPP")
+
+LC_ALL=C awk 'BEGIN { for (i = 1; i <= 199; i += 2) print i; print "x"; print ""; print " 004\r" }' >"$PAR/odd.lines"
+{
+  echo '# mistura de diretivas validas e invalidas'
+  echo 'path **/dir with space/*.prw'
+  printf '\tpath ação/*.TLPP\r\n'
+  echo 'rule ca4000'
+  echo 'rule adv021'
+  echo 'field A1_NomeX'
+  echo 'function MA410IMPOS'
+  echo 'rule a b'
+  echo 'path'
+  echo 'function'
+  echo 'bogus x'
+} >"$PAR/mix.ignore"
+{
+  printf 'PAR001\terror\tline\tforbid\tcode\tc\t*\t%s\t-\tConOut exato\t-\n' '(^|[^A-Za-z0-9_])ConOut[ \t]*\('
+  printf 'PAR002\twarn\tline\tforbid\traw\ti\t*\t%s\t-\tmaiuscula latin-1\tREF-1\n' '\307|\311'
+  printf 'PAR003\twarn\tline\tforbid\traw\tc\tprw,tlpp\t%s\t-\tminuscula latin-1\t-\n' '\351|\341|\303'
+  printf 'PAR004\twarn\tline\tforbid\tcode\ti\t*\t%s\t%s\talternativa curta primeiro\t-\n' '(iif|iif[ \t]*\()' '^iif$'
+  printf 'PAR005\twarn\tline\tforbid\traw\ti\t*\t%s\t-\ttab antes de comentario\t-\n' '\t\/\/'
+  printf 'PAR006\twarn\tline\tforbid\tcode\ti\t*\t%s\t-\tcolchetes\t-\n' '[;]|[]x[]'
+  printf 'PAR007\terror\tfile\trequire\traw\tc\tprw,prx\t%s\t-\tsem include minusculo\t-\n' '^#include'
+  printf 'PAR008\twarn\tfile\tbalance\traw\ti\t*\t%s\t%s\tbalance raw\t-\n' '(^|[^a-z0-9_])reclock' '(^|[^a-z0-9_])(msunlock|msunlockall)'
+  printf 'PAR009\twarn\tfile\tundeclared\tcode\ti\t*\t%s\t-\tsem declaracao\t-\n' '^(nsem|x)$'
+  printf 'PAR010\twarn\tline\tforbid\tcode\ti\t*\t%s\t-\talternancia\t-\n' '(a|ab)(c|bcd)?'
+  printf 'PAR011\twarn\tline\tforbid\tcode\ti\t*\t%s\t-\tfim de linha\t-\n' ':=$|\.f\.'
+  printf 'PAR012\twarn\tline\tforbid\traw\tc\tTH,PRX\t%s\t%s\textensao maiuscula\t-\n' '.' '^[^A-Z]'
+} >"$PAR/par.rules"
+
+par_case() {   # DIR NAME ARGS...: one matrix run (output contract + parity)
+  local dir="$1" name="$2"
+  shift 2
+  run_lint_in "$dir" "$name" "$@"
+  begin_case
+  expect_that "output contract" wellformed "$name"
+  end_case "matrix: $name"
+}
+par_case "$RUN_DIR" par-all --scope all "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-line --scope line "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-lines --scope all --lines-file "$PAR/odd.lines" "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-nolines --lines-file "" "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-ign-valid --ignore-file "$IGNORE_DIR/valid.advpl-specialist-ignore" "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-ign-crlf --ignore-file "$IGNORE_DIR/unknown-crlf.advpl-specialist-ignore" "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-ign-mix --scope all --ignore-file "$PAR/mix.ignore" "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-dashdash --scope line --scope all --rules "$PLUGIN_ROOT/skills/advpl-code-review/scripts/advpl-lint.rules" -- "${PAR_FILES[@]}"
+par_case "$RUN_DIR" par-custom --rules "$PAR/par.rules" "${PAR_FILES[@]}"
+cp "$PAR/mix.ignore" "$PAR/.advpl-specialist-ignore"
+par_case "$PAR" par-relative edge.prw "dir with space/rules copy.prw" "ação/regras.TLPP" crcr.Th
+usage_case "lone '-' is a FILE" "cannot read FILE: -" -
+usage_case "single-dash option" "unknown option: -x" -x "$F"
+usage_case "FILE is a directory" "cannot read FILE: " "$TMP_DIR"
+usage_case "option after the first FILE is a FILE" "cannot read FILE: --scope" "$F" --scope line
+usage_case "--lines-file is a directory" "cannot read lines file: " --lines-file "$PAR" "$F"
 
 echo ""
 echo "============================="
+if [ -n "$PS_BIN" ]; then
+  echo "PowerShell parity: $PARITY_RUNS runs compared with $PS_BIN"
+else
+  echo "PowerShell parity: skipped (no pwsh/powershell found)"
+fi
 echo "TOTAL: PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
