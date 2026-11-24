@@ -531,12 +531,16 @@ printf '#INCLUDE "TLPP-CORE.TH"\n' >"$REQ_DIR/upper.tlpp"
 printf 'User Function LintTh()\nReturn\n' >"$REQ_DIR/noinc.th"
 : >"$REQ_DIR/empty.tlpp"
 printf '/*\n#include "tlpp-core.th"\n*/\n#include "tlpp-rest.th" // #include "tlpp-core.th"\n' >"$REQ_DIR/comment.tlpp"
-run_lint_in "$REQ_DIR" req ok.tlpp angle.tlpp upper.tlpp noinc.th empty.tlpp comment.tlpp
+# Task 8 (TDN): tlpp-core.th is recommended, not mandatory (warning), and the
+# official Smart X sources include fw-tlpp-core.th instead.
+printf "#include 'fw-tlpp-core.th'\n#include \"totvs.framework.structure.model.th\"\n" >"$REQ_DIR/smartx.tlpp"
+printf '#include "xfw-tlpp-core.th"\n' >"$REQ_DIR/other.tlpp"
+run_lint_in "$REQ_DIR" req ok.tlpp angle.tlpp upper.tlpp noinc.th empty.tlpp comment.tlpp smartx.tlpp other.tlpp
 begin_case
 expect_that "output contract" wellformed req
-expect_that "findings [$(parse_findings req | cut -f 1,2,4 | tr '\t\n' ': ')]" \
-  [ "$(parse_findings req | cut -f 1,2,4 | tr '\t\n' ': ')" = "upper.tlpp:1:ADV002 empty.tlpp:1:ADV019 comment.tlpp:1:ADV019 " ]
-end_case "ADV019: include on any line (\"\" or <>, any case) satisfies it, not inside a comment; .th is exempt, empty .tlpp reports line 1"
+expect_that "findings [$(parse_findings req | cut -f 1,2,3,4 | tr '\t\n' ': ')]" \
+  [ "$(parse_findings req | cut -f 1,2,3,4 | tr '\t\n' ': ')" = "upper.tlpp:1:error:ADV002 empty.tlpp:1:warning:ADV019 comment.tlpp:1:warning:ADV019 other.tlpp:1:warning:ADV019 " ]
+end_case "ADV019 (warning): include on any line (\"\" or <>, any case, fw-tlpp-core.th too) satisfies it, not inside a comment; .th is exempt, empty .tlpp reports line 1"
 
 FS="$FIXTURES_DIR/file-scope.prw"
 printf 'rule ADV020\nrule adv021\n' >"$TMP_DIR/fs.ignore"
@@ -582,6 +586,7 @@ printf '%s\n' \
   'method Foo(nA) class Bar' \
   '  nA := 1' \
   '  nB := 2' \
+  '  lAutoErrNoFile := .T.' \
   'Return' >"$TMP_DIR/undecl.prw"
 run_lint undecl --scope all "$TMP_DIR/undecl.prw"
 found_list undecl "$TMP_DIR/undecl.prw" >"$TMP_DIR/undecl.got"
@@ -589,7 +594,7 @@ printf '%s\n' 7:ADV021 8:ADV021 8:ADV021 13:ADV021 14:ADV020 18:ADV021 | LC_ALL=
 begin_case
 expect_that "output contract" wellformed undecl
 expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/undecl.exp" "$TMP_DIR/undecl.got"
-end_case "ADV021: one finding per name per block (2 names on one line = 2), file-level Public/Private declare, Local does not"
+end_case "ADV021: one finding per name per block (2 names on one line = 2), file-level Public/Private declare, Local does not, MsExecAuto lAutoErrNoFile is exempt"
 
 # arquivo-grande: ~5,000 generated lines with --scope all must take < 2 s.
 LC_ALL=C awk 'BEGIN {
