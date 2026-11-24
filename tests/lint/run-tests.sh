@@ -269,14 +269,14 @@ echo "=== Generic rule mechanics (custom --rules) ==="
   printf 'ADV018\twarn\tline\tforbid\tcode\ti\t*\t%s\t%s\tcampo fora do dicionario\t-\n' \
     '(^|[^a-z0-9_])(a1)_[a-z0-9]+' '^a1_(cod|nome)$'
   printf 'ADV017\twarn\tline\tforbid\tcode\ti\tprw,prx\t%s\t-\tfuncao sem suporte\tCA9999\n' \
-    '(^|[^a-z0-9_:])ma410impos[ \t]*\('
+    '(^|[^a-z0-9_])ma410impos[ \t]*\('
   printf 'ADV020\terror\tline\tforbid\tcode\ti\ttlpp,th\t%s\t-\tsomente tlpp\t-\n' 'ma410impos'
   printf 'ADV019\terror\tfile\trequire\traw\tc\tprw\t%s\t-\tkind still unimplemented\t-\n' '^#include'
 } >"$TMP_DIR/custom.rules"
 printf '%s\n' \
   'MA410IMPOS(SA1->A1_XPROJ)' \
   'SA1->A1_NOME := MA410IMPOS(MA410IMPOS(1))' \
-  'cX := "A1_XPROJ" + oObj:MA410IMPOS(1)' >"$TMP_DIR/custom.prw"
+  'cX := "A1_XPROJ" + u_MA410IMPOS(1)' >"$TMP_DIR/custom.prw"
 CF="$TMP_DIR/custom.prw"
 run_lint custom --rules "$TMP_DIR/custom.rules" "$CF"
 found_set custom "$CF" >"$TMP_DIR/custom.got"
@@ -322,15 +322,24 @@ expect_that "output contract" wellformed counts
 expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/counts.exp" "$TMP_DIR/counts.got"
 end_case "'? ?' and '?? x' give 1 ADV003, nested ConOut( gives 2, ConOut glued to identifiers gives 0"
 
-printf 'ADV091\twarn\tline\tforbid\tcode\tc\t*\t%s\t-\tlimite de identificador\t-\n' '(^|[^a-z0-9_])ab' >"$TMP_DIR/ab.rules"
-printf '%s\n' 'abab ab xab ab_ab' 'xabab' >"$TMP_DIR/ab.prw"
-run_lint ab --rules "$TMP_DIR/ab.rules" "$TMP_DIR/ab.prw"
-found_list ab "$TMP_DIR/ab.prw" >"$TMP_DIR/ab.got"
-printf '%s\n' 1:ADV091 1:ADV091 1:ADV091 >"$TMP_DIR/ab.exp"
-begin_case
-expect_that "output contract" wellformed ab
-expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/ab.exp" "$TMP_DIR/ab.got"
-end_case "(^|[^a-z0-9_]) boundary keeps the real left context between matches ('abab' = 1)"
+# count_case LABEL CASE REGEX REGEX2 LINE WANT: one custom rule on a one-line file (C24).
+count_case() {
+  printf 'ADV090\twarn\tline\tforbid\tcode\t%s\t*\t%s\t%s\tcontagem\t-\n' "$2" "$3" "$4" >"$TMP_DIR/cc.rules"
+  printf '%s\n' "$5" >"$TMP_DIR/cc.prw"
+  run_lint cc --rules "$TMP_DIR/cc.rules" "$TMP_DIR/cc.prw"
+  begin_case
+  expect_that "output contract" wellformed cc
+  expect_that "count $(count_id cc ADV090), want $6" [ "$(count_id cc ADV090)" = "$6" ]
+  end_case "$1"
+}
+count_case "'aa' on 'aaaa': matches never overlap (2)" i 'aa' - 'aaaa' 2
+count_case "'[a-z]a' on 'aaaa': matches never overlap (2)" i '[a-z]a' - 'aaaa' 2
+count_case "'^x' on 'xx': ^ only at the real line start (1)" i '^x' - 'xx' 1
+count_case "boundary 'ab' on 'abab' (1)" i '(^|[^a-z0-9_])ab' - 'abab' 1
+count_case "boundary 'ab' on 'x ab ab' (2)" i '(^|[^a-z0-9_])ab' - 'x ab ab' 2
+count_case "boundary 'ab' on 'abab ab xab ab_ab' (3)" i '(^|[^a-z0-9_])ab' - 'abab ab xab ab_ab' 3
+count_case "CASE=c boundary 'Ab(' on 'Ab(Ab( xAb( _Ab(' (2)" c '(^|[^A-Za-z0-9_])Ab\(' - 'Ab(Ab( xAb( _Ab(' 2
+count_case "REGEX2 sees the core text, not the '#' context char: '#ab_ok' excepted, 'ab_no' reported (1)" i '(^|[^a-z0-9_])ab_[a-z]+' '^ab_ok$' '#ab_ok ab_no' 1
 
 echo ""
 echo "============================="

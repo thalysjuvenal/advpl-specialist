@@ -2,6 +2,7 @@
 // Convenção: a linha que deve gerar achado(s) termina com o comentário expect seguido dos IDs;
 // linha sem "expect" não pode gerar achado. O runner usa --scope line (C17).
 #include "totvs.ch"
+  #include "totvs.ch"
 #include "protheus.ch" // expect: ADV001
 #INCLUDE "PROTHEUS.CH" // expect: ADV001,ADV002
 #INCLUDE "TOTVS.CH" // expect: ADV002
@@ -52,6 +53,6 @@ User Function LintR001()
 	ptinternal (1) // expect: ADV005
 	u_MyConOut()
 	U_StaticCallX()
-	oLog:ConOut("x")
+	oLog:ConOut("x") // expect: ADV003
 	cMsg := "Revisão concluída"
 Return xRet

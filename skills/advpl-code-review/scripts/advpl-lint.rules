@@ -13,9 +13,14 @@
 # REGEX2 and REF are "-" when empty. MESSAGE in pt-BR saying what to use instead.
 # Regex subset: portable ERE, no \b, no [[:class:]], no {m,n}, no lookaround, no
 # backreference; use [ \t] and [A-Za-z0-9_]. Keep this file ASCII only.
+# Left word boundary: start REGEX with exactly (^|[^a-z0-9_]) in CASE=i rules or
+# (^|[^A-Za-z0-9_]) in CASE=c rules. The engine strips it and requires that the
+# character before the match is not [A-Za-z0-9_]; it applies to the whole rest
+# of the REGEX (wrap alternatives in a group) and is not part of the matched text.
+# Matches on one line never overlap, and "^" only matches the real line start.
 
 ADV001	error	line	forbid	raw	i	*	^[ \t]*#[ \t]*include[ \t]*["'<][ \t]*protheus\.ch[ \t]*["'>]	-	include obsoleto; use #include "totvs.ch" em vez de protheus.ch	-
 ADV002	error	line	forbid	raw	c	*	^[ \t]*#[ \t]*[Ii][Nn][Cc][Ll][Uu][Dd][Ee][ \t]*["'<][^"'>]*["'>]	^#[ \t]*include[ \t]*["'<][^"'<>A-Z]*["'>]$	include fora do padrao; use diretiva e nome em minusculas (#include "totvs.ch")	CA3001
-ADV003	error	line	forbid	code	i	*	(^|[^a-z0-9_:])(conout|outerr)[ \t]*\(|^[ \t]*\?\??	-	use FWLogMsg() em vez de ConOut()/OutErr()/?	CA1004
-ADV004	error	line	forbid	code	i	*	(^|[^a-z0-9_:])staticcall[ \t]*\(	-	funcao restrita; use FWLoadModel()/FWLoadMenuDef() ou chamada direta em vez de StaticCall()	CA2022
-ADV005	error	line	forbid	code	i	*	(^|[^a-z0-9_:])ptinternal[ \t]*\(	-	funcao restrita sem excecao; remova PTInternal()	CA2023
+ADV003	error	line	forbid	code	i	*	(^|[^a-z0-9_])((conout|outerr)[ \t]*\(|^[ \t]*\?\??)	-	use FWLogMsg() em vez de ConOut()/OutErr()/?	CA1004
+ADV004	error	line	forbid	code	i	*	(^|[^a-z0-9_])staticcall[ \t]*\(	-	funcao restrita; use FWLoadModel()/FWLoadMenuDef() ou chamada direta em vez de StaticCall()	CA2022
+ADV005	error	line	forbid	code	i	*	(^|[^a-z0-9_])ptinternal[ \t]*\(	-	funcao restrita sem excecao; remova PTInternal()	CA2023

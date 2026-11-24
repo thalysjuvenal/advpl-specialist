@@ -202,6 +202,18 @@ function load_rules(path,    line, lineno, n, f, r, ok, uid, uref) {
     # "\t" in a regex becomes a real TAB (same meaning in every awk and .NET)
     gsub(/\\t/, "\t", f[8])
     gsub(/\\t/, "\t", f[9])
+    # C24: a leading "(^|[^a-z0-9_])" (CASE=i) or "(^|[^A-Za-z0-9_])" (CASE=c)
+    # is a left word boundary that scan() checks itself. RX keeps only the core,
+    # and the boundary applies to the whole core (all its alternatives).
+    BOUND[r] = 0
+    if (CASEI[r] && substr(f[8], 1, 14) == "(^|[^a-z0-9_])") {
+      BOUND[r] = 1
+      f[8] = substr(f[8], 15)
+    } else if (!CASEI[r] && substr(f[8], 1, 17) == "(^|[^A-Za-z0-9_])") {
+      BOUND[r] = 1
+      f[8] = substr(f[8], 18)
+    }
+    if (f[8] == "") fatal("invalid rule at " path ":" lineno)
     RX[r] = f[8]
     RX2[r] = (f[9] == "-") ? "" : f[9]
     RXC[r] = no_bol(RX[r])
@@ -308,30 +320,30 @@ function add_finding(r, ln, m) {
   FI[NFIND] = ID[r]
 }
 
-# forbid: one finding per match not covered by the REGEX2 exception (searched,
-# unanchored, in the trimmed matched text). Successive matches on one line: the
-# first search covers the whole line; every next search starts at the LAST
-# character of the previous match, which may serve again as left context (the
-# "(" of "ConOut(" before a nested "ConOut("), and uses RXC, so "^" never
-# matches there. A candidate counts only if it ends after the previous match;
-# one that does not (or an empty match) is skipped and the search resumes one
-# character after its start. Result: "abab" has one "(^|[^a-z0-9_])ab" match.
-function scan(r, s, ln,    q, e, rx, st, len, m) {
+# forbid (C24): one finding per match of the core regex not covered by the
+# REGEX2 exception (searched, unanchored, in the trimmed core match text; the
+# boundary character is never part of it). The search starts at q = 1 with RX;
+# any search from q > 1 uses RXC, so "^" only matches the real line start.
+# - boundary rule (BOUND): a candidate at st is rejected when st > 1 and the
+#   character at st-1 is [A-Za-z0-9_]; the search then restarts at st+1;
+# - accepted match [st, st+len-1]: matches never overlap, the next search
+#   starts at st+len (st+1 when len is 0).
+# Examples: "aa" on "aaaa" = 2; boundary "ab" on "abab" = 1, on "x ab ab" = 2.
+function scan(r, s, ln,    q, n, rx, st, len, m) {
+  n = length(s)
   q = 1
-  e = 0
-  rx = RX[r]
-  while (q <= length(s) && match(substr(s, q), rx)) {
+  while (q <= n + 1) {
+    rx = (q == 1) ? RX[r] : RXC[r]
+    if (!match(substr(s, q), rx)) break
     st = q + RSTART - 1
     len = RLENGTH
-    rx = RXC[r]
-    if (len > 0 && st + len - 1 > e) {
-      m = substr(s, st, len)
-      if (RX2[r] == "" || trimmed(m) !~ RX2[r]) add_finding(r, ln, m)
-      e = st + len - 1
-      q = e
-    } else {
+    if (BOUND[r] && st > 1 && substr(s, st - 1, 1) ~ /[A-Za-z0-9_]/) {
       q = st + 1
+      continue
     }
+    m = substr(s, st, len)
+    if (RX2[r] == "" || trimmed(m) !~ RX2[r]) add_finding(r, ln, m)
+    q = st + ((len > 0) ? len : 1)
   }
 }
 
