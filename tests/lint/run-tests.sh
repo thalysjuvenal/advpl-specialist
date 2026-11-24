@@ -5,7 +5,8 @@
 # Fixture convention: a line that must produce finding(s) ends with
 # "// expect: ID[,ID]"; a line without "expect" must produce none.
 # Scope per fixture (C17): file-scope.* runs with --scope all; the others
-# (rules.*, fffd.*) run with --scope line.
+# (rules.*, fffd.*) run with --scope line. Fixture sets ignore repeated
+# findings, so finding COUNTS are checked by dedicated cases (found_list).
 
 set -u
 
@@ -183,6 +184,12 @@ usage_case "nonexistent FILE" "cannot read FILE: " "$TMP_DIR/missing.prw"
 usage_case "unreadable --rules" "cannot read rules file: " --rules "$TMP_DIR/missing.rules" "$F"
 usage_case "nonexistent --lines-file" "cannot read lines file: " --lines-file "$TMP_DIR/missing.txt" "$F"
 usage_case "invalid rule in --rules" "invalid rule at .*bad.rules:1" --rules "$TMP_DIR/bad.rules" "$F"
+printf 'ADV019\terror\tline\trequire\traw\ti\t*\tx\t-\tmsg\t-\n' >"$TMP_DIR/bad-scope.rules"
+printf 'ADV020\twarn\tfile\tbalance\tcode\ti\t*\tx\t-\tmsg\t-\n' >"$TMP_DIR/bad-balance.rules"
+printf 'ADV021\twarn\tfile\tundeclared\traw\ti\t*\tx\t-\tmsg\t-\n' >"$TMP_DIR/bad-undecl.rules"
+usage_case "require/balance/undeclared with SCOPE=line" "invalid rule at .*bad-scope.rules:1" --rules "$TMP_DIR/bad-scope.rules" "$F"
+usage_case "balance without REGEX2" "invalid rule at .*bad-balance.rules:1" --rules "$TMP_DIR/bad-balance.rules" "$F"
+usage_case "undeclared with TARGET=raw" "invalid rule at .*bad-undecl.rules:1" --rules "$TMP_DIR/bad-undecl.rules" "$F"
 usage_case "nonexistent --ignore-file" "cannot read ignore file: " --ignore-file "$TMP_DIR/missing.ignore" "$F"
 usage_case "--ignore-file is a directory" "cannot read ignore file: " --ignore-file "$TMP_DIR" "$F"
 
@@ -281,7 +288,7 @@ echo "=== Generic rule mechanics (custom --rules) ==="
   printf 'ADV017\twarn\tline\tforbid\tcode\ti\tprw,prx\t%s\t-\tfuncao sem suporte\tCA9999\n' \
     '(^|[^a-z0-9_])ma410impos[ \t]*\('
   printf 'ADV020\terror\tline\tforbid\tcode\ti\ttlpp,th\t%s\t-\tsomente tlpp\t-\n' 'ma410impos'
-  printf 'ADV019\terror\tfile\trequire\traw\tc\tprw\t%s\t-\tkind still unimplemented\t-\n' '^#include'
+  printf 'ADV019\terror\tfile\trequire\traw\tc\tprw\t%s\t-\trequire de teste\t-\n' '^#include'
 } >"$TMP_DIR/custom.rules"
 printf '%s\n' \
   'MA410IMPOS(SA1->A1_XPROJ)' \
@@ -290,20 +297,22 @@ printf '%s\n' \
 CF="$TMP_DIR/custom.prw"
 run_lint custom --rules "$TMP_DIR/custom.rules" "$CF"
 found_set custom "$CF" >"$TMP_DIR/custom.got"
-printf '%s\n' 1:ADV017 1:ADV018 2:ADV017 >"$TMP_DIR/custom.exp"
+printf '%s\n' 1:ADV017 1:ADV018 1:ADV019 2:ADV017 >"$TMP_DIR/custom.exp"
 begin_case
 expect_that "output contract" wellformed custom
 expect_that "findings differ (< expected, > actual)" same_file "$TMP_DIR/custom.exp" "$TMP_DIR/custom.got"
 expect_that "two matches on one line are not two findings" [ "$(count_id custom ADV017)" = 3 ]
 expect_that "first line format" [ "$(head -n 1 "$TMP_DIR/custom.out")" = "$CF:1: warning ADV017 funcao sem suporte [CA9999]" ]
 expect_that "REF '-' must omit the brackets" [ "$(sed -n 2p "$TMP_DIR/custom.out")" = "$CF:1: warning ADV018 campo fora do dicionario" ]
-expect_that "summary" [ "$(tail -n 1 "$TMP_DIR/custom.out")" = "advpl-lint: 0 error(s), 4 warning(s), 0 suppressed" ]
-end_case "forbid: one finding per match, REGEX2 exception on trimmed text, EXTS, unimplemented kind skipped"
+expect_that "file finding not sorted by ID among the line-1 findings" [ "$(sed -n 3p "$TMP_DIR/custom.out")" = "$CF:1: error ADV019 require de teste" ]
+expect_that "summary" [ "$(tail -n 1 "$TMP_DIR/custom.out")" = "advpl-lint: 1 error(s), 4 warning(s), 0 suppressed" ]
+end_case "forbid: one finding per match, REGEX2 exception on trimmed text, EXTS; require finding sorted by ID on line 1"
 
 printf 'field a1_xproj\nfunction Ma410Impos\n' >"$TMP_DIR/custom.ignore"
 run_lint custom-ign --rules "$TMP_DIR/custom.rules" --ignore-file "$TMP_DIR/custom.ignore" "$CF"
 begin_case
-expect_that "summary" [ "$(cat "$TMP_DIR/custom-ign.out")" = "advpl-lint: 0 error(s), 0 warning(s), 4 suppressed" ]
+expect_that "only the require finding is left" [ "$(found_set custom-ign "$CF")" = "1:ADV019" ]
+expect_that "summary" [ "$(tail -n 1 "$TMP_DIR/custom-ign.out")" = "advpl-lint: 1 error(s), 0 warning(s), 4 suppressed" ]
 end_case "field X suppresses ADV018 and function X suppresses ADV017 (any case)"
 
 printf 'field ma410impos\nfunction a1_xproj\n' >"$TMP_DIR/custom-swap.ignore"
@@ -350,6 +359,135 @@ count_case "boundary 'ab' on 'x ab ab' (2)" i '(^|[^a-z0-9_])ab' - 'x ab ab' 2
 count_case "boundary 'ab' on 'abab ab xab ab_ab' (3)" i '(^|[^a-z0-9_])ab' - 'abab ab xab ab_ab' 3
 count_case "CASE=c boundary 'Ab(' on 'Ab(Ab( xAb( _Ab(' (2)" c '(^|[^A-Za-z0-9_])Ab\(' - 'Ab(Ab( xAb( _Ab(' 2
 count_case "REGEX2 sees the core text, not the '#' context char: '#ab_ok' excepted, 'ab_no' reported (1)" i '(^|[^a-z0-9_])ab_[a-z]+' '^ab_ok$' '#ab_ok ab_no' 1
+
+echo "=== File-scope rules (ADV019-ADV021) ==="
+# --scope line, and --lines-file even when it lists every line, turn SCOPE=file
+# rules off: what is left must be exactly the fixture's line-rule expectations.
+for fixture in "$FIXTURES_DIR"/file-scope.*; do
+  [ -f "$fixture" ] || continue
+  base="$(basename "$fixture")"
+  LC_ALL=C awk '{ print NR }' "$fixture" >"$TMP_DIR/fs-all.lines"
+  grep -v -e ':ADV019$' -e ':ADV020$' -e ':ADV021$' "$TMP_DIR/fx-$base.exp" >"$TMP_DIR/fs-line.exp"
+  run_lint fs-lines --scope all --lines-file "$TMP_DIR/fs-all.lines" "$fixture"
+  run_lint fs-line --scope line "$fixture"
+  found_set fs-lines "$fixture" >"$TMP_DIR/fs-lines.got"
+  found_set fs-line "$fixture" >"$TMP_DIR/fs-line.got"
+  begin_case
+  expect_that "fixture has no ADV019-ADV021 expectation" [ "$(( $(wc -l <"$TMP_DIR/fx-$base.exp") ))" -gt "$(( $(wc -l <"$TMP_DIR/fs-line.exp") ))" ]
+  expect_that "output contract (--lines-file)" wellformed fs-lines
+  expect_that "--lines-file findings differ (< expected, > actual)" same_file "$TMP_DIR/fs-line.exp" "$TMP_DIR/fs-lines.got"
+  expect_that "output contract (--scope line)" wellformed fs-line
+  expect_that "--scope line findings differ (< expected, > actual)" same_file "$TMP_DIR/fs-line.exp" "$TMP_DIR/fs-line.got"
+  end_case "$base: --lines-file (every line listed) and --scope line turn ADV019-ADV021 off"
+done
+
+# ADV019 (require): any line of the file may satisfy it; EXTS limits it to .tlpp.
+REQ_DIR="$TMP_DIR/req"
+mkdir -p "$REQ_DIR"
+printf '// cabecalho\n#include "tlpp-core.th"\n' >"$REQ_DIR/ok.tlpp"
+printf '#include <tlpp-core.th>\n' >"$REQ_DIR/angle.tlpp"
+printf '#INCLUDE "TLPP-CORE.TH"\n' >"$REQ_DIR/upper.tlpp"
+printf 'User Function LintTh()\nReturn\n' >"$REQ_DIR/noinc.th"
+: >"$REQ_DIR/empty.tlpp"
+run_lint_in "$REQ_DIR" req ok.tlpp angle.tlpp upper.tlpp noinc.th empty.tlpp
+begin_case
+expect_that "output contract" wellformed req
+expect_that "findings [$(parse_findings req | cut -f 1,2,4 | tr '\t\n' ': ')]" \
+  [ "$(parse_findings req | cut -f 1,2,4 | tr '\t\n' ': ')" = "upper.tlpp:1:ADV002 empty.tlpp:1:ADV019 " ]
+end_case "ADV019: include on any line (\"\" or <>, any case) satisfies it, .th is exempt, empty .tlpp reports line 1"
+
+FS="$FIXTURES_DIR/file-scope.prw"
+printf 'rule ADV020\nrule adv021\n' >"$TMP_DIR/fs.ignore"
+run_lint fs-ign --scope all --ignore-file "$TMP_DIR/fs.ignore" "$FS"
+found_set fs-ign "$FS" >"$TMP_DIR/fs-ign.got"
+grep -v -e ':ADV020$' -e ':ADV021$' "$TMP_DIR/fx-file-scope.prw.exp" >"$TMP_DIR/fs-ign.exp"
+want=$(( $(count_id fx-file-scope.prw ADV020) + $(count_id fx-file-scope.prw ADV021) ))
+begin_case
+expect_that "output contract" wellformed fs-ign
+expect_that "findings differ (< expected, > actual)" same_file "$TMP_DIR/fs-ign.exp" "$TMP_DIR/fs-ign.got"
+expect_that "suppressed $(suppressed_of fs-ign), want $want" [ "$(suppressed_of fs-ign)" = "$want" ]
+expect_that "nothing to suppress in baseline" [ "$want" -gt 0 ]
+end_case "rule ADV020 / rule adv021 suppress file-scope findings (counted as suppressed)"
+
+printf 'path **/file-scope.tlpp\n' >"$TMP_DIR/fs-path.ignore"
+run_lint fs-path --scope all --ignore-file "$TMP_DIR/fs-path.ignore" "$FIXTURES_DIR/file-scope.tlpp"
+total="$(parse_findings fx-file-scope.tlpp | wc -l | tr -d ' ')"
+begin_case
+expect_that "stdout [$(cat "$TMP_DIR/fs-path.out")], want only $total suppressed" \
+  [ "$(cat "$TMP_DIR/fs-path.out")" = "advpl-lint: 0 error(s), 0 warning(s), $total suppressed" ]
+expect_that "nothing to suppress in baseline" [ "$total" -gt 0 ]
+end_case "path glob suppresses file-scope findings too"
+
+# ADV021 counts: one finding per NAME per block, file-level Local does not
+# declare, "[" before the NAME or a digit glued to it excludes it; ADV020 per
+# block.
+printf '%s\n' \
+  'Public cPub := ""' \
+  'Private cPriv' \
+  'Local cLoc' \
+  'Function LintU01()' \
+  '  cPub := "x"' \
+  '  cPriv := "y"' \
+  '  cLoc := "z"' \
+  '  nA := nB := 0' \
+  '  nA := 1; SA1 -> A1_XCOD := "1"' \
+  '  aX[nI := 1] := 2; 9nQ := 1' \
+  'Return' \
+  'main function LintU02' \
+  '  nA := 1' \
+  '  RecLock("SA1", .F.)' \
+  'Return' \
+  'method Foo(nA) class Bar' \
+  '  nA := 1' \
+  '  nB := 2' \
+  'Return' >"$TMP_DIR/undecl.prw"
+run_lint undecl --scope all "$TMP_DIR/undecl.prw"
+found_list undecl "$TMP_DIR/undecl.prw" >"$TMP_DIR/undecl.got"
+printf '%s\n' 7:ADV021 8:ADV021 8:ADV021 13:ADV021 14:ADV020 18:ADV021 | LC_ALL=C sort >"$TMP_DIR/undecl.exp"
+begin_case
+expect_that "output contract" wellformed undecl
+expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/undecl.exp" "$TMP_DIR/undecl.got"
+end_case "ADV021: one finding per name per block (2 names on one line = 2), file-level Public/Private declare, Local does not"
+
+# arquivo-grande: ~5,000 generated lines with --scope all must take < 2 s.
+LC_ALL=C awk 'BEGIN {
+  print "#include \"totvs.ch\""
+  for (i = 1; i <= 250; i++) {
+    printf "Static Function F%04d(cPar, nPar)\n", i
+    print "\tLocal nOk := 0"
+    print "\tLocal cA, ;"
+    print "\t\tcB"
+    print "\tLocal aItens := {}, nPos := Max(1, 2)"
+    print "\tLocal nI"
+    print "\tnOk := Len(aItens) + nPos"
+    print "\tcA := \"x\" + cPar"
+    print "\tcB := \"y\""
+    print "\tFor nI := 1 To 10"
+    print "\t\tnOk += nI"
+    print "\tNext nI"
+    print "\tIf RecLock(\"SA1\", .F.)"
+    print "\t\tSA1->A1_NOME := cA"
+    if (i % 5 == 0) print "\t\tnSemDecl := IIf(nOk > 0, 1, 2)"
+    else print "\t\tSA1->(MsUnlock())"
+    print "\tEndIf"
+    print "\tnPar := nPar + 1"
+    print "\t// comentario nTotal := 0"
+    print "\tcPar := \"MsUnlock()\""
+    print "Return nOk"
+  }
+}' >"$TMP_DIR/big.prw"
+TIMEFORMAT='%R'
+{ time run_lint big --scope all "$TMP_DIR/big.prw"; } 2>"$TMP_DIR/big.time"
+secs="$(tail -n 1 "$TMP_DIR/big.time")"
+begin_case
+expect_that "output contract" wellformed big
+expect_that "generated $(( $(wc -l <"$TMP_DIR/big.prw") )) lines, want 5001" [ "$(( $(wc -l <"$TMP_DIR/big.prw") ))" = 5001 ]
+expect_that "ADV020 $(count_id big ADV020), want 50" [ "$(count_id big ADV020)" = 50 ]
+expect_that "ADV021 $(count_id big ADV021), want 50" [ "$(count_id big ADV021)" = 50 ]
+expect_that "ADV009 $(count_id big ADV009), want 50" [ "$(count_id big ADV009)" = 50 ]
+expect_that "$(parse_findings big | wc -l | tr -d ' ') findings, want 150" [ "$(parse_findings big | wc -l | tr -d ' ')" = 150 ]
+expect_that "took ${secs}s, want < 2s" awk -v s="$secs" 'BEGIN { exit !(s + 0 < 2) }'
+end_case "arquivo-grande: 5001 lines, --scope all, ${secs}s (< 2 s)"
 
 echo ""
 echo "============================="

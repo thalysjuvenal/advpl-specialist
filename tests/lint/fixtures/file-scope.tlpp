@@ -1,0 +1,53 @@
+#include "tlpp-rest.th" // expect: ADV019
+// #include "tlpp-core.th" comentado nao satisfaz ADV019
+// Fixture TLPP das regras de escopo de arquivo; o runner usa --scope all (C17).
+namespace custom.lint.escopo
+
+User Function LintEsc01()
+	Local nA := 0
+	nA := nA + 1
+Return nA
+
+// Class ... EndClass nao e bloco e encerra o bloco anterior; o Static depois
+// do EndClass e de nivel de arquivo.
+Class LintEscopo
+	Data cNome
+	Data nValor
+	Method New(cNome) Constructor
+	Method Soma(nA, nB)
+EndClass
+
+Static nInstancias := 0
+
+Method New(cNome) Class LintEscopo
+	::cNome := cNome
+	Self:nValor := 0
+	nInstancias := nInstancias + 1
+Return Self
+
+Method Soma(nA, nB) Class LintEscopo
+	Local nRet as numeric := 0
+	Local oAux as object
+	oAux := LintEscopo():New("x")
+	oAux:nValor := nA
+	::nValor := nA + nB
+	nRet := nA + nB
+	nA := 0
+	nTmp := nRet // expect: ADV021
+Return nRet
+
+User Function LintEsc02(cA as character, ;
+		nB as numeric) as logical
+	Local lOk as logical := .T.
+	Local nI as numeric
+	cA := Upper(cA)
+	nB := nB + 1
+	For nI := 1 To 10
+		lOk := !lOk
+	Next
+	For nK := 1 To 10 // expect: ADV021
+	Next
+	If RecLock("SA1", .F.)
+		MsUnlock()
+	EndIf
+Return lOk
