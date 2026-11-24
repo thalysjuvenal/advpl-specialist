@@ -8,7 +8,9 @@
 #   --lines-file PATH   1-based line numbers, one per line (blank or non-numeric
 #                       lines skipped); SCOPE=line findings are restricted to
 #                       them and SCOPE=file rules are disabled
-#   --ignore-file PATH  default ./.advpl-specialist-ignore (missing = empty)
+#   --ignore-file PATH  must be a readable file; when not given,
+#                       ./.advpl-specialist-ignore is used if it is a readable
+#                       file and silently skipped otherwise
 #   --rules PATH        default advpl-lint.rules next to this script
 #
 # Options come before the FILEs ("--" ends them). Every FILE must be a readable
@@ -17,8 +19,8 @@
 # Output (stdout): "FILE:LINE: error|warning ID MESSAGE [REF]" per finding
 # (" [REF]" omitted when REF is "-"), FILEs in argument order, then line, then
 # ID (byte order); last line "advpl-lint: N error(s), M warning(s), K suppressed".
-# Exit: 0 no errors (warnings allowed), 1 errors, 2 usage error, unreadable FILE
-# or invalid rules file.
+# Exit: 0 no errors (warnings allowed), 1 errors, 2 usage error, unreadable FILE,
+# lines file or explicit ignore file, or invalid rules file.
 #
 # advpl-lint.ps1 is a twin that must print byte-identical stdout: any change to
 # the semantics below (stripping, matching, ignore, ordering) must be mirrored.
@@ -34,7 +36,8 @@ readable() { [ -f "$1" ] && [ -r "$1" ]; }
 
 scope=all
 lines_file=
-ignore_file=./.advpl-specialist-ignore
+ignore_file=
+ignore_given=0
 rules_file="$SCRIPT_DIR/advpl-lint.rules"
 
 while [ $# -gt 0 ]; do
@@ -48,7 +51,7 @@ while [ $# -gt 0 ]; do
             *) die "invalid --scope value: $2" ;;
           esac ;;
         --lines-file) lines_file="$2" ;;
-        --ignore-file) ignore_file="$2" ;;
+        --ignore-file) ignore_file="$2"; ignore_given=1 ;;
         --rules) rules_file="$2" ;;
       esac
       shift 2 ;;
@@ -63,13 +66,19 @@ readable "$rules_file" || die "cannot read rules file: $rules_file"
 if [ -n "$lines_file" ]; then
   readable "$lines_file" || die "cannot read lines file: $lines_file"
 fi
+if [ "$ignore_given" = 1 ]; then
+  readable "$ignore_file" || die "cannot read ignore file: $ignore_file"
+elif readable ./.advpl-specialist-ignore; then
+  ignore_file=./.advpl-specialist-ignore
+fi
 for f in "$@"; do
   readable "$f" || die "cannot read FILE: $f"
 done
 
 # The whole lint runs inside BEGIN: rules, ignore and lines files and every FILE
 # are read with getline, so empty files and argument order are fully controlled.
-# ARGV: 1 scope, 2 rules file, 3 ignore file, 4 lines file ("" = none), 5.. FILEs.
+# ARGV: 1 scope, 2 rules file, 3 ignore file, 4 lines file ("" = none for 3 and
+# 4), 5.. FILEs.
 IFS= read -r -d '' AWK_PROG <<'AWK' || true
 function warn(msg) { print "advpl-lint: " msg > "/dev/stderr" }
 function fatal(msg) { warn(msg); exit 2 }
@@ -83,7 +92,7 @@ function spaces(n) {
 # One directive per line: "rule ID|REF", "field NAME", "function NAME",
 # "path GLOB" (the GLOB may contain spaces). "#" starts a comment line; CRLF
 # and surrounding blanks are tolerated. Anything else: warning on stderr, the
-# line is skipped. A missing or unreadable file means no directives.
+# line is skipped. The bash side passes "" when no ignore file applies.
 function load_ignore(path,    line, lineno, kw, arg) {
   if (path == "") return
   lineno = 0
@@ -139,6 +148,33 @@ function glob_to_ere(g,    re, i, n, c) {
   return "(^|/)" re "$"
 }
 
+# Copy of a rule regex whose "^" anchors (outside bracket expressions) become a
+# newline, which never occurs in a line read by getline. Used for every search
+# after the first one on a line, so "^" only ever matches the real line start.
+function no_bol(re,    out, i, j, n, c) {
+  out = ""
+  n = length(re)
+  i = 1
+  while (i <= n) {
+    c = substr(re, i, 1)
+    if (c == "\\") {
+      out = out substr(re, i, 2)
+      i += 2
+    } else if (c == "[") {
+      j = i + 1
+      if (substr(re, j, 1) == "^") j++
+      if (substr(re, j, 1) == "]") j++
+      while (j <= n && substr(re, j, 1) != "]") j += (substr(re, j, 1) == "\\") ? 2 : 1
+      out = out substr(re, i, j - i + 1)
+      i = j + 1
+    } else {
+      out = out ((c == "^") ? "\n" : c)
+      i++
+    }
+  }
+  return out
+}
+
 # ---- advpl-lint.rules -------------------------------------------------------
 # TAB-separated: ID SEVERITY SCOPE KIND TARGET CASE EXTS REGEX REGEX2 MESSAGE REF
 function load_rules(path,    line, lineno, n, f, r, ok, uid, uref) {
@@ -168,9 +204,10 @@ function load_rules(path,    line, lineno, n, f, r, ok, uid, uref) {
     gsub(/\\t/, "\t", f[9])
     RX[r] = f[8]
     RX2[r] = (f[9] == "-") ? "" : f[9]
-    ANCHORED[r] = (substr(RX[r], 1, 1) == "^")
-    # compile both regexes now: a broken one aborts before any output
+    RXC[r] = no_bol(RX[r])
+    # compile the regexes now: a broken one aborts before any output
     ok = ("" ~ RX[r])
+    ok = ("" ~ RXC[r])
     if (RX2[r] != "") ok = ("" ~ RX2[r])
     # forbid rules run per line; require/balance/undeclared are not implemented
     # yet and are skipped. SCOPE=file rules only run with --scope all and
@@ -272,18 +309,29 @@ function add_finding(r, ln, m) {
 }
 
 # forbid: one finding per match not covered by the REGEX2 exception (searched,
-# unanchored, in the trimmed matched text). After a match the search goes on in
-# the remainder of the string, so a REGEX starting with "^" reports at most once
-# per line; an empty match ends the search.
-function scan(r, s, ln,    st, len, m) {
-  while (match(s, RX[r])) {
-    st = RSTART
+# unanchored, in the trimmed matched text). Successive matches on one line: the
+# first search covers the whole line; every next search starts at the LAST
+# character of the previous match, which may serve again as left context (the
+# "(" of "ConOut(" before a nested "ConOut("), and uses RXC, so "^" never
+# matches there. A candidate counts only if it ends after the previous match;
+# one that does not (or an empty match) is skipped and the search resumes one
+# character after its start. Result: "abab" has one "(^|[^a-z0-9_])ab" match.
+function scan(r, s, ln,    q, e, rx, st, len, m) {
+  q = 1
+  e = 0
+  rx = RX[r]
+  while (q <= length(s) && match(substr(s, q), rx)) {
+    st = q + RSTART - 1
     len = RLENGTH
-    if (len < 1) break
-    m = substr(s, st, len)
-    if (RX2[r] == "" || trimmed(m) !~ RX2[r]) add_finding(r, ln, m)
-    if (ANCHORED[r]) break
-    s = substr(s, st + len)
+    rx = RXC[r]
+    if (len > 0 && st + len - 1 > e) {
+      m = substr(s, st, len)
+      if (RX2[r] == "" || trimmed(m) !~ RX2[r]) add_finding(r, ln, m)
+      e = st + len - 1
+      q = e
+    } else {
+      q = st + 1
+    }
   }
 }
 

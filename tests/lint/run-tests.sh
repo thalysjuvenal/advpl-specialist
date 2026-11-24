@@ -57,6 +57,10 @@ parse_findings() {
 found_set() {
   parse_findings "$1" | F="$2" LC_ALL=C awk -F '\t' '$1 == ENVIRON["F"] { print $2 ":" $4 }' | LC_ALL=C sort -u
 }
+# Same as found_set but keeps duplicates, so finding COUNTS are compared.
+found_list() {
+  parse_findings "$1" | F="$2" LC_ALL=C awk -F '\t' '$1 == ENVIRON["F"] { print $2 ":" $4 }' | LC_ALL=C sort
+}
 # Set "LINE:ID" declared by the "// expect:" annotations of a fixture.
 expected_set() {
   LC_ALL=C awk '
@@ -179,6 +183,8 @@ usage_case "nonexistent FILE" "cannot read FILE: " "$TMP_DIR/missing.prw"
 usage_case "unreadable --rules" "cannot read rules file: " --rules "$TMP_DIR/missing.rules" "$F"
 usage_case "nonexistent --lines-file" "cannot read lines file: " --lines-file "$TMP_DIR/missing.txt" "$F"
 usage_case "invalid rule in --rules" "invalid rule at .*bad.rules:1" --rules "$TMP_DIR/bad.rules" "$F"
+usage_case "nonexistent --ignore-file" "cannot read ignore file: " --ignore-file "$TMP_DIR/missing.ignore" "$F"
+usage_case "--ignore-file is a directory" "cannot read ignore file: " --ignore-file "$TMP_DIR" "$F"
 
 echo "=== Ignore file ==="
 run_lint ign-valid --scope line --ignore-file "$IGNORE_DIR/valid.advpl-specialist-ignore" "$F"
@@ -207,11 +213,21 @@ expect_that "exit differs from baseline" [ "$(rc_of ign-empty)" = "$(rc_of base)
 expect_that "no stderr" no_stderr ign-empty
 end_case "empty ignore file changes nothing"
 
-run_lint ign-missing --scope line --ignore-file "$TMP_DIR/missing.ignore" "$F"
+printf '#include "totvs.ch"\n' >"$TMP_DIR/clean.prw"
+run_lint ign-absent "$TMP_DIR/clean.prw"
 begin_case
-expect_that "stdout differs from baseline" same_file "$TMP_DIR/base.out" "$TMP_DIR/ign-missing.out"
-expect_that "exit differs from baseline" [ "$(rc_of ign-missing)" = "$(rc_of base)" ]
-end_case "missing ignore file is treated as empty"
+expect_that "stdout is not just the zero summary" [ "$(cat "$TMP_DIR/ign-absent.out")" = "advpl-lint: 0 error(s), 0 warning(s), 0 suppressed" ]
+expect_that "exit $(rc_of ign-absent), want 0" [ "$(rc_of ign-absent)" = 0 ]
+expect_that "no stderr" no_stderr ign-absent
+end_case "default ./.advpl-specialist-ignore absent: silent, exit 0"
+
+mkdir -p "$TMP_DIR/dirproj/.advpl-specialist-ignore"
+run_lint_in "$TMP_DIR/dirproj" ign-defdir "$TMP_DIR/clean.prw"
+begin_case
+expect_that "stdout differs from the absent-default run" same_file "$TMP_DIR/ign-absent.out" "$TMP_DIR/ign-defdir.out"
+expect_that "exit $(rc_of ign-defdir), want 0" [ "$(rc_of ign-defdir)" = 0 ]
+expect_that "no stderr" no_stderr ign-defdir
+end_case "default ./.advpl-specialist-ignore that is a directory is skipped silently"
 
 run_lint ign-unknown --scope line --ignore-file "$IGNORE_DIR/unknown-crlf.advpl-specialist-ignore" "$F"
 found_set ign-unknown "$F" >"$TMP_DIR/ign-unknown.got"
@@ -295,6 +311,26 @@ begin_case
 expect_that "output contract" wellformed eol
 expect_that "findings differ (< expected, > actual)" same_file "$TMP_DIR/eol.exp" "$TMP_DIR/eol.got"
 end_case "CRLF input: \"\$\" anchors at end of line, /* */ spans CRLF lines"
+
+echo "=== Finding counts (successive matches on one line) ==="
+printf '%s\n' '? ?' 'ConOut(ConOut("x"))' '?? "x"' 'u_ConOutConOut("x")' 'ConOutConOut("x")' >"$TMP_DIR/counts.prw"
+run_lint counts --scope line "$TMP_DIR/counts.prw"
+found_list counts "$TMP_DIR/counts.prw" >"$TMP_DIR/counts.got"
+printf '%s\n' 1:ADV003 2:ADV003 2:ADV003 3:ADV003 >"$TMP_DIR/counts.exp"
+begin_case
+expect_that "output contract" wellformed counts
+expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/counts.exp" "$TMP_DIR/counts.got"
+end_case "'? ?' and '?? x' give 1 ADV003, nested ConOut( gives 2, ConOut glued to identifiers gives 0"
+
+printf 'ADV091\twarn\tline\tforbid\tcode\tc\t*\t%s\t-\tlimite de identificador\t-\n' '(^|[^a-z0-9_])ab' >"$TMP_DIR/ab.rules"
+printf '%s\n' 'abab ab xab ab_ab' 'xabab' >"$TMP_DIR/ab.prw"
+run_lint ab --rules "$TMP_DIR/ab.rules" "$TMP_DIR/ab.prw"
+found_list ab "$TMP_DIR/ab.prw" >"$TMP_DIR/ab.got"
+printf '%s\n' 1:ADV091 1:ADV091 1:ADV091 >"$TMP_DIR/ab.exp"
+begin_case
+expect_that "output contract" wellformed ab
+expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/ab.exp" "$TMP_DIR/ab.got"
+end_case "(^|[^a-z0-9_]) boundary keeps the real left context between matches ('abab' = 1)"
 
 echo ""
 echo "============================="
