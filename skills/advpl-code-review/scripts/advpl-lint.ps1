@@ -443,7 +443,7 @@ function Read-Rules([string]$path) {
       $ok = $ok -and ($f[1] -ceq 'error' -or $f[1] -ceq 'warn')
       $ok = $ok -and ($f[2] -ceq 'line' -or $f[2] -ceq 'file')
       $ok = $ok -and ($f[3] -ceq 'forbid' -or $f[3] -ceq 'require' -or $f[3] -ceq 'balance' -or $f[3] -ceq 'undeclared')
-      $ok = $ok -and ($f[4] -ceq 'code' -or $f[4] -ceq 'raw') -and ($f[5] -ceq 'i' -or $f[5] -ceq 'c')
+      $ok = $ok -and ($f[4] -ceq 'code' -or $f[4] -ceq 'nocomment' -or $f[4] -ceq 'raw') -and ($f[5] -ceq 'i' -or $f[5] -ceq 'c')
       $ok = $ok -and $f[6].Length -gt 0 -and $f[7].Length -gt 0 -and $f[7] -cne '-' -and $f[8].Length -gt 0
       $ok = $ok -and $f[9].Length -gt 0 -and $f[10].Length -gt 0
       $ok = $ok -and ($f[3] -ceq 'forbid' -or $f[2] -ceq 'file')
@@ -470,7 +470,7 @@ function Read-Rules([string]$path) {
       Id = $f[0]
       IsError = ($f[1] -ceq 'error')
       Kind = $kind
-      Code = ($f[4] -ceq 'code')
+      Target = $f[4]
       CaseI = $casei
       Exts = ',' + (ConvertTo-AsciiLower $f[6]) + ','
       Bound = $bound
@@ -496,6 +496,7 @@ function Read-Rules([string]$path) {
     $tail = $sev + ' ' + $f[0] + ' ' + $f[9]
     if ($f[10] -cne '-') { $tail = $tail + ' [' + $f[10] + ']' }
     $rule.Tail = $tail
+    if ($f[4] -ceq 'nocomment') { $script:HasNc = $true }
     $script:Rules.Add($rule)
   }
 }
@@ -532,20 +533,28 @@ function Read-WantedLines([string]$path) {
 # never span lines and run to the end of the line when unterminated; "//" and
 # "&&" comment to the end of the line; "/* ... */" spans lines (InBlock); "*"
 # as the first non-blank character comments the line (not on a line that
-# closes a block).
+# closes a block). When a rule uses TARGET=nocomment (HasNc), LastNc gets that
+# view: the code view with every literal span ([start, end) pairs in NcSpans)
+# copied back from the line, i.e. comments blanked and literals intact.
 function Get-CodeView([string]$line) {
   $n = $line.Length
   $i = 0
   $sb = $script:CodeSb
   [void]$sb.Clear()
+  $spans = $script:NcSpans
+  $spans.Clear()
   if ($script:InBlock) {
     $j = $line.IndexOf('*/', $script:Ordinal)
-    if ($j -lt 0) { return [string]::new([char]32, $n) }
+    if ($j -lt 0) {
+      $script:LastNc = [string]::new([char]32, $n)
+      return $script:LastNc
+    }
     [void]$sb.Append([char]32, $j + 2)
     $i = $j + 2
     $script:InBlock = $false
   } elseif ($script:RxStarLine.IsMatch($line)) {
-    return [string]::new([char]32, $n)
+    $script:LastNc = [string]::new([char]32, $n)
+    return $script:LastNc
   }
   while ($i -lt $n) {
     $k = $line.IndexOfAny($script:Special, $i)
@@ -560,6 +569,7 @@ function Get-CodeView([string]$line) {
     if ($i + 1 -lt $n) { $c2 = [int]$line[$i + 1] }
     if ($c -eq 34 -or $c -eq 39) {
       $j = $line.IndexOf([char]$c, $i + 1)
+      $spans.Add($i)
       if ($j -lt 0) {
         [void]$sb.Append([char]$c).Append([char]32, $n - $i - 1)
         $i = $n
@@ -567,6 +577,7 @@ function Get-CodeView([string]$line) {
         [void]$sb.Append([char]$c).Append([char]32, $j - $i - 1).Append([char]$c)
         $i = $j + 1
       }
+      $spans.Add($i)
     } elseif (($c -eq 47 -and $c2 -eq 47) -or ($c -eq 38 -and $c2 -eq 38)) {
       [void]$sb.Append([char]32, $n - $i)
       $i = $n
@@ -585,7 +596,17 @@ function Get-CodeView([string]$line) {
       $i++
     }
   }
-  return $sb.ToString()
+  $out = $sb.ToString()
+  if (-not $script:HasNc -or $spans.Count -eq 0) {
+    $script:LastNc = $out
+  } else {
+    $arr = $out.ToCharArray()
+    for ($p = 0; $p -lt $spans.Count; $p += 2) {
+      $line.CopyTo($spans[$p], $arr, $spans[$p], $spans[$p + 1] - $spans[$p])
+    }
+    $script:LastNc = [string]::new($arr)
+  }
+  return $out
 }
 
 # ---- matching -------------------------------------------------------------------
@@ -654,16 +675,23 @@ function Get-Candidates([System.Text.RegularExpressions.Regex]$rxm, [string]$joi
   return , $res
 }
 
-# Joined text (lines separated by LF) of a view: code or raw, lowercased
-# (ASCII only) when CASE=i. Every view has the same line starts.
-function Get-View([bool]$code, [bool]$casei) {
+# Joined text (lines separated by LF) of a view: code, nocomment or raw,
+# lowercased (ASCII only) when CASE=i. Every view has the same line starts.
+function Get-View([string]$target, [bool]$casei) {
   $c = $script:Cur
-  if ($code) {
+  if ($target -ceq 'code') {
     if ($null -eq $c.CodeJ) { $c.CodeJ = [string]::Join("`n", $c.Code) }
     if (-not $casei) { return $c.CodeJ }
     if ($null -eq $c.LowCodeJ) { $c.LowCodeJ = ConvertTo-AsciiLower $c.CodeJ }
     return $c.LowCodeJ
   }
+  if ($target -ceq 'nocomment') {
+    if ($null -eq $c.NcJ) { $c.NcJ = [string]::Join("`n", $c.Nc) }
+    if (-not $casei) { return $c.NcJ }
+    if ($null -eq $c.LowNcJ) { $c.LowNcJ = ConvertTo-AsciiLower $c.NcJ }
+    return $c.LowNcJ
+  }
+  if ($target -cne 'raw') { throw ('unknown view: ' + $target) }
   if ($null -eq $c.RawJ) { $c.RawJ = [string]::Join("`n", $c.Raw) }
   if (-not $casei) { return $c.RawJ }
   if ($null -eq $c.LowRawJ) { $c.LowRawJ = ConvertTo-AsciiLower $c.RawJ }
@@ -733,7 +761,7 @@ function Get-MatchCount($set, [bool]$bound, [string]$s) {
 # ---- SCOPE=file kinds (require, balance, undeclared) ---------------------------
 # require: one finding at line 1 when no line of the view matches.
 function Invoke-Require($r) {
-  $j = Get-View $r.Code $r.CaseI
+  $j = Get-View $r.Target $r.CaseI
   foreach ($l in (Get-Candidates $r.Main.RxM $j)) {
     if ((Find-Next $r.Main.Rx $r.Bound (Get-LineOf $j $l) 0) -ge 0) { return }
   }
@@ -749,7 +777,7 @@ function Build-Blocks {
   $c = $script:Cur
   $n = $c.N
   $lines = New-Object 'string[]' 0
-  if ($n -gt 0) { $lines = (Get-View $true $true).Split([char]10) }
+  if ($n -gt 0) { $lines = (Get-View 'code' $true).Split([char]10) }
   $b = @{
     LOff = (New-Object 'int[]' $n)
     LogOf = (New-Object 'int[]' $n)
@@ -818,7 +846,7 @@ function Invoke-Balance($r) {
   $bal2 = New-Object 'int[]' ($nb + 1)
   $first = New-Object 'int[]' ($nb + 1)
   for ($i = 0; $i -le $nb; $i++) { $first[$i] = -1 }
-  $j = Get-View $r.Code $r.CaseI
+  $j = Get-View $r.Target $r.CaseI
   foreach ($l in (Get-Candidates $r.Main.RxM $j)) {
     $blk = $b.Reg[$l]
     if ($blk -le 0) { continue }
@@ -1012,17 +1040,21 @@ function Invoke-LintFile([string]$file, [string]$path) {
   $raw = Read-Lines $file
   $n = $raw.Length
   $code = New-Object 'string[]' $n
+  $nc = New-Object 'string[]' $n
   $script:InBlock = $false
-  for ($l = 0; $l -lt $n; $l++) { $code[$l] = Get-CodeView $raw[$l] }
+  for ($l = 0; $l -lt $n; $l++) {
+    $code[$l] = Get-CodeView $raw[$l]
+    $nc[$l] = $script:LastNc
+  }
   $starts = New-Object 'int[]' $n
   $pos = 0
   for ($l = 0; $l -lt $n; $l++) {
     $starts[$l] = $pos
     $pos += $raw[$l].Length + 1
   }
-  $script:Cur = @{ Raw = $raw; Code = $code; Starts = $starts; N = $n; RawJ = $null; CodeJ = $null; LowRawJ = $null; LowCodeJ = $null }
+  $script:Cur = @{ Raw = $raw; Code = $code; Nc = $nc; Starts = $starts; N = $n; RawJ = $null; CodeJ = $null; NcJ = $null; LowRawJ = $null; LowCodeJ = $null; LowNcJ = $null }
   foreach ($r in $forbid) {
-    $j = Get-View $r.Code $r.CaseI
+    $j = Get-View $r.Target $r.CaseI
     foreach ($l in (Get-Candidates $r.Main.RxM $j)) {
       if ($script:UseLines -and -not $script:Want.Contains($l + 1)) { continue }
       Invoke-Scan $r (Get-LineOf $j $l) ($l + 1)
@@ -1103,6 +1135,8 @@ function Invoke-Main {
   $script:IgnFunc = New-Object 'System.Collections.Generic.HashSet[string]' -ArgumentList ([System.StringComparer]::Ordinal)
   $script:Want = New-Object 'System.Collections.Generic.HashSet[int]'
   $script:CodeSb = New-Object System.Text.StringBuilder
+  $script:NcSpans = New-Object 'System.Collections.Generic.List[int]'
+  $script:HasNc = $false
   $script:Out = New-Object System.Text.StringBuilder
 
   Read-Ignore $ignoreFile

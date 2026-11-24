@@ -210,7 +210,7 @@ function load_rules(path,    line, lineno, n, f, r, ok, uid, uref) {
     ok = ok && (f[2] == "error" || f[2] == "warn")
     ok = ok && (f[3] == "line" || f[3] == "file")
     ok = ok && f[4] ~ /^(forbid|require|balance|undeclared)$/
-    ok = ok && (f[5] == "code" || f[5] == "raw") && (f[6] == "i" || f[6] == "c")
+    ok = ok && (f[5] == "code" || f[5] == "nocomment" || f[5] == "raw") && (f[6] == "i" || f[6] == "c")
     ok = ok && f[7] != "" && f[8] != "" && f[8] != "-" && f[9] != ""
     ok = ok && f[10] != "" && f[11] != ""
     # require/balance/undeclared look at the whole file: SCOPE must be file;
@@ -224,7 +224,8 @@ function load_rules(path,    line, lineno, n, f, r, ok, uid, uref) {
     ID[r] = f[1] ""
     SEV[r] = (f[2] == "error") ? "error" : "warning"
     KIND[r] = f[4]
-    CODE[r] = (f[5] == "code")
+    TGT[r] = f[5]
+    if (TGT[r] == "nocomment") HAS_NC = 1
     CASEI[r] = (f[6] == "i")
     EXTS[r] = "," tolower(f[7]) ","
     # "\t" in a regex becomes a real TAB (same meaning in every awk and .NET)
@@ -277,42 +278,54 @@ function load_lines(path,    line) {
 # the end of the line when unterminated. Comments: "//" and "&&" (outside
 # literals) to the end of the line; "/* ... */" across lines (state kept in
 # IN_BLOCK); "*" when it is the first non-blank character of the line.
-function code_of(line,    n, i, out, rest, c, c2, j) {
+# The same pass leaves the TARGET=nocomment view in NC_VIEW: comments blanked
+# exactly as above, literals kept intact (delimiters and contents).
+function code_of(line,    n, i, out, nc, rest, s, c, c2, j) {
   n = length(line)
   i = 1
   out = ""
   if (IN_BLOCK) {
     j = index(line, "*/")
-    if (j == 0) return spaces(n)
+    if (j == 0) { NC_VIEW = spaces(n); return NC_VIEW }
     out = spaces(j + 1)
     i = j + 2
     IN_BLOCK = 0
   } else if (line ~ /^[ \t]*\*/) {
-    return spaces(n)
+    NC_VIEW = spaces(n)
+    return NC_VIEW
   }
+  nc = out
   while (i <= n) {
     rest = substr(line, i)
-    if (!match(rest, SPECIAL)) { out = out rest; break }
-    out = out substr(rest, 1, RSTART - 1)
+    if (!match(rest, SPECIAL)) { out = out rest; nc = nc rest; break }
+    s = substr(rest, 1, RSTART - 1)
+    out = out s
+    nc = nc s
     i += RSTART - 1
     c = substr(line, i, 1)
     c2 = substr(line, i, 2)
     if (c == "\"" || c == "'") {
       j = index(substr(line, i + 1), c)
-      if (j == 0) { out = out c spaces(n - i); i = n + 1 }
-      else { out = out c spaces(j - 1) c; i += j + 1 }
+      if (j == 0) { out = out c spaces(n - i); nc = nc substr(line, i); i = n + 1 }
+      else { out = out c spaces(j - 1) c; nc = nc substr(line, i, j + 1); i += j + 1 }
     } else if (c2 == "//" || c2 == "&&") {
-      out = out spaces(n - i + 1)
+      s = spaces(n - i + 1)
+      out = out s
+      nc = nc s
       i = n + 1
     } else if (c2 == "/*") {
       j = index(substr(line, i + 2), "*/")
-      if (j == 0) { out = out spaces(n - i + 1); i = n + 1; IN_BLOCK = 1 }
-      else { out = out spaces(j + 3); i += j + 3 }
+      if (j == 0) { s = spaces(n - i + 1); i = n + 1; IN_BLOCK = 1 }
+      else { s = spaces(j + 3); i += j + 3 }
+      out = out s
+      nc = nc s
     } else {
       out = out c
+      nc = nc c
       i++
     }
   }
+  NC_VIEW = nc
   return out
 }
 
@@ -387,10 +400,12 @@ function count_rx(rx, rxc, bound, s,    q, st, c) {
   return c
 }
 
-# Text of line ln that rule r looks at: the code view (TARGET=code) or the
-# raw line (TARGET=raw), lowercased when CASE=i (C14, ASCII only).
+# Text of line ln that rule r looks at: the code view (TARGET=code), the
+# nocomment view (TARGET=nocomment) or the raw line (TARGET=raw), lowercased
+# when CASE=i (C14, ASCII only).
 function view(r, ln) {
-  if (CODE[r]) return CASEI[r] ? LCL[ln] : CL[ln]
+  if (TGT[r] == "code") return CASEI[r] ? LCL[ln] : CL[ln]
+  if (TGT[r] == "nocomment") return CASEI[r] ? LNL[ln] : NL[ln]
   return CASEI[r] ? LRL[ln] : RL[ln]
 }
 
@@ -670,7 +685,8 @@ function ext_of(path,    b) {
 }
 
 # The file is read first: CL/RL hold the code view and the raw line (CR
-# removed) of every line, LCL/LRL their lowercased copies. forbid rules (any
+# removed) of every line, LCL/LRL their lowercased copies, NL/LNL the
+# nocomment view when some rule uses it (HAS_NC). forbid rules (any
 # SCOPE) are then scanned rule by rule over the lines (only the --lines-file
 # lines when given; see the performance note of next_match()), and
 # require/balance/undeclared run after them, in rules-file order. flush()
@@ -700,6 +716,7 @@ function lint_file(path,    ext, r, nr, nf, list, flist, i, norm, line, ln, l) {
     RL[ln] = line
     LCL[ln] = tolower(CL[ln])
     LRL[ln] = tolower(line)
+    if (HAS_NC) { NL[ln] = NC_VIEW; LNL[ln] = tolower(NC_VIEW) }
   }
   close(path)
   for (i = 1; i <= nr; i++) {

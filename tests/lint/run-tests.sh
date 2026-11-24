@@ -294,6 +294,10 @@ printf 'ADV021\twarn\tfile\tundeclared\traw\ti\t*\tx\t-\tmsg\t-\n' >"$TMP_DIR/ba
 usage_case "require/balance/undeclared with SCOPE=line" "invalid rule at .*bad-scope.rules:1" --rules "$TMP_DIR/bad-scope.rules" "$F"
 usage_case "balance without REGEX2" "invalid rule at .*bad-balance.rules:1" --rules "$TMP_DIR/bad-balance.rules" "$F"
 usage_case "undeclared with TARGET=raw" "invalid rule at .*bad-undecl.rules:1" --rules "$TMP_DIR/bad-undecl.rules" "$F"
+printf 'ADV021\twarn\tfile\tundeclared\tnocomment\ti\t*\tx\t-\tmsg\t-\n' >"$TMP_DIR/bad-undecl-nc.rules"
+printf 'ADV008\terror\tline\tforbid\tnocomments\ti\t*\tx\t-\tmsg\t-\n' >"$TMP_DIR/bad-target.rules"
+usage_case "undeclared with TARGET=nocomment" "invalid rule at .*bad-undecl-nc.rules:1" --rules "$TMP_DIR/bad-undecl-nc.rules" "$F"
+usage_case "unknown TARGET value" "invalid rule at .*bad-target.rules:1" --rules "$TMP_DIR/bad-target.rules" "$F"
 usage_case "nonexistent --ignore-file" "cannot read ignore file: " --ignore-file "$TMP_DIR/missing.ignore" "$F"
 usage_case "--ignore-file is a directory" "cannot read ignore file: " --ignore-file "$TMP_DIR" "$F"
 
@@ -481,6 +485,22 @@ count_case "bracket: '[-[]' holds '-' and '[' (2)" i '[-[]' - '-[' 2
 count_case "CASE=i keeps Latin-1 0xC7: '\\307' matches (1)" i '\307' - "$(printf 'x\307y')" 1
 count_case "CASE=i keeps Latin-1 0xC7: '\\347' does not match (0)" i '\347' - "$(printf 'x\307y')" 0
 
+# TARGET=nocomment (ADV001, ADV002, ADV008, ADV012, ADV019): comments are
+# blanked, literals stay, so hits inside literals count and hits inside "//",
+# "&&", "/* */" or a "*" comment line do not.
+printf '%s\n' 'DbSelectArea("SX5") && DbSelectArea("SX6")' \
+  'cQ := "WITH(NOLOCK)" + " with ( nolock ) " // WITH(NOLOCK)' \
+  '/* DbSelectArea("SX1") */ DbSelectArea("SM0") /* WITH(NOLOCK)' \
+  'DbSelectArea("SX2") */ DbSelectArea(' \
+  '  * DbSelectArea("SIX")' >"$TMP_DIR/nc.prw"
+run_lint nc --scope line "$TMP_DIR/nc.prw"
+found_list nc "$TMP_DIR/nc.prw" >"$TMP_DIR/nc.got"
+printf '%s\n' 1:ADV008 2:ADV012 2:ADV012 3:ADV008 >"$TMP_DIR/nc.exp"
+begin_case
+expect_that "output contract" wellformed nc
+expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/nc.exp" "$TMP_DIR/nc.got"
+end_case "TARGET=nocomment: literal hits counted (2 NOLOCK), comment hits dropped"
+
 echo "=== File-scope rules (ADV019-ADV021) ==="
 # --scope line, and --lines-file even when it lists every line, turn SCOPE=file
 # rules off: what is left must be exactly the fixture's line-rule expectations.
@@ -510,12 +530,13 @@ printf '#include <tlpp-core.th>\n' >"$REQ_DIR/angle.tlpp"
 printf '#INCLUDE "TLPP-CORE.TH"\n' >"$REQ_DIR/upper.tlpp"
 printf 'User Function LintTh()\nReturn\n' >"$REQ_DIR/noinc.th"
 : >"$REQ_DIR/empty.tlpp"
-run_lint_in "$REQ_DIR" req ok.tlpp angle.tlpp upper.tlpp noinc.th empty.tlpp
+printf '/*\n#include "tlpp-core.th"\n*/\n#include "tlpp-rest.th" // #include "tlpp-core.th"\n' >"$REQ_DIR/comment.tlpp"
+run_lint_in "$REQ_DIR" req ok.tlpp angle.tlpp upper.tlpp noinc.th empty.tlpp comment.tlpp
 begin_case
 expect_that "output contract" wellformed req
 expect_that "findings [$(parse_findings req | cut -f 1,2,4 | tr '\t\n' ': ')]" \
-  [ "$(parse_findings req | cut -f 1,2,4 | tr '\t\n' ': ')" = "upper.tlpp:1:ADV002 empty.tlpp:1:ADV019 " ]
-end_case "ADV019: include on any line (\"\" or <>, any case) satisfies it, .th is exempt, empty .tlpp reports line 1"
+  [ "$(parse_findings req | cut -f 1,2,4 | tr '\t\n' ': ')" = "upper.tlpp:1:ADV002 empty.tlpp:1:ADV019 comment.tlpp:1:ADV019 " ]
+end_case "ADV019: include on any line (\"\" or <>, any case) satisfies it, not inside a comment; .th is exempt, empty .tlpp reports line 1"
 
 FS="$FIXTURES_DIR/file-scope.prw"
 printf 'rule ADV020\nrule adv021\n' >"$TMP_DIR/fs.ignore"
@@ -709,6 +730,12 @@ LC_ALL=C awk 'BEGIN { for (i = 1; i <= 199; i += 2) print i; print "x"; print ""
   printf 'PAR010\twarn\tline\tforbid\tcode\ti\t*\t%s\t-\talternancia\t-\n' '(a|ab)(c|bcd)?'
   printf 'PAR011\twarn\tline\tforbid\tcode\ti\t*\t%s\t-\tfim de linha\t-\n' ':=$|\.f\.'
   printf 'PAR012\twarn\tline\tforbid\traw\tc\tTH,PRX\t%s\t%s\textensao maiuscula\t-\n' '.' '^[^A-Z]'
+  # TARGET=nocomment: whole literals (any quote, Latin-1 bytes, unterminated)
+  # outside comments, CASE=c and CASE=i, plus require/balance on that view.
+  printf 'PAR013\twarn\tline\tforbid\tnocomment\tc\t*\t%s\t-\tliteral intacto\t-\n' "\"[^\"]*(\"|\$)|'[^']*('|\$)"
+  printf 'PAR014\twarn\tline\tforbid\tnocomment\ti\t*\t%s\t%s\tconout fora de comentario\t-\n' '(^|[^a-z0-9_])conout[ \t]*\(' '-'
+  printf 'PAR015\terror\tfile\trequire\tnocomment\ti\ttlpp,th\t%s\t-\tinclude fora de comentario\t-\n' '^[ \t]*#[ \t]*include'
+  printf 'PAR016\twarn\tfile\tbalance\tnocomment\tc\t*\t%s\t%s\tbalance nocomment\t-\n' '(^|[^A-Za-z0-9_])RecLock' '(^|[^A-Za-z0-9_])MsUnlock'
 } >"$PAR/par.rules"
 
 par_case() {   # DIR NAME ARGS...: one matrix run (output contract + parity)

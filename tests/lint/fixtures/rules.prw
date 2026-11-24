@@ -114,3 +114,25 @@ Return xRet
 	nLin := FT_FReadLn()
 	While !FT_FEof()
 	FT_FOOBAR(1) // expect: ADV018
+Function u_LintCal1()
+	// calibragem Task 7: TARGET=nocomment apaga comentarios e mantem literais
+	// DbSelectArea("SX3") comentado
+	/* DbSelectArea("SX2") */ DbSelectArea("SA1")
+	cQry += " FROM SA1010 " // WITH(NOLOCK) removido
+	* WITH(NOLOCK) em linha de comentario
+	cQry += " WITH(NOLOCK) " // comentario // expect: ADV012
+	DbSelectArea("SX5") && DbSelectArea("SX6") // expect: ADV008
+/*
+#include "protheus.ch"
+#INCLUDE "TOTVS.CH"
+*/
+#include "totvs.ch" // #INCLUDE "PROTHEUS.CH" no comentario
+	// membro de objeto nao e a variavel global nem a funcao ISAM
+	::cEmpAnt := cEmp
+	oCfg:cEmpAnt := "01"
+	Self:cEmpAnt:="02"
+	oTmp:DbCreate(cArq, aStru)
+	::MsCreate(cArq)
+	x := 1; cEmpAnt := "03" // expect: ADV007
+	aX[1]:=cEmpAnt:="04" // expect: ADV007
+Return
