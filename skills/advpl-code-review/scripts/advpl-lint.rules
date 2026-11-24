@@ -24,3 +24,14 @@ ADV002	error	line	forbid	raw	c	*	^[ \t]*#[ \t]*[Ii][Nn][Cc][Ll][Uu][Dd][Ee][ \t]
 ADV003	error	line	forbid	code	i	*	(^|[^a-z0-9_])((conout|outerr)[ \t]*\(|^[ \t]*\?\??)	-	use FWLogMsg() em vez de ConOut()/OutErr()/?	CA1004
 ADV004	error	line	forbid	code	i	*	(^|[^a-z0-9_])staticcall[ \t]*\(	-	funcao restrita; use FWLoadModel()/FWLoadMenuDef() ou chamada direta em vez de StaticCall()	CA2022
 ADV005	error	line	forbid	code	i	*	(^|[^a-z0-9_])ptinternal[ \t]*\(	-	funcao restrita sem excecao; remova PTInternal()	CA2023
+ADV006	error	line	forbid	code	i	*	(^|[^a-z0-9_])__cuserid[ \t]*:=	-	__cUserID e variavel somente leitura; nao atribua, apenas leia (use RetCodUsr()/FWGetUserCode quando precisar)	CA2024
+ADV007	error	line	forbid	code	i	*	(^|[^a-z0-9_])cempant[ \t]*:=	-	cEmpAnt e variavel somente leitura; troque de empresa com RpcSetEnv()/FWSM0Util em vez de atribuir	CA2025
+ADV008	error	line	forbid	raw	i	*	(^|[^a-z0-9_])dbselectarea[ \t]*\([ \t]*["'](sx[0-9a-z]|sm0|six)[0-9]*["']	-	acesso direto a tabela de sistema (SX*/SM0/SIX); use FWSX3Util, GetMV/SuperGetMV, FWSM0Util ou outra API do framework	CA2000-CA2013
+ADV009	warn	line	forbid	code	i	*	(^|[^a-z0-9_])iif[ \t]*\(	-	evite IIf() inline; use bloco If/Else/EndIf	CA4000
+ADV010	error	line	forbid	code	i	*	(^|[^a-z0-9_])(dbcreate|mscreate)[ \t]*\(	-	API da era ISAM; use FWTemporaryTable em modo relacional	CA1000
+ADV011	warn	line	forbid	code	i	*	(^|[^a-z0-9_])criatrab[ \t]*\(	-	API da era ISAM; use FWTemporaryTable em modo relacional (CriaTrab so para nome de arquivo)	CA1000
+ADV012	error	line	forbid	raw	i	*	(^|[^a-z0-9_])with[ \t]*\([ \t]*nolock[ \t]*\)	-	WITH(NOLOCK) permite leitura suja e nao funciona em todos os bancos; remova a dica	-
+ADV013	error	line	forbid	code	i	*	(^|[^a-z0-9_])using[ \t]+namespace[ \t]+tlpp\.[a-z0-9_.]*	tlpp\.probat	namespace tlpp.* e desnecessario; use os includes .th (tlpp-core.th, tlpp-rest.th, tlpp-object.th)	-
+ADV014	error	line	forbid	raw	c	*	\357\277\275	-	caractere U+FFFD (substituicao): o arquivo foi salvo com encoding errado; restaure o texto e salve em Windows-1252	CA0000
+ADV015	warn	line	forbid	code	i	*	(^|[^a-z0-9_])(cquery|csql|cqry)[ \t]*(\+=|:=|=)[^=].*\+[ \t]*[a-z_(]	-	possivel concatenacao em SQL (injecao); use BeginSQL/EndSQL com %exp:% ou FWPreparedStatement	CA2050
+ADV016	error	line	forbid	code	i	*	(^|[^a-z0-9_])local[ \t]+([a-z0-9_]+([ \t]*:=[^,]*)?[ \t]*,[ \t]*)*(cempant|cfilant|ddatabase|__cuserid|cusername|nmodulo|cmodulo)([^a-z0-9_]|$)	-	Local redeclara variavel de ambiente do Protheus (cEmpAnt, cFilAnt, dDataBase...); remova a declaracao e apenas leia a variavel	-

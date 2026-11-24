@@ -1,0 +1,16 @@
+#include "tlpp-core.th"
+using namespace tlpp.core // expect: ADV013
+using namespace tlpp.log // expect: ADV013
+using namespace tlpp.probat
+using namespace tlpp.probat.assert
+using namespace custom.fat.pedido
+// using namespace tlpp.core
+Using Namespace TLPP.Rest // expect: ADV013
+
+Function u_LintR002()
+	Local cQuery := ""
+	Local cEmpAnt := "01" // expect: ADV007,ADV016
+	cQuery += " AND A1_COD = '" + cCod + "'" // expect: ADV015
+	cQuery += " AND A1_COD = 'X'"
+	cMsg := "using namespace tlpp.core"
+Return Nil
