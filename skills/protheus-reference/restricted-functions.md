@@ -1,6 +1,6 @@
 # TOTVS Restricted Functions, Classes, and Variables
 
-> **Source:** https://centraldeatendimento.totvs.com/hc/pt-br/articles/360016461772
+> **Source:** https://centraldeatendimento.totvs.com/hc/pt-br/articles/56931144146579
 >
 > These functions, classes, and variables are TOTVS internal property. They are NOT documented, NOT supported, and may be altered or removed without prior notice. Using them in custom code is NOT recommended and may cause compilation failures, runtime errors, or unpredictable behavior after updates.
 
@@ -235,7 +235,7 @@ These functions compile but are NOT supported. They may be altered or removed in
 | `LASTKEY` | Specific navigation control |
 | `SetPrvt` | Declare `Private` variables explicitly |
 | `MontaBlock` | Build code blocks with `{|| ... }` |
-| `FWMVCROTAUTO` | `FWExecView()` for MVC routine automation |
+| `FWMVCROTAUTO` | `MsExecAuto` following the documented example of the routine; for MVC routines, the model API (`FWLoadModel` + `SetOperation` + `Activate` + `SetValue` + `VldData` + `CommitData` + `DeActivate`). `FWExecView()` opens the interface and is not automation |
 | `FWLOOKUP` | `FWInputDialog()` or standard F3 lookup |
 | `OPENSXS` | Framework opens tables automatically |
 | `APPEND FROM` | `RecLock` + field-by-field copy |

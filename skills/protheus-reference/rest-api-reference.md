@@ -88,7 +88,7 @@ Protheus REST supports HTTP Basic Authentication by default when `Security=1` is
 
 ```advpl
 // Client-side: calling Protheus REST with Basic Auth
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function CallWithAuth()
     Local cUrl    := "http://localhost:8282/rest/myservice"
@@ -104,7 +104,7 @@ User Function CallWithAuth()
     cResponse := HttpGet(cUrl, "", "", @aHeaders)
 
     If !Empty(cResponse)
-        ConOut("Response: " + cResponse)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
     EndIf
 Return
 ```
@@ -114,7 +114,7 @@ Return
 Protheus supports token-based authentication through the `/api/oauth2/v1/token` endpoint:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function GetToken()
     Local cUrl      := "http://localhost:8282/rest/api/oauth2/v1/token"
@@ -134,7 +134,7 @@ User Function GetToken()
     If !Empty(cResponse)
         oJson := JsonObject():New()
         oJson:FromJson(cResponse)
-        ConOut("Access Token: " + oJson["access_token"])
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Access Token: " + oJson["access_token"])
         FreeObj(oJson)
     EndIf
 Return
@@ -143,7 +143,7 @@ Return
 ### Using a Token in Subsequent Requests
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function CallWithToken()
     Local cUrl      := "http://localhost:8282/rest/api/v1/customers"
@@ -157,7 +157,7 @@ User Function CallWithToken()
     cResponse := HttpGet(cUrl, "", "", @aHeaders)
 
     If !Empty(cResponse)
-        ConOut("Response: " + cResponse)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
     EndIf
 Return
 ```
@@ -171,8 +171,8 @@ The WsRestFul approach uses the `RestFul.ch` include and class-based declaration
 ### Service Declaration
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "RestFul.ch"
+#include "totvs.ch"
+#include "restful.ch"
 
 WsRestFul CustomerService Description "Customer CRUD Service" Format APPLICATION_JSON
 
@@ -196,10 +196,18 @@ WsMethod GET WsReceive id, page, pageSize WsService CustomerService
     Local oJsonItem := Nil
     Local aItems    := {}
     Local cAlias    := "SA1"
-    Local nPage     := IIf(::page == Nil, 1, ::page)
-    Local nPageSize := IIf(::pageSize == Nil, 20, ::pageSize)
-    Local nSkip     := (nPage - 1) * nPageSize
+    Local nPage     := 1
+    Local nPageSize := 20
+    Local nSkip     := 0
     Local nCount    := 0
+
+    If ::page != Nil
+        nPage := ::page
+    EndIf
+    If ::pageSize != Nil
+        nPageSize := ::pageSize
+    EndIf
+    nSkip := (nPage - 1) * nPageSize
 
     // If ID is provided, return single customer
     If ::id != Nil .And. !Empty(::id)
@@ -305,8 +313,12 @@ WsMethod POST WsService CustomerService
         (cAlias)->A1_COD    := GetSXENum("SA1", "A1_COD")
         (cAlias)->A1_LOJA   := "01"
         (cAlias)->A1_NOME   := oJson["name"]
-        (cAlias)->A1_CGC    := IIf(oJson["cnpj"] != Nil, oJson["cnpj"], "")
-        (cAlias)->A1_EMAIL  := IIf(oJson["email"] != Nil, oJson["email"], "")
+        If oJson["cnpj"] != Nil
+            (cAlias)->A1_CGC := oJson["cnpj"]
+        EndIf
+        If oJson["email"] != Nil
+            (cAlias)->A1_EMAIL := oJson["email"]
+        EndIf
         MsUnlock()
         ConfirmSX8()
         lSuccess := .T.
@@ -477,26 +489,30 @@ The modern TLPP framework uses annotations to define REST endpoints. This approa
 
 ### Complete Service with Annotations
 
+Rules applied (TDN, tlppCore REST): `tlpp-core.th` + `tlpp-rest.th`, plus `totvs.ch` because the endpoints use framework commands; the namespace follows `custom.<agrupador>.<servico>` (lowercase, no underscores). Inside the methods the REST server exposes the `oRest` object. Official `oRest` methods: `getQueryRequest()` and `getPathParamsRequest()` (return a `JsonObject`; read-only reference), `getBodyRequest()` (raw body string), `setStatusCode(nCode)`, `setResponse(cBody)` and `setFault(cBody)` (sets the body and forces HTTP 500). There is no `setStatus`, `getQueryString`, `getBody` or `getContent` in `oRest`. Error body: `{code, message, detailedMessage}` (TOTVS API guide). Validation of these examples in TDS is pending.
+
 ```tlpp
-#Include "tlpp-core.th"
-#Include "tlpp-rest.th"
+#include "tlpp-core.th"
+#include "tlpp-rest.th"
+#include "totvs.ch"
 
-@RestService("/api/v1/customers")
-class CustomerAPI from LongClassName
+namespace custom.vendas.customerapi
 
-    @Get("")
+class CustomerAPI
+
+    @Get("/api/v1/customers")
     public method list()
 
-    @Get("/:id")
+    @Get("/api/v1/customers/:id")
     public method getById()
 
-    @Post("")
+    @Post("/api/v1/customers")
     public method create()
 
-    @Put("/:id")
+    @Put("/api/v1/customers/:id")
     public method update()
 
-    @Delete("/:id")
+    @Delete("/api/v1/customers/:id")
     public method remove()
 
 endclass
@@ -510,10 +526,22 @@ method list() class CustomerAPI
     local aItems    := {}
     local oItem     := nil
     local cAlias    := "SA1"
-    local nPage     := val(self:getQueryString("page", "1"))
-    local nPageSize := val(self:getQueryString("pageSize", "20"))
-    local nSkip     := (nPage - 1) * nPageSize
+    local jQuery    := oRest:getQueryRequest()
+    local nPage     := 1
+    local nPageSize := 20
+    local nSkip     := 0
     local nCount    := 0
+
+    // The JsonObject returned by oRest is a reference: read only
+    if jQuery != nil
+        if valtype(jQuery["page"]) == "C" .and. !empty(jQuery["page"])
+            nPage := val(jQuery["page"])
+        endif
+        if valtype(jQuery["pageSize"]) == "C" .and. !empty(jQuery["pageSize"])
+            nPageSize := val(jQuery["pageSize"])
+        endif
+    endif
+    nSkip := (nPage - 1) * nPageSize
 
     DbSelectArea(cAlias)
     (cAlias)->(DbSetOrder(1))
@@ -547,8 +575,8 @@ method list() class CustomerAPI
     oJson["pageSize"] := nPageSize
     oJson["hasNext"]  := !(cAlias)->(Eof())
 
-    self:setStatus(200)
-    self:setResponse(oJson:toJson())
+    oRest:setStatusCode(200)
+    oRest:setResponse(oJson:toJson())
 
     FreeObj(oJson)
 return
@@ -559,14 +587,15 @@ return
 ```tlpp
 method getById() class CustomerAPI
     local oJson  := JsonObject():New()
-    local cId    := self:getPathParam("id")
+    local cId    := oRest:getPathParamsRequest()["id"]
     local cAlias := "SA1"
 
     if empty(cId)
-        self:setStatus(400)
+        oRest:setStatusCode(400)
         oJson["code"]    := "BAD_REQUEST"
         oJson["message"] := "Customer ID is required"
-        self:setResponse(oJson:toJson())
+        oJson["detailedMessage"] := "Check the request path and body"
+        oRest:setResponse(oJson:toJson())
         FreeObj(oJson)
         return
     endif
@@ -581,13 +610,14 @@ method getById() class CustomerAPI
         oJson["cnpj"]  := alltrim((cAlias)->A1_CGC)
         oJson["email"] := alltrim((cAlias)->A1_EMAIL)
 
-        self:setStatus(200)
-        self:setResponse(oJson:toJson())
+        oRest:setStatusCode(200)
+        oRest:setResponse(oJson:toJson())
     else
-        self:setStatus(404)
+        oRest:setStatusCode(404)
         oJson["code"]    := "NOT_FOUND"
         oJson["message"] := "Customer not found: " + cId
-        self:setResponse(oJson:toJson())
+        oJson["detailedMessage"] := "No SA1 record matches the informed id"
+        oRest:setResponse(oJson:toJson())
     endif
 
     FreeObj(oJson)
@@ -598,17 +628,18 @@ return
 
 ```tlpp
 method create() class CustomerAPI
-    local cBody    := self:getContent()
+    local cBody    := oRest:getBodyRequest()
     local oJson    := JsonObject():New()
     local oResp    := JsonObject():New()
     local cAlias   := "SA1"
     local lSuccess := .F.
 
     if empty(cBody)
-        self:setStatus(400)
+        oRest:setStatusCode(400)
         oResp["code"]    := "BAD_REQUEST"
         oResp["message"] := "Request body is required"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "Check the request path and body"
+        oRest:setResponse(oResp:toJson())
         FreeObj(oJson)
         FreeObj(oResp)
         return
@@ -618,10 +649,11 @@ method create() class CustomerAPI
 
     // Validate required fields
     if oJson["name"] == nil .or. empty(oJson["name"])
-        self:setStatus(400)
+        oRest:setStatusCode(400)
         oResp["code"]    := "VALIDATION_ERROR"
         oResp["message"] := "Field 'name' is required"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "Check the required fields of the request body"
+        oRest:setResponse(oResp:toJson())
         FreeObj(oJson)
         FreeObj(oResp)
         return
@@ -637,27 +669,32 @@ method create() class CustomerAPI
         (cAlias)->A1_COD    := GetSXENum("SA1", "A1_COD")
         (cAlias)->A1_LOJA   := "01"
         (cAlias)->A1_NOME   := oJson["name"]
-        (cAlias)->A1_CGC    := iif(oJson["cnpj"] != nil, oJson["cnpj"], "")
-        (cAlias)->A1_EMAIL  := iif(oJson["email"] != nil, oJson["email"], "")
+        if oJson["cnpj"] != nil
+            (cAlias)->A1_CGC := oJson["cnpj"]
+        endif
+        if oJson["email"] != nil
+            (cAlias)->A1_EMAIL := oJson["email"]
+        endif
         MsUnlock()
         ConfirmSX8()
         lSuccess := .T.
     else
         DisarmTransaction()
-        self:setStatus(500)
+        oRest:setStatusCode(500)
         oResp["code"]    := "INTERNAL_ERROR"
         oResp["message"] := "Failed to lock record for insertion"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "RecLock failed; check the AppServer log"
+        oRest:setResponse(oResp:toJson())
     endif
 
     end transaction
 
     if lSuccess
-        self:setStatus(201)
+        oRest:setStatusCode(201)
         oResp["id"]      := alltrim((cAlias)->A1_COD)
         oResp["name"]    := alltrim((cAlias)->A1_NOME)
         oResp["message"] := "Customer created successfully"
-        self:setResponse(oResp:toJson())
+        oRest:setResponse(oResp:toJson())
     endif
 
     FreeObj(oJson)
@@ -669,28 +706,30 @@ return
 
 ```tlpp
 method update() class CustomerAPI
-    local cBody    := self:getContent()
-    local cId      := self:getPathParam("id")
+    local cBody    := oRest:getBodyRequest()
+    local cId      := oRest:getPathParamsRequest()["id"]
     local oJson    := JsonObject():New()
     local oResp    := JsonObject():New()
     local cAlias   := "SA1"
     local lSuccess := .F.
 
     if empty(cId)
-        self:setStatus(400)
+        oRest:setStatusCode(400)
         oResp["code"]    := "BAD_REQUEST"
         oResp["message"] := "Customer ID is required"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "Check the request path and body"
+        oRest:setResponse(oResp:toJson())
         FreeObj(oJson)
         FreeObj(oResp)
         return
     endif
 
     if empty(cBody)
-        self:setStatus(400)
+        oRest:setStatusCode(400)
         oResp["code"]    := "BAD_REQUEST"
         oResp["message"] := "Request body is required"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "Check the request path and body"
+        oRest:setResponse(oResp:toJson())
         FreeObj(oJson)
         FreeObj(oResp)
         return
@@ -702,10 +741,11 @@ method update() class CustomerAPI
     (cAlias)->(DbSetOrder(1))
 
     if !(cAlias)->(DbSeek(xFilial(cAlias) + cId))
-        self:setStatus(404)
+        oRest:setStatusCode(404)
         oResp["code"]    := "NOT_FOUND"
         oResp["message"] := "Customer not found: " + cId
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "No SA1 record matches the informed id"
+        oRest:setResponse(oResp:toJson())
         FreeObj(oJson)
         FreeObj(oResp)
         return
@@ -727,20 +767,21 @@ method update() class CustomerAPI
         lSuccess := .T.
     else
         DisarmTransaction()
-        self:setStatus(500)
+        oRest:setStatusCode(500)
         oResp["code"]    := "INTERNAL_ERROR"
         oResp["message"] := "Failed to lock record for update"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "RecLock failed; check the AppServer log"
+        oRest:setResponse(oResp:toJson())
     endif
 
     end transaction
 
     if lSuccess
-        self:setStatus(200)
+        oRest:setStatusCode(200)
         oResp["id"]      := alltrim((cAlias)->A1_COD)
         oResp["name"]    := alltrim((cAlias)->A1_NOME)
         oResp["message"] := "Customer updated successfully"
-        self:setResponse(oResp:toJson())
+        oRest:setResponse(oResp:toJson())
     endif
 
     FreeObj(oJson)
@@ -752,16 +793,17 @@ return
 
 ```tlpp
 method remove() class CustomerAPI
-    local cId      := self:getPathParam("id")
+    local cId      := oRest:getPathParamsRequest()["id"]
     local oResp    := JsonObject():New()
     local cAlias   := "SA1"
     local lSuccess := .F.
 
     if empty(cId)
-        self:setStatus(400)
+        oRest:setStatusCode(400)
         oResp["code"]    := "BAD_REQUEST"
         oResp["message"] := "Customer ID is required"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "Check the request path and body"
+        oRest:setResponse(oResp:toJson())
         FreeObj(oResp)
         return
     endif
@@ -770,10 +812,11 @@ method remove() class CustomerAPI
     (cAlias)->(DbSetOrder(1))
 
     if !(cAlias)->(DbSeek(xFilial(cAlias) + cId))
-        self:setStatus(404)
+        oRest:setStatusCode(404)
         oResp["code"]    := "NOT_FOUND"
         oResp["message"] := "Customer not found: " + cId
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "No SA1 record matches the informed id"
+        oRest:setResponse(oResp:toJson())
         FreeObj(oResp)
         return
     endif
@@ -786,19 +829,20 @@ method remove() class CustomerAPI
         lSuccess := .T.
     else
         DisarmTransaction()
-        self:setStatus(500)
+        oRest:setStatusCode(500)
         oResp["code"]    := "INTERNAL_ERROR"
         oResp["message"] := "Failed to lock record for deletion"
-        self:setResponse(oResp:toJson())
+        oResp["detailedMessage"] := "RecLock failed; check the AppServer log"
+        oRest:setResponse(oResp:toJson())
     endif
 
     end transaction
 
     if lSuccess
-        self:setStatus(200)
+        oRest:setStatusCode(200)
         oResp["id"]      := cId
         oResp["message"] := "Customer deleted successfully"
-        self:setResponse(oResp:toJson())
+        oRest:setResponse(oResp:toJson())
     endif
 
     FreeObj(oResp)
@@ -814,9 +858,9 @@ FWRestModel provides automatic CRUD operations based on existing MVC models, sig
 ### Basic FWRestModel Setup
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "RestFul.ch"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "restful.ch"
+#include "fwmvcdef.ch"
 
 WsRestFul CustomerModel Description "Customer REST via FWRestModel" Format APPLICATION_JSON
 
@@ -945,7 +989,7 @@ The `JsonObject` class is the primary way to work with JSON in ADVPL/TLPP.
 #### Creating JSON
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function JsonCreate()
     Local oJson := JsonObject():New()
@@ -957,7 +1001,7 @@ User Function JsonCreate()
     oJson["rate"]   := 99.90
 
     // Convert to string
-    ConOut(oJson:ToJson())
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:ToJson()))
     // Output: {"name":"TOTVS S.A.","code":12345,"active":true,"rate":99.9}
 
     FreeObj(oJson)
@@ -967,7 +1011,7 @@ Return
 #### Parsing JSON
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function JsonParse()
     Local oJson   := JsonObject():New()
@@ -977,11 +1021,11 @@ User Function JsonParse()
     nResult := oJson:FromJson(cJson)
 
     If nResult == 0  // 0 = success
-        ConOut("Name: " + oJson["name"])       // "TOTVS"
-        ConOut("Code: " + cValToChar(oJson["code"]))  // "123"
-        ConOut("Active: " + IIf(oJson["active"], "Yes", "No"))  // "Yes"
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Name: " + oJson["name"])       // "TOTVS"
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Code: " + cValToChar(oJson["code"]))  // "123"
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Active: " + cValToChar(oJson["active"]))  // ".T."
     Else
-        ConOut("JSON parse error code: " + cValToChar(nResult))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "JSON parse error code: " + cValToChar(nResult))
     EndIf
 
     FreeObj(oJson)
@@ -991,7 +1035,7 @@ Return
 #### Working with Nested JSON
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function JsonNested()
     Local oJson    := JsonObject():New()
@@ -1011,11 +1055,11 @@ User Function JsonNested()
     oJson["address"] := oAddress
     oJson["contact"] := oContact
 
-    ConOut(oJson:ToJson())
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:ToJson()))
     // {"company":"TOTVS S.A.","address":{"street":"Av. Braz Leme, 1631",...},...}
 
     // Reading nested values
-    ConOut("City: " + oJson["address"]["city"])  // "Sao Paulo"
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "City: " + oJson["address"]["city"])  // "Sao Paulo"
 
     FreeObj(oJson)
 Return
@@ -1024,7 +1068,7 @@ Return
 #### Arrays in JSON
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function JsonArrays()
     Local oJson  := JsonObject():New()
@@ -1051,12 +1095,12 @@ User Function JsonArrays()
     oJson["products"] := aItems
     oJson["total"]    := Len(aItems)
 
-    ConOut(oJson:ToJson())
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:ToJson()))
     // {"products":[{"id":"001","name":"Product A"},...],"total":3}
 
     // Iterating over JSON array
     For nI := 1 To Len(oJson["products"])
-        ConOut("Item: " + oJson["products"][nI]["name"])
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Item: " + oJson["products"][nI]["name"])
     Next nI
 
     FreeObj(oJson)
@@ -1068,7 +1112,7 @@ Return
 `FWJsonDeserialize` converts a JSON string into a structured ADVPL hash map.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function JsonDeserialize()
     Local cJson   := '{"customer":{"name":"TOTVS","items":[1,2,3]}}'
@@ -1077,8 +1121,8 @@ User Function JsonDeserialize()
     oResult := FWJsonDeserialize(cJson)
 
     If oResult != Nil
-        ConOut("Name: " + oResult:customer:name)
-        ConOut("Items count: " + cValToChar(Len(oResult:customer:items)))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Name: " + oResult:customer:name)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Items count: " + cValToChar(Len(oResult:customer:items)))
     EndIf
 Return
 ```
@@ -1088,7 +1132,7 @@ Return
 `FWJsonSerialize` converts ADVPL objects/arrays into JSON strings.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function JsonSerialize()
     Local aData    := {}
@@ -1101,7 +1145,7 @@ User Function JsonSerialize()
     aAdd(aData, aItem)
 
     cResult := FWJsonSerialize(aData)
-    ConOut("JSON: " + cResult)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "JSON: " + cResult)
 Return
 ```
 
@@ -1112,7 +1156,7 @@ Return
 ### HttpGet
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function CallGet()
     Local cUrl      := "https://api.example.com/users"
@@ -1125,15 +1169,15 @@ User Function CallGet()
 
     cResponse := HttpGet(cUrl, "", "", @aHeaders, @nStatus)
 
-    ConOut("Status: " + cValToChar(nStatus))
-    ConOut("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Status: " + cValToChar(nStatus))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 Return
 ```
 
 ### HttpPost
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function CallPost()
     Local cUrl      := "https://api.example.com/users"
@@ -1151,7 +1195,7 @@ User Function CallPost()
 
     cResponse := HttpPost(cUrl, "", cPayload, @aHeaders)
 
-    ConOut("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 
     FreeObj(oJson)
 Return
@@ -1162,7 +1206,7 @@ Return
 `FWCallRest` is the recommended class for making external HTTP calls in Protheus.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function ExternalAPI()
     Local oRest     := FWCallRest():New()
@@ -1190,8 +1234,8 @@ User Function ExternalAPI()
     nStatus := oRest:Get()
     cResponse := oRest:GetResult()
 
-    ConOut("GET Status: " + cValToChar(nStatus))
-    ConOut("GET Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "GET Status: " + cValToChar(nStatus))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "GET Response: " + cResponse)
 
     //------------------------------------------
     // POST request
@@ -1206,8 +1250,8 @@ User Function ExternalAPI()
     nStatus := oRest:Post()
     cResponse := oRest:GetResult()
 
-    ConOut("POST Status: " + cValToChar(nStatus))
-    ConOut("POST Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "POST Status: " + cValToChar(nStatus))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "POST Response: " + cResponse)
 
     FreeObj(oJson)
     FreeObj(oRest)
@@ -1219,7 +1263,7 @@ Return
 When calling HTTPS endpoints, you may need to configure certificates:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function SecureCall()
     Local oRest := FWCallRest():New()
@@ -1238,9 +1282,9 @@ User Function SecureCall()
     Local nStatus := oRest:Get()
 
     If nStatus == 200
-        ConOut("Secure response: " + oRest:GetResult())
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Secure response: " + oRest:GetResult())
     Else
-        ConOut("SSL call failed with status: " + cValToChar(nStatus))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SSL call failed with status: " + cValToChar(nStatus))
     EndIf
 
     FreeObj(oRest)
@@ -1250,7 +1294,7 @@ Return
 ### Handling Timeouts
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function TimeoutExample()
     Local oRest := FWCallRest():New()
@@ -1264,12 +1308,12 @@ User Function TimeoutExample()
     Local nStatus := oRest:Get()
 
     If nStatus == 0
-        ConOut("Request timed out or connection failed")
-        ConOut("Error: " + oRest:GetLastError())
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Request timed out or connection failed")
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error: " + oRest:GetLastError())
     ElseIf nStatus == 200
-        ConOut("Response: " + oRest:GetResult())
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + oRest:GetResult())
     Else
-        ConOut("HTTP Error: " + cValToChar(nStatus))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "HTTP Error: " + cValToChar(nStatus))
     EndIf
 
     FreeObj(oRest)
@@ -1282,12 +1326,13 @@ Return
 
 ### Standard Error Response Format
 
-Protheus REST APIs should follow a consistent error response structure:
+Protheus REST APIs should follow a consistent error response structure. The TOTVS API guide (v2.0) defines `code`, `message` and `detailedMessage`; `helpUrl` and `details` (a recursive list of error objects) are optional.
 
 ```json
 {
     "code": "ERROR_CODE",
     "message": "Human-readable error description",
+    "detailedMessage": "Detailed technical description of the error",
     "details": [
         {
             "field": "fieldName",
@@ -1317,13 +1362,13 @@ Protheus REST APIs should follow a consistent error response structure:
 **WsRestFul (Legacy):**
 ```advpl
 ::SetStatus(404)
-::SetResponse('{"code":"NOT_FOUND","message":"Resource not found"}')
+::SetResponse('{"code":"NOT_FOUND","message":"Resource not found","detailedMessage":"No record matches the informed id"}')
 ```
 
 **TLPP (Modern):**
 ```tlpp
-self:setStatus(404)
-self:setResponse('{"code":"NOT_FOUND","message":"Resource not found"}')
+oRest:setStatusCode(404)
+oRest:setResponse('{"code":"NOT_FOUND","message":"Resource not found","detailedMessage":"No record matches the informed id"}')
 ```
 
 ### Error Handler Function
@@ -1331,9 +1376,9 @@ self:setResponse('{"code":"NOT_FOUND","message":"Resource not found"}')
 A reusable error handler for REST services:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
-Static Function RestError(oSelf, nStatus, cCode, cMessage, aDetails)
+Static Function RestError(oSelf, nStatus, cCode, cMessage, cDetailed, aDetails)
     Local oJson    := JsonObject():New()
     Local aDetList := {}
     Local oDetail  := Nil
@@ -1342,10 +1387,12 @@ Static Function RestError(oSelf, nStatus, cCode, cMessage, aDetails)
     Default nStatus  := 500
     Default cCode    := "INTERNAL_ERROR"
     Default cMessage := "An unexpected error occurred"
+    Default cDetailed := ""
     Default aDetails := {}
 
     oJson["code"]    := cCode
     oJson["message"] := cMessage
+    oJson["detailedMessage"] := cDetailed
 
     If Len(aDetails) > 0
         For nI := 1 To Len(aDetails)
@@ -1361,8 +1408,7 @@ Static Function RestError(oSelf, nStatus, cCode, cMessage, aDetails)
     oSelf:SetResponse(oJson:ToJson())
 
     // Log the error
-    ConOut("[REST ERROR] " + cCode + ": " + cMessage)
-    FWLogMsg("ERROR", , "REST", , , , cCode + ": " + cMessage, , , )
+    FWLogMsg("ERROR", /*cTransactionId*/, "REST", "ERRO", /*cStep*/, /*cMsgId*/, cCode + ": " + cMessage)
 
     FreeObj(oJson)
 Return
@@ -1487,10 +1533,17 @@ Return oJson
 
 ```advpl
 WsMethod GET WsReceive page, pageSize WsService CustomerService
-    Local nPage     := IIf(::page == Nil, 1, ::page)
-    Local nPageSize := IIf(::pageSize == Nil, 20, ::pageSize)
+    Local nPage     := 1
+    Local nPageSize := 20
     Local oJson     := Nil
     Local bItem     := Nil
+
+    If ::page != Nil
+        nPage := ::page
+    EndIf
+    If ::pageSize != Nil
+        nPageSize := ::pageSize
+    EndIf
 
     DbSelectArea("SA1")
     SA1->(DbSetOrder(1))
@@ -1516,11 +1569,18 @@ Return oItem
 ```advpl
 WsMethod GET WsReceive page, pageSize, name, status WsService CustomerService
     Local cFilter  := ""
-    Local nPage    := IIf(::page == Nil, 1, ::page)
-    Local nPageSize := IIf(::pageSize == Nil, 20, ::pageSize)
+    Local nPage    := 1
+    Local nPageSize := 20
     Local oJson    := JsonObject():New()
     Local aItems   := {}
     Local nCount   := 0
+
+    If ::page != Nil
+        nPage := ::page
+    EndIf
+    If ::pageSize != Nil
+        nPageSize := ::pageSize
+    EndIf
 
     DbSelectArea("SA1")
     SA1->(DbSetOrder(1))
@@ -1569,9 +1629,16 @@ Return .T.
 
 ```advpl
 WsMethod GET WsReceive orderBy, direction WsService CustomerService
-    Local cOrderBy   := IIf(::orderBy == Nil, "name", ::orderBy)
-    Local cDirection := IIf(::direction == Nil, "asc", Lower(::direction))
+    Local cOrderBy   := "name"
+    Local cDirection := "asc"
     Local nOrder     := 1
+
+    If ::orderBy != Nil
+        cOrderBy := ::orderBy
+    EndIf
+    If ::direction != Nil
+        cDirection := Lower(::direction)
+    EndIf
 
     DbSelectArea("SA1")
 
@@ -1707,8 +1774,12 @@ WsMethod POST WsService BatchCustomerService
             (cAlias)->A1_COD    := GetSXENum("SA1", "A1_COD")
             (cAlias)->A1_LOJA   := "01"
             (cAlias)->A1_NOME   := aItems[nI]["name"]
-            (cAlias)->A1_CGC    := IIf(aItems[nI]["cnpj"] != Nil, aItems[nI]["cnpj"], "")
-            (cAlias)->A1_EMAIL  := IIf(aItems[nI]["email"] != Nil, aItems[nI]["email"], "")
+            If aItems[nI]["cnpj"] != Nil
+                (cAlias)->A1_CGC := aItems[nI]["cnpj"]
+            EndIf
+            If aItems[nI]["email"] != Nil
+                (cAlias)->A1_EMAIL := aItems[nI]["email"]
+            EndIf
             MsUnlock()
             ConfirmSX8()
 

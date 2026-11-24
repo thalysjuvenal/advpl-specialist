@@ -78,7 +78,7 @@ See `restricted-functions.md` for the complete list and supported alternatives.
 | Semaphore | MayIUseCode, MPCriaNumS | native-functions.md |
 | Dictionary | FWX3Titulo, FWX2CHAVE, FWX2Unico | native-functions.md |
 | Interface | SaveInter, RestInter | native-functions.md |
-| ExecAuto | MsGetDAuto, MsExecAuto, FWMVCRotAuto | native-functions.md |
+| ExecAuto | MsGetDAuto, MsExecAuto, FWMVCRotAuto (restricted: use MsExecAuto or the MVC model API) | native-functions.md |
 | Restricted | StaticCall, PTInternal, PARAMBOX, etc. | restricted-functions.md |
 
 ## Data Dictionary Quick Reference

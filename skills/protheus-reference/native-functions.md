@@ -466,7 +466,7 @@ Returns the current system date.
 **Example:**
 ```advpl
 Local dToday := Date()
-Conout("Today is: " + DtoC(dToday))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Today is: " + DtoC(dToday))
 ```
 
 ---
@@ -639,7 +639,7 @@ Returns the day of the week as a number.
 ```advpl
 Local nDow := DOW(Date())
 If nDow == 1 .Or. nDow == 7
-    Conout("Weekend!")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Weekend!")
 EndIf
 ```
 
@@ -739,9 +739,9 @@ Validates whether a date is valid.
 **Example:**
 ```advpl
 If DateValid("29/02/2026")
-    Conout("Valid date")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Valid date")
 Else
-    Conout("Invalid date") // 2026 is not a leap year
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Invalid date") // 2026 is not a leap year
 EndIf
 ```
 
@@ -1207,7 +1207,7 @@ Evaluates a code block for each element in an array.
 **Example:**
 ```advpl
 Local aNames := {"Alice", "Bob", "Charlie"}
-aEval(aNames, {|cName, nIdx| Conout(Str(nIdx) + ": " + cName)})
+aEval(aNames, {|cName, nIdx| FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(Str(nIdx) + ": " + cName))})
 ```
 
 ---
@@ -1318,9 +1318,9 @@ Seeks a record by key in the current index order.
 DbSelectArea("SA1")
 DbSetOrder(1)
 If DbSeek(xFilial("SA1") + "000001" + "01")
-    Conout("Customer found: " + SA1->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer found: " + SA1->A1_NOME)
 Else
-    Conout("Customer not found")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer not found")
 EndIf
 ```
 
@@ -1343,7 +1343,7 @@ Moves the record pointer forward or backward.
 DbSelectArea("SA1")
 DbGoTop()
 While !Eof()
-    Conout(SA1->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(SA1->A1_NOME))
     DbSkip()
 EndDo
 ```
@@ -1379,7 +1379,7 @@ Moves the record pointer to the last record in the current work area.
 ```advpl
 DbSelectArea("SA1")
 DbGoBottom()
-Conout("Last record: " + Str(RecNo()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Last record: " + Str(RecNo()))
 ```
 
 ---
@@ -1451,7 +1451,7 @@ Returns the current record number.
 ```advpl
 DbSelectArea("SA1")
 DbGoTop()
-Conout("Record number: " + Str(RecNo()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Record number: " + Str(RecNo()))
 ```
 
 ---
@@ -1467,7 +1467,7 @@ Returns the total number of records in the current work area.
 **Example:**
 ```advpl
 DbSelectArea("SA1")
-Conout("Total records: " + Str(LastRec()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Total records: " + Str(LastRec()))
 ```
 
 ---
@@ -1525,7 +1525,7 @@ Returns whether the current record is marked for deletion.
 DbSelectArea("SA1")
 DbGoTop()
 If !Deleted()
-    Conout("Active record: " + SA1->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Active record: " + SA1->A1_NOME)
 EndIf
 ```
 
@@ -1550,7 +1550,7 @@ DbSelectArea("SA1")
 DbSetFilter({|| SA1->A1_TIPO == "F"}, 'SA1->A1_TIPO == "F"')
 DbGoTop()
 While !Eof()
-    Conout(SA1->A1_NOME) // Only physical person customers
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(SA1->A1_NOME)) // Only physical person customers
     DbSkip()
 EndDo
 DbClearFilter()
@@ -1570,7 +1570,7 @@ Returns the current index order number.
 ```advpl
 DbSelectArea("SA1")
 DbSetOrder(3)
-Conout("Current index: " + Str(IndexOrd())) // 3
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Current index: " + Str(IndexOrd())) // 3
 ```
 
 ---
@@ -1651,7 +1651,7 @@ Returns the alias of the current or specified work area.
 **Example:**
 ```advpl
 DbSelectArea("SA1")
-Conout(Alias()) // "SA1"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, Alias()) // "SA1"
 ```
 
 ---
@@ -1672,7 +1672,7 @@ Returns the work area number for a given alias.
 ```advpl
 Local nArea := Select("SA1")
 If nArea > 0
-    Conout("SA1 is open in work area: " + Str(nArea))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SA1 is open in work area: " + Str(nArea))
 EndIf
 ```
 
@@ -1690,7 +1690,7 @@ Returns whether the current work area has a table open.
 ```advpl
 DbSelectArea("SA1")
 If Used()
-    Conout("SA1 is open")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SA1 is open")
 EndIf
 ```
 
@@ -1707,7 +1707,7 @@ Returns the number of fields in the current work area.
 **Example:**
 ```advpl
 DbSelectArea("SA1")
-Conout("Number of fields: " + Str(FCount()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Number of fields: " + Str(FCount()))
 ```
 
 ---
@@ -1730,7 +1730,7 @@ Local nI := 0
 
 DbSelectArea("SA1")
 For nI := 1 To FCount()
-    Conout(FieldName(nI))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, FieldName(nI))
 Next nI
 ```
 
@@ -2152,7 +2152,7 @@ If nHandle >= 0
     // Read file...
     FClose(nHandle)
 Else
-    Conout("Error opening file: " + Str(FError()))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error opening file: " + Str(FError()))
 EndIf
 ```
 
@@ -2178,7 +2178,7 @@ Local nHandle := FOpen("C:\Temp\data.txt", 0)
 Local cBuffer := Space(1024)
 Local nRead := FRead(nHandle, @cBuffer, 1024)
 cBuffer := Left(cBuffer, nRead)
-Conout(cBuffer)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(cBuffer))
 FClose(nHandle)
 ```
 
@@ -2244,7 +2244,7 @@ Deletes a file from the file system.
 **Example:**
 ```advpl
 If FErase("C:\Temp\old_file.txt") == 0
-    Conout("File deleted successfully")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "File deleted successfully")
 EndIf
 ```
 
@@ -2285,7 +2285,7 @@ Checks if a file exists.
 **Example:**
 ```advpl
 If File("C:\Temp\config.ini")
-    Conout("Configuration file found")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Configuration file found")
 EndIf
 ```
 
@@ -2309,7 +2309,7 @@ Returns an array with file and directory information.
 Local aFiles := Directory("C:\Temp\*.txt")
 Local nI
 For nI := 1 To Len(aFiles)
-    Conout(aFiles[nI][1] + " - Size: " + Str(aFiles[nI][2]))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(aFiles[nI][1] + " - Size: " + Str(aFiles[nI][2])))
 Next nI
 ```
 
@@ -2330,7 +2330,7 @@ Creates a new directory.
 **Example:**
 ```advpl
 If MakeDir("C:\Temp\Reports") == 0
-    Conout("Directory created")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Directory created")
 EndIf
 ```
 
@@ -2347,7 +2347,7 @@ Returns the current directory.
 **Example:**
 ```advpl
 Local cDir := CurDir()
-Conout("Current directory: " + cDir)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Current directory: " + cDir)
 ```
 
 ---
@@ -2367,7 +2367,7 @@ Removes an empty directory.
 **Example:**
 ```advpl
 If DirRemove("C:\Temp\OldReports") == 0
-    Conout("Directory removed")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Directory removed")
 EndIf
 ```
 
@@ -2392,7 +2392,7 @@ Moves the file pointer to a specified position.
 Local nHandle := FOpen("C:\Temp\data.bin", 0)
 Local nSize := FSeek(nHandle, 0, 2) // Get file size by seeking to end
 FSeek(nHandle, 0, 0)                // Return to beginning
-Conout("File size: " + Str(nSize))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "File size: " + Str(nSize))
 FClose(nHandle)
 ```
 
@@ -2439,7 +2439,7 @@ Retrieves the value of an MV_* system parameter from SX6.
 **Example:**
 ```advpl
 Local cState := GetMV("MV_ESTADO")
-Conout("Default state: " + cState)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Default state: " + cState)
 ```
 
 ---
@@ -2502,8 +2502,8 @@ Outputs a message to the Protheus console log.
 
 **Example:**
 ```advpl
-Conout("Processing started at: " + Time())
-Conout("Record count: " + Str(LastRec()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Processing started at: " + Time())
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Record count: " + Str(LastRec()))
 ```
 
 ---
@@ -2546,7 +2546,7 @@ Returns the name of the current Protheus environment.
 **Example:**
 ```advpl
 Local cEnv := GetEnvServer()
-Conout("Running in environment: " + cEnv) // e.g., "P12"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Running in environment: " + cEnv) // e.g., "P12"
 ```
 
 ---
@@ -2611,7 +2611,7 @@ Returns the data type of an expression given as a string.
 ```advpl
 Local cType := Type("SA1->A1_NOME") // "C"
 If Type("cMyVar") != "U"
-    Conout("Variable exists")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Variable exists")
 EndIf
 ```
 
@@ -2632,10 +2632,10 @@ Returns the data type of a value.
 **Example:**
 ```advpl
 Local xVar := "Hello"
-Conout(ValType(xVar)) // "C"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(ValType(xVar))) // "C"
 
 xVar := 42
-Conout(ValType(xVar)) // "N"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(ValType(xVar))) // "N"
 ```
 
 ---
@@ -2654,10 +2654,10 @@ Converts any value to its character string representation.
 
 **Example:**
 ```advpl
-Conout(cValToChar(42))        // "42"
-Conout(cValToChar(.T.))       // ".T."
-Conout(cValToChar(Date()))    // "04/03/2026"
-Conout(cValToChar({"A","B"})) // "{...}"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(42))        // "42"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(.T.))       // ".T."
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(Date()))    // "04/03/2026"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar({"A","B"})) // "{...}"
 ```
 
 ---
@@ -2676,9 +2676,9 @@ Pauses execution for a specified number of milliseconds.
 
 **Example:**
 ```advpl
-Conout("Waiting 3 seconds...")
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Waiting 3 seconds...")
 Sleep(3000)
-Conout("Done!")
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Done!")
 ```
 
 ---
@@ -2698,7 +2698,7 @@ Local nEnd   := 0
 
 // ... perform operation ...
 nEnd := Seconds()
-Conout("Elapsed: " + Str(nEnd - nStart, 10, 3) + " seconds")
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Elapsed: " + Str(nEnd - nStart, 10, 3) + " seconds")
 ```
 
 ---
@@ -2807,7 +2807,7 @@ Returns the current branch code (M0_CODFIL).
 **Example:**
 ```advpl
 Local cCodFil := FWCodFil()
-Conout("Branch code: " + cCodFil)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Branch code: " + cCodFil)
 ```
 
 ---
@@ -2827,7 +2827,7 @@ Returns the company code (or the company group if company is not configured in t
 **Example:**
 ```advpl
 Local cCodEmp := FWCodEmp()
-Conout("Company: " + cCodEmp)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Company: " + cCodEmp)
 ```
 
 ---
@@ -2923,7 +2923,7 @@ Returns all companies for the given company group.
 Local aEmpresas := FWAllCompany()
 Local nI
 For nI := 1 To Len(aEmpresas)
-    Conout("Company: " + aEmpresas[nI])
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Company: " + aEmpresas[nI])
 Next nI
 ```
 
@@ -2949,7 +2949,7 @@ Returns all branches for the given company group, company, and business unit.
 Local aFiliais := FWAllFilial()
 Local nI
 For nI := 1 To Len(aFiliais)
-    Conout("Branch: " + aFiliais[nI])
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Branch: " + aFiliais[nI])
 Next nI
 ```
 
@@ -2985,7 +2985,7 @@ Returns the size of the branch field.
 **Example:**
 ```advpl
 Local nFilSize := FWSizeFilial()
-Conout("Branch field size: " + cValToChar(nFilSize))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Branch field size: " + cValToChar(nFilSize))
 ```
 
 ---
@@ -3075,7 +3075,7 @@ cSql += "AND A1_COD = '000001' AND A1_LOJA = '01' "
 cSql += "AND D_E_L_E_T_ = ' '"
 
 If TCSqlExec(cSql) < 0
-    Conout("SQL execution failed: " + TCSqlError())
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SQL execution failed: " + TCSqlError())
 EndIf
 ```
 
@@ -3126,7 +3126,7 @@ Executes a stored procedure.
 ```advpl
 Local nRet := TCSPExec("sp_update_balance", "000001", 1500.00)
 If nRet < 0
-    Conout("Stored procedure failed")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Stored procedure failed")
 EndIf
 ```
 
@@ -3185,7 +3185,7 @@ Local nResult := Eval(bCalc, 5, 3) // 25
 
 Local bValid := {|cVal| !Empty(cVal)}
 If Eval(bValid, cName)
-    Conout("Name is valid")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Name is valid")
 EndIf
 ```
 
@@ -3222,52 +3222,49 @@ MsExecAuto({|x,y| MATA030(x,y)}, aFields, 3) // Insert
 
 If lMsErroAuto
     cError := GetAutoGRLog()
-    Conout("Error in MsExecAuto: " + cError)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error in MsExecAuto: " + cError)
 EndIf
 ```
 
 ---
 
-### FWMVCRotAuto
+### FWMVCRotAuto (restricted)
 
-Executes MVC model operations automatically (batch mode).
+> **Restricted function.** `FWMVCRotAuto` is for internal TOTVS use since 2019 (listed as a restricted resource, without support, in the TOTVS "Funcoes, classes e variaveis de propriedade interna" article). Do not use it in customizations. See `restricted-functions.md`. Use `MsExecAuto` following the documented example of the routine, or, for MVC routines, the model API below.
 
-**Syntax:** `FWMVCRotAuto( oModel, cModelId, nOperation, aFieldValues [, lVerbose] ) --> lSuccess`
+**Alternative (MVC model API):** `FWLoadModel( cSource ) --> oModel`, then `SetOperation`, `Activate`, `SetValue`, `VldData`, `CommitData` and `DeActivate`, following the documented example of the target routine.
 
-| Param | Type | Description |
-|-------|------|-------------|
-| oModel | O | MVC model object (or NIL to use cModelId) |
-| cModelId | C | Model identifier (function name) |
-| nOperation | N | Operation: MODEL_OPERATION_INSERT (3), _UPDATE (4), _DELETE (5) |
-| aFieldValues | A | Array of {cFormId, {{"field", value}, ...}} |
-| lVerbose | L | Display log messages |
+| Step | Method | Description |
+|------|--------|-------------|
+| 1 | `FWLoadModel( cSource )` | Loads the model of the MVC routine |
+| 2 | `oModel:SetOperation( nOperation )` | MODEL_OPERATION_INSERT (3), _UPDATE (4), _DELETE (5) |
+| 3 | `oModel:Activate()` | Activates the model |
+| 4 | `oModel:SetValue( cFormId, cField, xValue )` | Fills the fields of each form |
+| 5 | `oModel:VldData()` | Validates the data (`.T.` if valid) |
+| 6 | `oModel:CommitData()` | Persists the data |
+| 7 | `oModel:DeActivate()` | Deactivates the model |
 
-**Return:** L - .T. if operation succeeded.
-
-**Example:**
+**Example:** (validation in TDS/VSCode TOTVS pending)
 ```advpl
-Local aData   := {}
-Local aHeader := {}
-Local aItems  := {}
-Local lRet    := .F.
-Local oModel  := NIL
-Local cError  := ""
+Local oModel := FWLoadModel("MATA030")
+Local aError := {}
+Local lRet   := .F.
 
-// Header data (FormGrid)
-aAdd(aHeader, {"A1_FILIAL", xFilial("SA1")})
-aAdd(aHeader, {"A1_COD",    "000200"})
-aAdd(aHeader, {"A1_LOJA",   "01"})
-aAdd(aHeader, {"A1_NOME",   "MVC Customer"})
+oModel:SetOperation(MODEL_OPERATION_INSERT)
+oModel:Activate()
 
-aAdd(aData, {"SA1MASTER", aHeader})
+oModel:SetValue("SA1MASTER", "A1_COD",  "000200")
+oModel:SetValue("SA1MASTER", "A1_LOJA", "01")
+oModel:SetValue("SA1MASTER", "A1_NOME", "MVC Customer")
 
-lRet := FWMVCRotAuto(NIL, "MATA030", MODEL_OPERATION_INSERT, aData)
-
-If !lRet
-    oModel := FWLoadModel("MATA030")
-    cError := oModel:GetErrorMessage()
-    Conout("MVC Error: " + cError)
+If oModel:VldData()
+    lRet := oModel:CommitData()
+Else
+    aError := oModel:GetErrorMessage()
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "MVC Error: " + cValToChar(aError[6]))
 EndIf
+
+oModel:DeActivate()
 ```
 
 ---
@@ -3318,9 +3315,9 @@ Local cResponse := ""
 Local aHeaders  := {"Content-Type: application/json", "Authorization: Bearer token123"}
 
 If HttpGet(cUrl, "", 30, aHeaders, @cResponse)
-    Conout("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 Else
-    Conout("HTTP GET failed")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "HTTP GET failed")
 EndIf
 ```
 
@@ -3350,7 +3347,7 @@ Local cResponse := ""
 Local aHeaders  := {"Content-Type: application/json"}
 
 If HttpPost(cUrl, cBody, 30, aHeaders, @cResponse)
-    Conout("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 EndIf
 ```
 
@@ -3370,8 +3367,9 @@ Framework class for building REST API services (server-side).
 
 **Example:**
 ```tlpp
-#Include "tlpp-core.th"
-#Include "tlpp-rest.th"
+#include "tlpp-core.th"
+#include "tlpp-rest.th"
+#include "totvs.ch"
 
 @Get("/api/v1/customers")
 User Function getCustomers()
@@ -3454,8 +3452,8 @@ Local cJson := '{"name": "John", "age": 30, "active": true}'
 Local oResult
 
 If FWJsonDeserialize(cJson, @oResult)
-    Conout("Name: " + oResult:name)
-    Conout("Age: " + Str(oResult:age))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Name: " + oResult:name)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Age: " + Str(oResult:age))
 EndIf
 ```
 
@@ -3484,7 +3482,7 @@ oData["age"]  := 30
 oData["items"] := {"A", "B", "C"}
 
 cJson := FWJsonSerialize(oData, .T.)
-Conout(cJson)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(cJson))
 ```
 
 ---
@@ -3513,7 +3511,7 @@ cJson := oJson:toJson()
 
 // Parse from string
 oJson2:fromJson('{"status": "ok", "count": 42}')
-Conout(oJson2["status"]) // "ok"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson2["status"])) // "ok"
 
 FreeObj(oJson)
 FreeObj(oJson2)
@@ -3543,9 +3541,9 @@ oRest:AddHeader("Authorization", "Bearer " + cToken)
 lRet := oRest:Execute()
 If lRet
     cResponse := oRest:GetResult()
-    Conout("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 Else
-    Conout("Error: " + Str(oRest:GetStatusCode()))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error: " + Str(oRest:GetStatusCode()))
 EndIf
 ```
 
@@ -3662,7 +3660,7 @@ Returns the last SQL error message.
 **Example:**
 ```advpl
 If TCSqlExec(cSql) < 0
-    Conout("SQL Error: " + TCSqlError())
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SQL Error: " + TCSqlError())
 EndIf
 ```
 
@@ -3694,7 +3692,7 @@ cQuery += " ORDER BY A1_COD"
 DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
 
 While !(cAlias)->(Eof())
-    Conout((cAlias)->A1_COD + " - " + (cAlias)->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar((cAlias)->A1_COD + " - " + (cAlias)->A1_NOME))
     (cAlias)->(DbSkip())
 EndDo
 
@@ -3745,7 +3743,7 @@ Positions on a record and returns a field value from any table.
 ```advpl
 // Get customer name without changing current work area
 Local cName := Posicione("SA1", 1, xFilial("SA1") + "000001" + "01", "A1_NOME")
-Conout("Customer: " + cName)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer: " + cName)
 ```
 
 ---
@@ -3768,7 +3766,7 @@ Checks if a value exists in a specific table field.
 ```advpl
 // Check if customer code exists
 If ExistCpo("SA1", "00000101")
-    Conout("Customer exists")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer exists")
 EndIf
 ```
 
@@ -3802,7 +3800,7 @@ oMaster:SetValue("A1_NOME", "Model Customer")
 If oModel:VldData()
     oModel:CommitData()
 Else
-    Conout("Validation error: " + oModel:GetErrorMessage())
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Validation error: " + oModel:GetErrorMessage())
 EndIf
 
 oModel:DeActivate()
@@ -3834,7 +3832,7 @@ cQuery += " WHERE D_E_L_E_T_ = ' '"
 MsOpenQuery(cQuery, cAlias)
 
 While !(cAlias)->(Eof())
-    Conout((cAlias)->A1_COD + " - " + (cAlias)->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar((cAlias)->A1_COD + " - " + (cAlias)->A1_NOME))
     (cAlias)->(DbSkip())
 EndDo
 
@@ -3859,8 +3857,8 @@ MsExecAuto({|x,y| MATA030(x,y)}, aFields, 3)
 
 If lMsErroAuto
     cLog := GetAutoGRLog()
-    Conout("MsExecAuto errors:")
-    Conout(cLog)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "MsExecAuto errors:")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(cLog))
 EndIf
 ```
 
@@ -3895,8 +3893,8 @@ Class for creating customizable reports, replacing SetPrint, SetDefault, RptStat
 
 **Example:**
 ```advpl
-#Include "TOTVS.CH"
-#Include "rptdef.ch"
+#include "totvs.ch"
+#include "rptdef.ch"
 
 Local oReport  := NIL
 Local oSection := NIL
@@ -4069,7 +4067,7 @@ Class providing a grid browse object with side buttons and column details based 
 
 **Example:**
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function MyBrowse()
     Local oBrowse := FWMBrowse():New()
@@ -4163,7 +4161,7 @@ StartJob("u_ProcessBatch", GetEnvServer(), .F., "SA1", Date())
 // Synchronous job (waits for completion)
 Local lOk := StartJob("u_GenerateReport", GetEnvServer(), .T., cReportId)
 If !lOk
-    Conout("Job failed to start")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Job failed to start")
 EndIf
 ```
 
@@ -4200,7 +4198,7 @@ User Function MyJob(cParam)
 
     lEnv := RpcSetEnv("99", "01")
     If !lEnv
-        Conout("Failed to open environment")
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Failed to open environment")
         Return
     EndIf
 
@@ -4328,7 +4326,7 @@ oServer:Init("", "smtp.gmail.com", "user@gmail.com", "password", 0, 465)
 // Connect
 nErr := oServer:SmtpConnect()
 If nErr != 0
-    Conout("SMTP Error: " + oServer:GetErrorString(nErr))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SMTP Error: " + oServer:GetErrorString(nErr))
     Return
 EndIf
 
@@ -4345,7 +4343,7 @@ oMessage:cBody    := "The monthly report is attached."
 // Send
 nErr := oServer:SendMail(oMessage)
 If nErr != 0
-    Conout("Send Error: " + oServer:GetErrorString(nErr))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Send Error: " + oServer:GetErrorString(nErr))
 EndIf
 
 oServer:SmtpDisconnect()
@@ -4432,9 +4430,9 @@ Local oJson := JsonObject():New()
 Local cRet  := oJson:FromJson('{"name":"John", "age":31}')
 
 If ValType(cRet) == "U"
-    Conout("JsonObject populado com sucesso")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "JsonObject populado com sucesso")
 Else
-    Conout("Falha: " + cRet)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Falha: " + cRet)
 EndIf
 ```
 
@@ -4453,7 +4451,7 @@ Serializes the JsonObject to a JSON-formatted string.
 Local oJson := JsonObject():New()
 oJson["name"] := "John"
 oJson["age"]  := 31
-Conout(oJson:toJSON()) // {"name":"John","age":31}
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, oJson:toJSON()) // {"name":"John","age":31}
 ```
 
 ---
@@ -4476,7 +4474,7 @@ oJson:FromJson('{"Content-Type":"application/json", "Authorization":"Bearer abc1
 
 aNames := oJson:GetNames()
 For i := 1 To Len(aNames)
-    Conout(aNames[i]) // "Content-Type", "Authorization", "X-Custom"
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(aNames[i])) // "Content-Type", "Authorization", "X-Custom"
 Next i
 ```
 
@@ -4503,8 +4501,8 @@ Checks if the JsonObject contains a given key. Property names are **case-sensiti
 Local oJson := JsonObject():New()
 oJson:FromJson('{"sKey":"texto", "nKey":23}')
 
-Conout(oJson:HasProperty("sKey"))  // .T.
-Conout(oJson:HasProperty("SKEY"))  // .F. (case-sensitive!)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:HasProperty("sKey")))  // .T.
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:HasProperty("SKEY")))  // .F. (case-sensitive!)
 ```
 
 ---
@@ -4554,9 +4552,9 @@ Returns the value of a property as a string, regardless of the original type.
 Local oJson := JsonObject():New()
 oJson:FromJson('{"name":"John", "age":31, "active":true}')
 
-Conout(oJson:GetJsonText("name"))    // "John"
-Conout(oJson:GetJsonText("age"))     // "31"
-Conout(oJson:GetJsonText("active"))  // "true"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:GetJsonText("name")))    // "John"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:GetJsonText("age")))     // "31"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson:GetJsonText("active")))  // "true"
 ```
 
 ---
@@ -4584,8 +4582,8 @@ Local xVal, cType
 oJson:FromJson('{"name":"John", "age":31}')
 
 If oJson:GetJsonValue("name", @xVal, @cType)
-    Conout(xVal)   // "John"
-    Conout(cType)  // "C"
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(xVal))   // "John"
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(cType))  // "C"
 EndIf
 ```
 
@@ -4610,7 +4608,7 @@ Removes a property and its value from the JsonObject. Property name is **case-se
 Local oJson := JsonObject():New()
 oJson:FromJson('{"name":"John", "age":31, "temp":"remove me"}')
 oJson:DelName("temp")
-Conout(oJson:toJSON()) // {"name":"John","age":31}
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, oJson:toJSON()) // {"name":"John","age":31}
 ```
 
 ---
@@ -4638,7 +4636,7 @@ AAdd(aItems, JsonObject():New())
 aItems[2]["name"] := "Item2"
 
 oRoot:Set(aItems)
-Conout(oRoot:toJSON()) // [{"name":"Item1"},{"name":"Item2"}]
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, oRoot:toJSON()) // [{"name":"Item1"},{"name":"Item2"}]
 ```
 
 ---
@@ -4665,9 +4663,9 @@ Return ""
 Local oHeaders := JsonObject():New()
 oHeaders:FromJson('{"Content-Type":"application/json","authorization":"Bearer token123","X-Custom-Header":"value"}')
 
-Conout(GetHeaderCI(oHeaders, "content-type"))    // "application/json"
-Conout(GetHeaderCI(oHeaders, "Authorization"))    // "Bearer token123"
-Conout(GetHeaderCI(oHeaders, "x-custom-header"))  // "value"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, GetHeaderCI(oHeaders, "content-type"))    // "application/json"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, GetHeaderCI(oHeaders, "Authorization"))    // "Bearer token123"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, GetHeaderCI(oHeaders, "x-custom-header"))  // "value"
 ```
 
 > **CRITICAL:** JsonObject property access is **case-sensitive**. HTTP headers are case-insensitive by spec (RFC 7230). Always use `GetNames()` + `Upper()` when matching headers.
@@ -4817,7 +4815,7 @@ If oWsdl:ParseURL(cUrl)
     oWsdl:SetOperation("OPERACAO")
     If oWsdl:SendSoapMsg(cEnvelope)
         If !Empty(oWsdl:cFaultCode)
-            Conout("SOAP Fault: " + oWsdl:cFaultCode + " - " + oWsdl:cFaultString)
+            FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SOAP Fault: " + oWsdl:cFaultCode + " - " + oWsdl:cFaultString)
         Else
             cResp := oWsdl:GetParsedResponse()
         EndIf
@@ -5293,7 +5291,7 @@ Returns the full name of the currently logged user.
 **Example:**
 ```advpl
 Local cUser := FwGetUserName()
-Conout("Logged user: " + cUser)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Logged user: " + cUser)
 ```
 
 ---
@@ -5313,7 +5311,7 @@ Returns the user name for a given user code. Unlike `FwGetUserName()` which retu
 **Example:**
 ```advpl
 Local cName := UsrRetName("000001")
-Conout("User name: " + cName)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "User name: " + cName)
 ```
 
 ---
@@ -5549,11 +5547,11 @@ MATA030(3, "SA1", {"A1_COD", "000001", Nil}, ;
                    {"A1_NOME", "Client Name", Nil})
 
 If lMsErroAuto
-    Conout("Error in auto routine")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error in auto routine")
 EndIf
 ```
 
-> **Preferred approach:** Use `FWMVCRotAuto()` for MVC-based routines instead of direct `MsExecAuto`. See patterns-mvc.md for MVC automatic routine patterns.
+> **Note:** `FWMVCRotAuto()` is restricted (internal TOTVS use). Use `MsExecAuto` following the documented example of the routine or, for MVC routines, the model API (`FWLoadModel` + `SetOperation` + `Activate` + `SetValue` + `VldData` + `CommitData` + `DeActivate`). See patterns-mvc.md.
 
 ---
 
@@ -5702,7 +5700,7 @@ oClient:SetAsCode()
 
 Local cResp := oClient:Access("https://api.provider.com/resource", "GET")
 If !Empty(cResp)
-    Conout("Response: " + cResp)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResp)
 EndIf
 
 oClient:Destroy()
@@ -5928,9 +5926,9 @@ Local aFiliais := FWLoadSM0(.T., .T.)
 Local nI
 
 For nI := 1 To Len(aFiliais)
-    Conout("Company: " + aFiliais[nI][SM0_EMPRESA])
-    Conout("Branch: "  + aFiliais[nI][SM0_FILIAL])
-    Conout("Name: "    + aFiliais[nI][SM0_NOME])
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Company: " + aFiliais[nI][SM0_EMPRESA])
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Branch: "  + aFiliais[nI][SM0_FILIAL])
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Name: "    + aFiliais[nI][SM0_NOME])
 Next nI
 ```
 
@@ -5991,7 +5989,7 @@ Local aResult := FwListBranches(.F., .T., .T., { 'FLAG', 'SM0_CODFIL', 'SM0_CGC'
 If Len(aResult) > 0
     Local nI
     For nI := 1 To Len(aResult)
-        Conout("Branch: " + aResult[nI][2] + " - " + aResult[nI][4])
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Branch: " + aResult[nI][2] + " - " + aResult[nI][4])
     Next nI
 EndIf
 ```
@@ -6356,7 +6354,7 @@ Visual wizard (step-by-step assistant) with navigation buttons (Back, Next, Canc
 
 **Example:**
 ```advpl
-#include "protheus.ch"
+#include "totvs.ch"
 #include "apwizard.ch"
 
 DEFINE WIZARD oWizard TITLE "Wizard" HEADER "Config Wizard" MESSAGE " " ;
@@ -6469,8 +6467,8 @@ Class for viewing and printing reports in Protheus. Supports PDF and spool outpu
 
 **Example:**
 ```advpl
-#include "RPTDEF.CH"
-#include "protheus.ch"
+#include "rptdef.ch"
+#include "totvs.ch"
 
 oPrinter := FWMSPrinter():New("report.rel", IMP_PDF, .F., "\spool", .T.)
 oPrinter:SetPortrait()
@@ -6506,7 +6504,7 @@ Static class to retrieve printer.exe versions from AppServer or SmartClient. Ava
 ```advpl
 Local cSrv := PrinterVersion():fromServer()
 Local cClt := PrinterVersion():fromClient()
-Conout("Server: " + cSrv + " / Client: " + cClt)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Server: " + cSrv + " / Client: " + cClt)
 ```
 
 ---
@@ -6553,7 +6551,7 @@ If FWBulk():CanBulk()
     Next
 
     If !oBulk:Close()
-        Conout("Error: " + oBulk:GetError())
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error: " + oBulk:GetError())
     EndIf
     oBulk:Destroy()
 EndIf
@@ -6598,7 +6596,7 @@ Local cQuery := "SELECT ED_CODIGO FROM " + RetSqlName("SED") + " WHERE D_E_L_E_T
 Local cAlias := FWExecCachedQuery():OpenQuery(cQuery,,,,  "120", "60")
 
 While !(cAlias)->(Eof())
-    Conout((cAlias)->ED_CODIGO)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar((cAlias)->ED_CODIGO))
     (cAlias)->(DBSkip())
 EndDo
 (cAlias)->(DBCloseArea())

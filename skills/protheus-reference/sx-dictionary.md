@@ -88,6 +88,7 @@ Return
 
 > **Warning**: Direct access to SX tables via `DbSelectArea()` / `DbSeek()` is blocked by TOTVS SonarQube. Use `FWSX1Util` instead.
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // Reading SX1 directly to check what questions exist in a group
 // DEPRECATED - Use FWSX1Util():GetGroup() instead
@@ -99,8 +100,8 @@ User Function ListQuestions(cGroup)
     DbSeek(cGroup)
 
     While !Eof() .And. SX1->X1_GRUPO == cGroup
-        ConOut("Question " + SX1->X1_ORDEM + ": " + AllTrim(SX1->X1_PERGUNT))
-        ConOut("  Type: " + SX1->X1_TIPO + " | Size: " + cValToChar(SX1->X1_TAMANHO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Question " + SX1->X1_ORDEM + ": " + AllTrim(SX1->X1_PERGUNT))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Type: " + SX1->X1_TIPO + " | Size: " + cValToChar(SX1->X1_TAMANHO))
         DbSkip()
     EndDo
 
@@ -170,6 +171,7 @@ DbSetOrder(1)             // Set to the first SIX index
 
 > **Warning**: Direct access to SX tables via `DbSelectArea()` / `DbSeek()` is blocked by TOTVS SonarQube. Use `FWSX2Util` instead.
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // Check if a table alias exists in SX2
 // DEPRECATED - Use FWSX2Util():SeekX2File() instead
@@ -194,9 +196,10 @@ User Function ListCustomTables()
     DbSeek("Z")
 
     While !Eof() .And. Left(SX2->X2_CHAVE, 1) == "Z"
-        ConOut("Alias: " + SX2->X2_CHAVE + ;
-               " | File: " + AllTrim(SX2->X2_ARQUIVO) + ;
-               " | Desc: " + AllTrim(SX2->X2_NOME))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ;
+            "Alias: " + SX2->X2_CHAVE + ;
+            " | File: " + AllTrim(SX2->X2_ARQUIVO) + ;
+            " | Desc: " + AllTrim(SX2->X2_NOME))
         DbSkip()
     EndDo
 
@@ -285,6 +288,7 @@ Local cPict := GetSX3Cache("A1_COD", "X3_PICTURE")   // Returns picture mask
 
 > **Warning**: Direct access to SX tables via `DbSelectArea()` / `DbSeek()` is blocked by TOTVS SonarQube. Use `FWSX3Util` instead.
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // Read field properties from SX3
 // DEPRECATED - Use FWSX3Util():GetFieldStruct() instead
@@ -294,17 +298,17 @@ User Function GetFieldInfo(cField)
     DbSelectArea("SX3")
     DbSetOrder(2) // Index by field name (X3_CAMPO)
     If DbSeek(cField)
-        ConOut("Field: "   + AllTrim(SX3->X3_CAMPO))
-        ConOut("Table: "   + AllTrim(SX3->X3_ARQUIVO))
-        ConOut("Type: "    + SX3->X3_TIPO)
-        ConOut("Size: "    + cValToChar(SX3->X3_TAMANHO))
-        ConOut("Dec: "     + cValToChar(SX3->X3_DECIMAL))
-        ConOut("Title: "   + AllTrim(SX3->X3_TITULO))
-        ConOut("Mand: "    + SX3->X3_OBRIGAT)
-        ConOut("Valid: "   + AllTrim(SX3->X3_VALID))
-        ConOut("Picture: " + AllTrim(SX3->X3_PICTURE))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Field: "   + AllTrim(SX3->X3_CAMPO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Table: "   + AllTrim(SX3->X3_ARQUIVO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Type: "    + SX3->X3_TIPO)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Size: "    + cValToChar(SX3->X3_TAMANHO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Dec: "     + cValToChar(SX3->X3_DECIMAL))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Title: "   + AllTrim(SX3->X3_TITULO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Mand: "    + SX3->X3_OBRIGAT)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Valid: "   + AllTrim(SX3->X3_VALID))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Picture: " + AllTrim(SX3->X3_PICTURE))
     Else
-        ConOut("Field " + cField + " not found in SX3")
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Field " + cField + " not found in SX3")
     EndIf
 
     RestArea(aArea)
@@ -320,10 +324,11 @@ User Function ListTableFields(cAlias)
     DbSeek(cAlias)
 
     While !Eof() .And. AllTrim(SX3->X3_ARQUIVO) == cAlias
-        ConOut(PadR(SX3->X3_CAMPO, 10) + " | " + ;
-               SX3->X3_TIPO + " | " + ;
-               Str(SX3->X3_TAMANHO, 3) + " | " + ;
-               AllTrim(SX3->X3_TITULO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ;
+            PadR(SX3->X3_CAMPO, 10) + " | " + ;
+            SX3->X3_TIPO + " | " + ;
+            Str(SX3->X3_TAMANHO, 3) + " | " + ;
+            AllTrim(SX3->X3_TITULO))
         DbSkip()
     EndDo
 
@@ -382,6 +387,7 @@ Local cDesc := X5Descri("13", "001") // Returns description for table 13, key 00
 
 > **Warning**: Direct access to SX tables via `DbSelectArea()` / `DbSeek()` is blocked by TOTVS SonarQube. Use `FWGetSX5()` and `FwPutSX5()` instead.
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // Read a description from a generic table
 // DEPRECATED - Use FWGetSX5() instead
@@ -408,8 +414,9 @@ User Function ListSX5Table(cTabela)
     DbSeek(xFilial("SX5") + cTabela)
 
     While !Eof() .And. SX5->X5_FILIAL == xFilial("SX5") .And. SX5->X5_TABELA == cTabela
-        ConOut("Key: " + AllTrim(SX5->X5_CHAVE) + ;
-               " | Desc: " + AllTrim(SX5->X5_DESCRI))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ;
+            "Key: " + AllTrim(SX5->X5_CHAVE) + ;
+            " | Desc: " + AllTrim(SX5->X5_DESCRI))
         DbSkip()
     EndDo
 
@@ -437,10 +444,19 @@ SX6 stores all system parameters (also called MV parameters) that control the be
 | X6_VAR | C | 10 | Parameter name (e.g., "MV_ESTADO", "MV_1DUP") |
 | X6_TIPO | C | 1 | Value type: "C" (Char), "N" (Numeric), "D" (Date), "L" (Logical) |
 | X6_CONTEUD | C | 250 | Parameter value (stored as character regardless of type) |
-| X6_DESCRIC | C | 60 | Description in Portuguese |
-| X6_DESCSPA | C | 60 | Description in Spanish |
-| X6_DESCENG | C | 60 | Description in English |
-| X6_PROPRI | C | 1 | Proprietary module flag |
+| X6_DESCRIC | C | 60 | Description in Portuguese (continued in `X6_DESC1` and `X6_DESC2`) |
+| X6_DSCSPA | C | 60 | Description in Spanish (continued in `X6_DSCSPA1` and `X6_DSCSPA2`) |
+| X6_DSCENG | C | 60 | Description in English (continued in `X6_DSCENG1` and `X6_DSCENG2`) |
+| X6_CONTSPA | C | 250 | Parameter value in Spanish |
+| X6_CONTENG | C | 250 | Parameter value in English |
+| X6_VALID | C | - | Validation expression for the parameter value |
+| X6_PYME | C | 1 | Small/medium company (PYME) flag |
+| X6_DEFPOR / X6_DEFSPA / X6_DEFENG | C | - | Default value in Portuguese/Spanish/English (standard parameters only) |
+| X6_ACTIVE | C | 1 | Active flag (standard parameters only) |
+| X6_EXPDEST | C | - | Destination expression (available from release 12.1.025) |
+| X6_PROPRI | C | 1 | Owner: "S" (System) or "U" (User) |
+
+> **Note (TDN)**: `X6_FIL` + `X6_VAR` form the key, and `X6_VAR` must be unique. The SX6 page of the TDN names the owner field `X6_PRIORI`, while the more recent UPDDISTR page names it `X6_PROPRI` (internal divergence in the TDN; confirm in your environment). The TDN does not mark fields as mandatory. A practical minimum for a custom parameter is `X6_FIL`, `X6_VAR`, `X6_TIPO`, `X6_DESCRIC`, `X6_CONTEUD` and `X6_PROPRI = "U"` (a practical minimum, not a TDN requirement). Custom parameter names usually follow `MV_` + prefix of the customer (the TDN mentions the `ES` prefix).
 
 ### Programmatic Access
 
@@ -484,6 +500,7 @@ Local cJson := FWSX6Util():GetParamData("MV_ESTADO", "99")
 
 > **Warning**: Direct access to SX tables via `DbSelectArea()` / `DbSeek()` is blocked by TOTVS SonarQube. Use `SuperGetMV()`, `PutMV()`, and `FWSX6Util` instead.
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // Reading SX6 directly (bulk queries)
 // DEPRECATED - Use FWSX6Util methods instead
@@ -495,10 +512,11 @@ User Function ListMVParams(cPrefix)
     DbSeek(xFilial("SX6") + cPrefix)
 
     While !Eof() .And. Left(AllTrim(SX6->X6_VAR), Len(cPrefix)) == cPrefix
-        ConOut("Param: " + AllTrim(SX6->X6_VAR) + ;
-               " | Type: " + SX6->X6_TIPO + ;
-               " | Value: " + AllTrim(SX6->X6_CONTEUD) + ;
-               " | Desc: " + AllTrim(SX6->X6_DESCRIC))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ;
+            "Param: " + AllTrim(SX6->X6_VAR) + ;
+            " | Type: " + SX6->X6_TIPO + ;
+            " | Value: " + AllTrim(SX6->X6_CONTEUD) + ;
+            " | Desc: " + AllTrim(SX6->X6_DESCRIC))
         DbSkip()
     EndDo
 
@@ -537,6 +555,9 @@ SX7 defines automatic field triggers. A trigger fires when a source field change
 
 ### Programmatic Access
 
+> **Warning**: no framework class is documented for SX7, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SX7 through the Configurador (SIGACFG) or the UPDDISTR update process.
+
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // List all triggers for a specific source field
 User Function ListTriggers(cField)
@@ -547,14 +568,14 @@ User Function ListTriggers(cField)
     DbSeek(cField)
 
     While !Eof() .And. AllTrim(SX7->X7_CAMPO) == cField
-        ConOut("Trigger #" + SX7->X7_SEQUENC)
-        ConOut("  Source: "    + AllTrim(SX7->X7_CAMPO))
-        ConOut("  Target: "    + AllTrim(SX7->X7_CDOMIN))
-        ConOut("  Rule: "      + AllTrim(SX7->X7_REGRA))
-        ConOut("  Condition: " + AllTrim(SX7->X7_CONDIC))
-        ConOut("  Type: "      + SX7->X7_TIPO)
-        ConOut("  Alias: "     + AllTrim(SX7->X7_ALIAS))
-        ConOut("  Order: "     + SX7->X7_ORDEM)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Trigger #" + SX7->X7_SEQUENC)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Source: "    + AllTrim(SX7->X7_CAMPO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Target: "    + AllTrim(SX7->X7_CDOMIN))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Rule: "      + AllTrim(SX7->X7_REGRA))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Condition: " + AllTrim(SX7->X7_CONDIC))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Type: "      + SX7->X7_TIPO)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Alias: "     + AllTrim(SX7->X7_ALIAS))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Order: "     + SX7->X7_ORDEM)
         DbSkip()
     EndDo
 
@@ -591,15 +612,27 @@ SX9 defines relationships between tables, similar to foreign key constraints in 
 
 | Field Name | Type | Size | Description |
 |------------|------|------|-------------|
-| X9_DOM | C | 10 | Domain/parent table alias (e.g., "SA1") |
-| X9_CDOM | C | 10 | Key field in the domain/parent table |
-| X9_EXPDOM | C | 120 | Expression for the domain side of the relationship |
-| X9_EXP | C | 120 | Expression for the related/child side of the relationship |
+| X9_DOM | C | 10 | Domain table alias (e.g., "SA1") |
+| X9_IDENT | C | - | Sequential identifier within the domain table |
+| X9_CDOM | C | 10 | Counter-domain table alias (the related table, not a key field) |
+| X9_EXPDOM | C | 120 | ADVPL expression for the domain side of the relationship |
+| X9_EXPCDOM | C | 120 | ADVPL expression for the counter-domain side of the relationship |
+| X9_PROPRI | C | 1 | Owner: "S" (System) or "U" (User) |
+| X9_LIGDOM | C | 1 | Cardinality of the domain side ("1" or "N") |
+| X9_LIGCDOM | C | 1 | Cardinality of the counter-domain side ("1" or "N") |
 | X9_CONDSQL | C | 200 | SQL condition expression for the relationship |
-| X9_PROPRI | C | 1 | Proprietary module flag |
+| X9_USEFIL | C | 1 | Use branch (filial) in the relationship |
+| X9_ENABLE | C | 1 | Relationship is active when filled with "S" |
+| X9_VINFIL | C | 1 | Strong key (chave forte) link by branch: "1" (enabled) or "2" (disabled) |
+| X9_CHVFOR | C | 1 | Strong key (chave forte): "1" (enabled) or "2" (disabled) |
+
+> **Note (TDN)**: the sizes and the exact mandatory fields are not documented in the TDN; fill the fields above when creating a relationship and treat which ones are mandatory as to be confirmed (a confirmar) in your environment.
 
 ### Programmatic Access
 
+> **Warning**: no framework class is documented for SX9, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SX9 through the Configurador (SIGACFG) or the UPDDISTR update process.
+
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // List relationships for a specific table
 User Function ListRelationships(cAlias)
@@ -610,11 +643,11 @@ User Function ListRelationships(cAlias)
     DbSeek(cAlias)
 
     While !Eof() .And. AllTrim(SX9->X9_DOM) == cAlias
-        ConOut("Parent Table: " + AllTrim(SX9->X9_DOM))
-        ConOut("  Parent Key: "   + AllTrim(SX9->X9_CDOM))
-        ConOut("  Parent Expr: "  + AllTrim(SX9->X9_EXPDOM))
-        ConOut("  Related Expr: " + AllTrim(SX9->X9_EXP))
-        ConOut("  SQL Cond: "     + AllTrim(SX9->X9_CONDSQL))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Domain Table: " + AllTrim(SX9->X9_DOM))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Counter-domain Table: "   + AllTrim(SX9->X9_CDOM))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Domain Expr: " + AllTrim(SX9->X9_EXPDOM))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Counter-domain Expr: " + AllTrim(SX9->X9_EXPCDOM))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  SQL Cond: "     + AllTrim(SX9->X9_CONDSQL))
         DbSkip()
     EndDo
 
@@ -632,7 +665,7 @@ User Function CheckCustomerRels()
     DbSeek("SA1")
 
     While !Eof() .And. AllTrim(SX9->X9_DOM) == "SA1"
-        ConOut("SA1 -> " + AllTrim(SX9->X9_EXP))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SA1 -> " + AllTrim(SX9->X9_CDOM))
         DbSkip()
     EndDo
 
@@ -670,6 +703,9 @@ SXB defines the standard queries (Consultas Padrao) used for F3 lookups. When a 
 
 ### Programmatic Access
 
+> **Warning**: no framework class is documented for SXB, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SXB through the Configurador (SIGACFG) or the UPDDISTR update process.
+
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // List the configuration of a standard query
 User Function ListSXBQuery(cQueryAlias)
@@ -682,16 +718,17 @@ User Function ListSXBQuery(cQueryAlias)
     While !Eof() .And. AllTrim(SXB->XB_ALIAS) == cQueryAlias
         Do Case
             Case SXB->XB_TIPO == "1"
-                ConOut("== Query: " + AllTrim(SXB->XB_DESCRI) + " ==")
+                FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "== Query: " + AllTrim(SXB->XB_DESCRI) + " ==")
             Case SXB->XB_TIPO == "2"
-                ConOut("  Column: " + AllTrim(SXB->XB_COLUNA) + ;
-                       " | Title: " + AllTrim(SXB->XB_DESCRI))
+                FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ;
+                    "  Column: " + AllTrim(SXB->XB_COLUNA) + ;
+                    " | Title: " + AllTrim(SXB->XB_DESCRI))
             Case SXB->XB_TIPO == "3"
-                ConOut("  Return: " + AllTrim(SXB->XB_CONTEM))
+                FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Return: " + AllTrim(SXB->XB_CONTEM))
             Case SXB->XB_TIPO == "4"
-                ConOut("  Filter: " + AllTrim(SXB->XB_SEEK))
+                FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Filter: " + AllTrim(SXB->XB_SEEK))
             Case SXB->XB_TIPO == "5"
-                ConOut("  Search Order: " + AllTrim(SXB->XB_DESCRI))
+                FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Search Order: " + AllTrim(SXB->XB_DESCRI))
         EndCase
         DbSkip()
     EndDo
@@ -764,6 +801,7 @@ DbSeek(xFilial("SA1") + "12345678000199")  // Seek by CNPJ
 
 > **Warning**: Direct access to SX tables via `DbSelectArea()` / `DbSeek()` is blocked by TOTVS SonarQube. Use `FWSIXUtil` instead.
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // List all indexes for a table
 // DEPRECATED - Use FWSIXUtil():GetAliasIndexes() instead
@@ -775,10 +813,10 @@ User Function ListIndexes(cAlias)
     DbSeek(cAlias)
 
     While !Eof() .And. AllTrim(SIX->INDICE) == cAlias
-        ConOut("Index Order " + SIX->ORDEM + ": " + AllTrim(SIX->CHAVE))
-        ConOut("  Description: " + AllTrim(SIX->DESCRICAO))
-        ConOut("  Nickname: "    + AllTrim(SIX->NICKNAME))
-        ConOut("  Show Search: " + SIX->SHOWPESQ)
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Index Order " + SIX->ORDEM + ": " + AllTrim(SIX->CHAVE))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Description: " + AllTrim(SIX->DESCRICAO))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Nickname: "    + AllTrim(SIX->NICKNAME))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "  Show Search: " + SIX->SHOWPESQ)
         DbSkip()
     EndDo
 
@@ -798,7 +836,7 @@ User Function FindIndexByKey(cAlias, cKeyFragment)
     While !Eof() .And. AllTrim(SIX->INDICE) == cAlias
         If cKeyFragment $ AllTrim(SIX->CHAVE)
             cOrder := SIX->ORDEM
-            ConOut("Found index order " + cOrder + ": " + AllTrim(SIX->CHAVE))
+            FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Found index order " + cOrder + ": " + AllTrim(SIX->CHAVE))
             Exit
         EndIf
         DbSkip()
