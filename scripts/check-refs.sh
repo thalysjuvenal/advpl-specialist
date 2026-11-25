@@ -11,9 +11,11 @@
 #      paths. A relative path glued to a longer path ("../skills/x",
 #      "/plugin-path/skills/x") is not one of them. Placeholders such as
 #      <arquivo> count as "*"; a path with "*" must match at least one entry; a
-#      path ending in "/" must be a directory.
+#      path ending in "/" must be a directory. Finding no cited path at all is
+#      a problem too (the extraction failed).
 #   2. Every skills/<name>/ has documentation/content/docs/skills/<name>.mdx and
-#      "<name>" is listed in documentation/content/docs/skills/meta.json.
+#      "<name>" is an entry of the "pages" array of that directory's meta.json;
+#      a site page or a pages entry without skills/<name>/ is a problem.
 #   3. Every name in the "skills:" frontmatter list of agents/*.md has
 #      skills/<name>/SKILL.md whose frontmatter "name:" is that name.
 #   4. The command list printed by hooks/session-start ("/advpl-specialist:NAME")
@@ -88,14 +90,42 @@ while IFS="$(printf '\t')" read -r where path; do
 done <<EOF
 $(cited_paths commands/*.md agents/*.md ai-commands/src/*.md)
 EOF
+[ "$PATHS" -gt 0 ] || problem "check-refs: no cited path found in commands/, agents/ or ai-commands/src/ (extraction failed?)"
 
 # ---- 2. one site page per skill ------------------------------------------------
+# Entries of the "pages" array of the meta.json $1, one per line.
+meta_pages() {
+  LC_ALL=C awk '
+    { sub(/\r$/, "") }
+    !inp && /"pages"[ \t]*:[ \t]*\[/ { inp = 1; sub(/.*"pages"[ \t]*:[ \t]*\[/, "") }
+    inp {
+      s = $0
+      k = index(s, "]")
+      if (k > 0) s = substr(s, 1, k - 1)
+      while (match(s, /"[^"]*"/)) {
+        print substr(s, RSTART + 1, RLENGTH - 2)
+        s = substr(s, RSTART + RLENGTH)
+      }
+      if (k > 0) exit
+    }
+  ' "$1"
+}
+PAGES="$(meta_pages "$SITE_META")"
 SKILLS=0
 for d in skills/*/; do
   n="$(basename "$d")"
   SKILLS=$((SKILLS + 1))
   [ -f "$SITE_DIR/$n.mdx" ] || problem "$SITE_DIR/$n.mdx: missing site page for skill $n"
-  grep -q "\"$n\"" "$SITE_META" || problem "$SITE_META: skill $n not listed in pages"
+  printf '%s\n' "$PAGES" | grep -qxF "$n" || problem "$SITE_META: skill $n not listed in pages"
+done
+for f in "$SITE_DIR"/*.mdx; do
+  [ -e "$f" ] || continue
+  n="$(basename "$f" .mdx)"
+  [ -d "skills/$n" ] || problem "$f: site page without skills/$n/"
+done
+for n in $PAGES; do
+  case "$n" in *[!A-Za-z0-9_-]*) continue ;; esac   # separators, "...", etc.
+  [ -d "skills/$n" ] || problem "$SITE_META: pages entry \"$n\" without skills/$n/"
 done
 
 # ---- 3. agents' skills: frontmatter --------------------------------------------

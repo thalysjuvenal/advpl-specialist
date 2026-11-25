@@ -246,16 +246,19 @@ jobs:
         run: bash scripts/lint-docs.sh skills commands agents AGENTS.md ai-commands .github/copilot-instructions.md
 
       # Runs without authentication. The root CLAUDE.md is the maintainers' dev
-      # file (a known --strict warning), so a copy with only the plugin parts is
-      # validated.
+      # file (a known --strict warning), so a copy with only the plugin parts,
+      # README.md and LICENSE (read by the directory checks) is validated.
       - name: Plugin validate (claude plugin validate --strict)
+        env:
+          DISABLE_AUTOUPDATER: 1
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: 1
         run: |
           set -euo pipefail
           npm install -g @anthropic-ai/claude-code@2.1.332
           dir="$RUNNER_TEMP/advpl-specialist"
           rm -rf "$dir"
           mkdir -p "$dir"
-          cp -R .claude-plugin agents skills commands hooks "$dir/"
+          cp -R .claude-plugin agents skills commands hooks README.md LICENSE "$dir/"
           claude plugin validate --strict "$dir"
 
       - name: Markdown lint (ruleset minimo)
@@ -264,6 +267,7 @@ jobs:
   engines:
     name: engines (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
