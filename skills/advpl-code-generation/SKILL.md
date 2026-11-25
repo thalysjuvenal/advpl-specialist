@@ -13,7 +13,8 @@ The reference and pattern files below hold the concrete templates -- read the sp
 
 | Reference file | Read when |
 |---|---|
-| reference.md | Always -- overview, naming conventions, mandatory User Function structure, namespace rules, identifier length limits, common mistakes |
+| critical-rules.md | Always, before generating any code -- `User Function` vs bare `Function`, TLPP namespace declaration, identifier length limits (8/10/255), valid `JsonObject`/`TWsdlManager`/`FWFormView` methods, `ALIAS_CAMPO` field-name validation |
+| reference.md | Always -- overview, naming conventions, mandatory User Function structure, variable scope, error handling, common mistakes |
 | templates-classes.md | Generating a TLPP class (data, methods, constructor) |
 | patterns-mvc.md | Generating an MVC screen (ModelDef/ViewDef/MenuDef) |
 | patterns-rest.md | Generating a REST API endpoint (WsRestFul or TLPP `@Get/@Post` annotations) |
