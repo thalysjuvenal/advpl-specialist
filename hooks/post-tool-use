@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# advpl-specialist - PostToolUse hook (Write|Edit|MultiEdit)
+#
+# After Claude writes or edits a file (tool_input.file_path of the stdin JSON):
+#   1. U+FFFD bytes (EF BF BD) in the file: the encoding step is skipped, so the
+#      corruption is not transliterated away; ADV014 reports it in step 4 when
+#      it is on an introduced line (U+FFFD already in the snapshot is legacy).
+#   2. Encoding: UTF-8 -> Windows-1252 (convert_encoding, the only call site;
+#      the converter decides which extensions it handles).
+#   3. Introduced lines: numbers of the lines of the converted file, CR
+#      stripped, whose text occurs nowhere in the pre-tool-use snapshot (CR
+#      stripped too). No snapshot = new file: the whole file is linted,
+#      file-scope rules included. No introduced line = nothing to lint.
+#   4. advpl-lint.sh --lines-file, only for .prw .prx .tlpp .th (any case), with
+#      ${CLAUDE_PROJECT_DIR:-$PWD}/.advpl-specialist-ignore when readable.
+#   5. Errors: findings and a hint on stderr, exit 2 (Claude sees them and fixes
+#      the lines). Warnings only (or a failed conversion): JSON additionalContext
+#      on stdout, exit 0. Nothing to report: exit 0, no output.
+#   6. The snapshot is always removed (EXIT trap).
+# Lint engine missing or failing: message on stderr, exit 1 (non-blocking).
+
+set -u
+export LC_ALL=C
+
+case "${BASH_SOURCE[0]}" in
+  */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;;
+  *) HOOK_DIR=. ;;
+esac
+# shellcheck source=pre-tool-use
+. "$HOOK_DIR/pre-tool-use"
+
+# Single call site of the UTF-8 -> Windows-1252 conversion.
+convert_encoding() {
+  "${BASH:-bash}" "$HOOK_DIR/lib/convert-encoding.sh" process_file "$1"
+}
+
+# Prints the path of advpl-lint.sh: plugin root first, then next to this hook.
+lint_engine() {
+  local root rel=skills/advpl-code-review/scripts/advpl-lint.sh
+  for root in "${CLAUDE_PLUGIN_ROOT:-}" "$HOOK_DIR/.."; do
+    if [ -n "$root" ] && [ -f "$root/$rel" ]; then
+      printf '%s' "$root/$rel"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# introduced_lines SNAPSHOT FILE: 1-based numbers of the FILE lines whose text
+# (CR stripped) is absent from SNAPSHOT (CR stripped). Paths go through ENVIRON
+# and stdin: awk -v and file operands would mangle "\" and "a=b" names.
+introduced_lines() {
+  SNAP="$1" awk '
+    BEGIN { while ((getline l < ENVIRON["SNAP"]) > 0) { sub(/\r$/, "", l); seen[l] = 1 } }
+    { sub(/\r$/, ""); if (!($0 in seen)) print NR }' <"$2"
+}
+
+# Text on stdin -> body of a JSON string (no quotes), lines joined with \n.
+json_escape() {
+  awk 'BEGIN {
+      for (i = 1; i < 32; i++) ESC[sprintf("%c", i)] = sprintf("\\u%04x", i)
+      ESC["\t"] = "\\t"; ESC["\r"] = "\\r"; ESC["\\"] = "\\\\"; ESC["\""] = "\\\""
+    }
+    {
+      n = length($0); o = ""
+      for (i = 1; i <= n; i++) { c = substr($0, i, 1); o = o ((c in ESC) ? ESC[c] : c) }
+      printf "%s%s", (NR > 1 ? "\\n" : ""), o
+    }'
+}
+
+# Exit 0, passing $notes (if any) to Claude as non-blocking context.
+finish() {
+  if [ -n "$notes" ]; then
+    printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' \
+      "$(printf '%s\n' "$notes" | json_escape)"
+  fi
+  exit 0
+}
+
+input=$(cat)
+file=$(advpl_hook_file_path "$input")
+[ -n "$file" ] || exit 0
+snap=$(advpl_snapshot_file "$file")
+trap 'rm -f "$snap" "$snap.lines"' EXIT
+[ -f "$file" ] || exit 0
+
+notes=""
+if grep -q "$(printf '\357\277\275')" "$file"; then
+  : # step 1: keep U+FFFD visible to ADV014
+elif ! conv=$(convert_encoding "$file" 2>&1); then
+  notes="advpl-specialist: falha na conversao para Windows-1252 de $file${conv:+: $conv}"
+fi
+
+advpl_is_lint_file "$file" || finish
+
+lint_args=()
+if [ -f "$snap" ]; then
+  introduced_lines "$snap" "$file" >"$snap.lines"
+  [ -s "$snap.lines" ] || finish
+  lint_args=(--lines-file "$snap.lines")
+fi
+ignore="${CLAUDE_PROJECT_DIR:-$PWD}/.advpl-specialist-ignore"
+if [ -f "$ignore" ] && [ -r "$ignore" ]; then
+  lint_args+=(--ignore-file "$ignore")
+fi
+
+if ! engine=$(lint_engine); then
+  echo "advpl-specialist: advpl-lint.sh nao encontrado; lint ignorado para $file" >&2
+  exit 1
+fi
+out=$("${BASH:-bash}" "$engine" ${lint_args[@]+"${lint_args[@]}"} -- "$file")
+rc=$?
+
+case $rc in
+  0)
+    if printf '%s\n' "$out" | grep -qv '^advpl-lint: '; then
+      notes="advpl-specialist: avisos do lint nas linhas introduzidas (nao bloqueiam; corrija se aplicavel):
+$out${notes:+
+$notes}"
+    fi
+    finish
+    ;;
+  1)
+    {
+      echo "advpl-specialist: o lint encontrou erros nas linhas introduzidas:"
+      printf '%s\n' "$out"
+      [ -z "$notes" ] || printf '%s\n' "$notes"
+      echo "advpl-specialist: corrija as linhas acima; para falso positivo use .advpl-specialist-ignore"
+    } >&2
+    exit 2
+    ;;
+  *)
+    echo "advpl-specialist: advpl-lint.sh falhou (exit $rc) para $file" >&2
+    exit 1
+    ;;
+esac

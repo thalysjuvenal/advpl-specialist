@@ -6,8 +6,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-start",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start\"",
             "async": false
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use\"",
+            "async": false,
+            "onFailure": "continue"
           }
         ]
       }
@@ -18,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-encoding",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use\"",
             "async": false
           }
         ]

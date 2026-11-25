@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# advpl-specialist - PreToolUse hook (Write|Edit|MultiEdit)
+#
+# Saves a snapshot of the file Claude is about to change, so post-tool-use can
+# lint only the lines Claude introduces. Only tool_input.file_path is read from
+# the stdin JSON (jq when installed, otherwise the awk fallback below).
+#
+# Snapshot: ${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}/advpl-specialist-snapshots/
+# <cksum of the path>, taken only when the file exists and has a lint extension
+# (.prw .prx .tlpp .th, any case). Any older snapshot for the path is removed
+# first, so a new file never inherits one left by a failed or denied call.
+#
+# This hook never blocks the tool call: it always exits 0.
+# post-tool-use sources this file for the advpl_* helpers; main runs only when
+# the file is executed. ADVPL_HOOK_NO_JQ=1 forces the awk fallback (tests).
+
+# Prints tool_input.file_path of the hook JSON given in $1 (nothing if absent).
+advpl_hook_file_path() {
+  local path=""
+  if [ "${ADVPL_HOOK_NO_JQ:-0}" != 1 ] && command -v jq >/dev/null 2>&1; then
+    path=$(printf '%s' "$1" | jq -r '.tool_input.file_path // empty' 2>/dev/null) || path=""
+  fi
+  if [ -z "$path" ]; then
+    # First "file_path" key: an escaped occurrence inside another string is
+    # followed by \" and never matches. The value is JSON-unescaped (\\ \" \/
+    # \b \f \n \r \t); \uXXXX is kept as written (JSON.stringify and jq emit
+    # non-ASCII characters as raw UTF-8).
+    path=$(printf '%s\n' "$1" | LC_ALL=C awk '
+      match($0, /"file_path"[ \t]*:[ \t]*"/) {
+        s = substr($0, RSTART + RLENGTH); n = length(s); out = ""
+        for (i = 1; i <= n; i++) {
+          c = substr(s, i, 1)
+          if (c == "\"") { print out; exit }
+          if (c == "\\") {
+            c = substr(s, ++i, 1)
+            if (c == "b") c = "\b"; else if (c == "f") c = "\f"
+            else if (c == "n") c = "\n"; else if (c == "r") c = "\r"
+            else if (c == "t") c = "\t"; else if (c == "u") c = "\\u"
+          }
+          out = out c
+        }
+        exit
+      }')
+  fi
+  printf '%s' "${path%$'\r'}"
+}
+
+# Prints the snapshot path for the file path $1.
+advpl_snapshot_file() {
+  local key
+  key=$(printf '%s' "$1" | cksum | awk '{ print $1 "-" $2 }')
+  printf '%s/advpl-specialist-snapshots/%s' "${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}" "$key"
+}
+
+# Succeeds when $1 has a lint extension (.prw .prx .tlpp .th, any case).
+advpl_is_lint_file() {
+  case "$(printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
+    *.prw|*.prx|*.tlpp|*.th) return 0 ;;
+  esac
+  return 1
+}
+
+advpl_pre_tool_use() {
+  local input file snap
+  input=$(cat)
+  file=$(advpl_hook_file_path "$input")
+  [ -n "$file" ] || return 0
+  snap=$(advpl_snapshot_file "$file")
+  rm -f "$snap" 2>/dev/null
+  if ! advpl_is_lint_file "$file" || [ ! -f "$file" ]; then
+    return 0
+  fi
+  umask 077
+  mkdir -p "${snap%/*}" 2>/dev/null && cp "$file" "$snap" 2>/dev/null
+  return 0
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  set -u
+  advpl_pre_tool_use
+  exit 0
+fi
