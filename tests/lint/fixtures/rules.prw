@@ -135,4 +135,9 @@ Function u_LintCal1()
 	::MsCreate(cArq)
 	x := 1; cEmpAnt := "03" // expect: ADV007
 	aX[1]:=cEmpAnt:="04" // expect: ADV007
+    EndSQL // expect: ADV022
+	EndSql // expect: ADV022
+EndSQL
+    BeginSQL Alias "X"
+cTxt := "   EndSQL"
 Return
