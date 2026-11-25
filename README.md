@@ -59,7 +59,7 @@ Repositorio: [https://github.com/thalysjuvenal/advpl-specialist](https://github.
 - **Refatoracao** - Sugestoes de melhoria de estrutura com 6 padroes (RF-001 a RF-006)
 - **Documentacao automatica** - Cabecalho Protheus.doc, documentacao completa e documentacao de API
 - **Changelog** - Geracao de changelog a partir do git diff com classificacao de impacto
-- **Conversao automatica para CP1252** - Todo arquivo ADVPL/TLPP (`.prw`, `.tlpp`, `.prx`, `.ch`, `.th`, `.prg`, `.apw`, `.aph`, `.tlh`) escrito ou editado pelo plugin e automaticamente convertido para Windows-1252 (CP1252), encoding esperado pelo TOTVS Protheus. Caracteres incompativeis (ex: emojis, kanji) geram um warning visivel e o arquivo permanece em UTF-8 — o plugin nunca bloqueia o fluxo. Requer `iconv` no PATH (presente nativamente em macOS, Linux, WSL e Git Bash).
+- **Conversao automatica para CP1252** - Todo arquivo ADVPL/TLPP (`.prw`, `.tlpp`, `.prx`, `.ch`, `.th`, `.prg`, `.apw`, `.aph`, `.tlh`) escrito ou editado pelo plugin e automaticamente convertido para Windows-1252 (CP1252), encoding esperado pelo TOTVS Protheus. A conversao usa decodificador proprio (scripts `skills/advpl-code-generation/scripts/convert-encoding.sh` e `.ps1`), sem depender de `iconv`. No hook PostToolUse a conversao roda com transliteracao (`--translit`): um caractere sem equivalente em Windows-1252 (ex: emojis, kanji) vira `?` e uma nota visivel, sem bloqueio, avisa. O script avulso e estrito por padrao: um arquivo com caractere incompativel falha sem ser alterado, a menos que se passe `--translit`.
 
 ### Para Consultores Funcionais
 
@@ -111,7 +111,7 @@ Para uma experiencia completa, recomendamos instalar o plugin oficial **superpow
 
 ### Windows
 
-Os hooks do plugin sao scripts bash e precisam do Git Bash no Windows (o Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e os hooks do plugin sao ignorados). O hook PreToolUse usa `onFailure: continue`, entao as edicoes nunca sao bloqueadas. Para uso manual sem bash, as skills trazem scripts PowerShell: `skills/advpl-code-review/scripts/advpl-lint.ps1` e `skills/advpl-code-generation/scripts/convert-encoding.ps1`.
+Os hooks do plugin sao scripts bash e precisam do Git Bash no Windows (o Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e podem nao executar ou exibir um erro nao bloqueante). Apenas o hook PreToolUse declara `onFailure: continue`; PostToolUse e SessionStart nao tem esse campo. Para uso manual sem bash, as skills trazem scripts PowerShell: `skills/advpl-code-review/scripts/advpl-lint.ps1` e `skills/advpl-code-generation/scripts/convert-encoding.ps1`.
 
 ## Uso com Copilot, Cursor, Gemini e outras IAs
 
@@ -160,6 +160,7 @@ Copie a pasta da sua plataforma para o seu repositorio:
 | `/advpl-specialist:advpr` | Gerar scripts de automacao de testes ADVPR (Advanced Protheus Robot) - TestSuite/TestGroup/TestCase para MVC, ExecAuto, relatorios, processamento, webservice, Smart View, TOTVS Message e SmartLink |
 | `/advpl-specialist:smartx` | Gerar ou migrar rotinas Smart X (telas web modernas a partir de metadados) - modelo, interface e launcher TLPP; conversao de mBrowse/FWMBrowse/MVC para Smart X |
 | `/advpl-specialist:smartview` | Gerar ou migrar objetos de negocio Smart View (Integrated Provider) - classe TLPP com getSchema/getData, fonte de menu callTReports e roteiro de publicacao do recurso .trp |
+| `/advpl-specialist:validate` | Validar arquivos ADVPL/TLPP: lint completo (advpl-lint, todas as regras) mais checagens semanticas S1-S6, em um unico relatorio somente leitura (erros, avisos, suprimidos pelo `.advpl-specialist-ignore` e achados semanticos) |
 
 ### Exemplos
 
@@ -281,7 +282,7 @@ advpl-specialist/
 │   ├── doc-generator.md
 │   ├── changelog-generator.md
 │   └── sx-configurator.md
-├── commands/                      # 15 commands invocaveis
+├── commands/                      # 16 commands invocaveis
 │   ├── generate.md
 │   ├── migrate.md
 │   ├── diagnose.md
@@ -296,7 +297,8 @@ advpl-specialist/
 │   ├── sxgen.md
 │   ├── advpr.md
 │   ├── smartx.md
-│   └── smartview.md
+│   ├── smartview.md
+│   └── validate.md
 ├── skills/                        # 19 referencias internas (reference.md + supporting files)
 │   ├── advpl-code-generation/     # Padroes MVC, REST, SOAP, PE, TReport, FWFormBrowse, Jobs, Workflow
 │   ├── advpl-to-tlpp-migration/   # Regras e checklist de migracao

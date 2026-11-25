@@ -4,7 +4,7 @@
 
 ## Project context
 
-**In this repository** (`advpl-specialist`): this is a knowledge plugin for AI coding agents working with TOTVS Protheus. It ships 15 slash commands (`commands/`), 10 specialized agents (`agents/`), and 19 reference skills (`skills/<name>/SKILL.md` + companion reference files) covering code generation, review, debugging, refactoring, TLPP migration, documentation, SQL, testing, locks, business processes, Smart X, Smart View, and SX dictionary configuration. There is no application runtime here — the "code" is markdown reference material and prompt instructions.
+**In this repository** (`advpl-specialist`): this is a knowledge plugin for AI coding agents working with TOTVS Protheus. It ships 16 slash commands (`commands/`), 10 specialized agents (`agents/`), and 19 reference skills (`skills/<name>/SKILL.md` + companion reference files) covering code generation, review, debugging, refactoring, TLPP migration, documentation, SQL, testing, locks, business processes, Smart X, Smart View, and SX dictionary configuration. There is no application runtime here — the "code" is markdown reference material and prompt instructions.
 
 **In a Protheus source repository** where this file is copied: the project contains `.prw` (ADVPL) and/or `.tlpp` (TLPP) source files that run inside a Protheus AppServer, plus SX dictionary scripts and possibly REST/SOAP services. Apply the standards below to any file with those extensions.
 

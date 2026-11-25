@@ -11,7 +11,7 @@
     {
       "name": "advpl-specialist",
       "source": "./",
-      "description": "Especialista em ADVPL e TLPP para desenvolvimento TOTVS Protheus - geracao de codigo, migracao, debug, documentacao, revisao de codigo, testes ProBat e processos de negocio",
+      "description": "Especialista em ADVPL e TLPP para desenvolvimento TOTVS Protheus - geracao de codigo, migracao, debug, documentacao, revisao de codigo, validacao com lint, testes ProBat e ADVPR, Smart X, Smart View e processos de negocio",
       "version": "1.6.0",
       "author": {
         "name": "Thalys Augusto"
@@ -19,7 +19,7 @@
       "homepage": "https://github.com/thalysjuvenal/advpl-specialist",
       "repository": "https://github.com/thalysjuvenal/advpl-specialist",
       "license": "MIT",
-      "keywords": ["advpl", "tlpp", "protheus", "totvs", "erp", "code-generation", "migration", "debugging", "claude-code-plugin"]
+      "keywords": ["advpl", "tlpp", "protheus", "totvs", "erp", "code-generation", "migration", "debugging", "smartx", "smartview", "advpr", "probat", "lint", "claude-code-plugin"]
     }
   ]
 }
