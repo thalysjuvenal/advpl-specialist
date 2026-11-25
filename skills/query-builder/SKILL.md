@@ -1,6 +1,6 @@
 ---
 name: query-builder
-description: Use when the user needs to build, choose the pattern for, or optimize a SQL query against Protheus ERP tables -- covering Workarea (DbSelectArea/DbSeek) vs Embedded SQL vs TCSqlExec pattern choice, mandatory D_E_L_E_T_/xFilial filters, SIX index-aligned WHERE ordering, FWPreparedStatement parameterization to prevent SQL injection, and cross-database (PostgreSQL/MSSQL/Oracle) portability. Also triggers on Portuguese phrasing like "consulta SQL", "montar query", "otimizar consulta", "qual indice usar", "escolher entre DbSeek ou SQL", or "prevenir SQL injection no Protheus".
+description: Build, choose the pattern for or optimize SQL queries on Protheus tables - DbSeek vs Embedded SQL vs TCSqlExec, filters, indexes, FWPreparedStatement. "montar query", "otimizar consulta", "qual indice usar".
 ---
 
 # Protheus Query Builder

@@ -1,6 +1,6 @@
 ---
 name: code-explanation
-description: Use when the user asks to explain what a piece of ADVPL/TLPP code does in plain language, adapting the explanation depth for a junior developer (line-by-line), a senior developer (business logic, design decisions, risks), or a functional consultant (no technical terms) -- e.g. understanding legacy code, filling in missing documentation, or assessing the impact of a customization. Also triggers on Portuguese phrasing like "explicar fonte", "explicar codigo", "o que essa rotina faz", "explicar para o consultor funcional", or requests for a --level junior/senior/funcional explanation.
+description: Explain ADVPL/TLPP code in plain language for a junior, senior or functional consultant audience. "explicar fonte", "explicar codigo", "o que essa rotina faz", "explicar para o consultor funcional".
 ---
 
 # ADVPL/TLPP Code Explanation

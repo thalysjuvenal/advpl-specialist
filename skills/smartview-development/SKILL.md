@@ -1,6 +1,6 @@
 ---
 name: smartview-development
-description: Use when the user wants to create, migrate, publish, or troubleshoot a TOTVS Smart View custom business object (Integrated Provider) -- the TLPP class carrying the @totvsFrameworkTReportsIntegratedProvider annotation with getSchema/getData, its parameters with lookup and combo endpoints, the callTReports menu source, and the .trp resource publication cycle. Also covers converting legacy TReport, FWMSPrinter, TMSPrinter and FWMSExcel reports into Smart View data views. Triggers on Portuguese phrasing like "objeto de negocio Smart View", "relatorio no Smart View", "migrar relatorio para Smart View", "visao de dados", "IntegratedProvider", "callTReports", "arquivo .trp", "combo de parametro Smart View". This is Smart View (TReports analytics), NOT Smart X (metadata-driven PO-UI screens) -- for Smart X screens use the smartx-development skill instead.
+description: Create, migrate or publish Smart View (TReports) business objects - IntegratedProvider, getSchema/getData, .trp. NOT Smart X. "objeto de negocio Smart View", "migrar relatorio para Smart View", "callTReports".
 ---
 
 # Smart View

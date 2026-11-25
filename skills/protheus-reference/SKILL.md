@@ -1,6 +1,6 @@
 ---
 name: protheus-reference
-description: Use when the user needs to look up a TOTVS Protheus native function's syntax/parameters/return value, the SX data dictionary structure (SX1-SX9, SIX), REST API endpoint patterns (FWRest, WsRestFul), MV_* system parameter behavior, SX3 field validation, or whether a function is restricted/internal-only. Also triggers on Portuguese phrasing like "funcao nativa", "dicionario de dados", "parametro MV_", "campo SX3", "API REST protheus", "essa funcao e restrita".
+description: Look up Protheus native functions, SX data dictionary, REST patterns (FWRest, WsRestFul), MV_* parameters and restricted functions. "funcao nativa", "dicionario de dados", "parametro MV_", "campo SX3".
 ---
 
 # Protheus Reference

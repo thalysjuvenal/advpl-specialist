@@ -1,6 +1,6 @@
 ---
 name: embedded-sql
-description: Use when the user needs to write, review, or migrate SQL queries in ADVPL/TLPP using BeginSQL/EndSQL blocks and macro expressions (%table%, %xfilial%, %notDel%, %exp%, %Order%) instead of raw TCQuery string concatenation -- covering INNER/LEFT JOIN patterns, aggregations (SUM/COUNT/GROUP BY/HAVING), subqueries, column type declarations, DML via TCSqlExec, and routing user input to FWPreparedStatement. Also triggers on Portuguese phrasing like "consulta SQL", "query embutida", "migrar TCQuery para BeginSQL", "escrever SELECT com filial e notDel", or "montar JOIN em ADVPL".
+description: Write, review or migrate Embedded SQL (BeginSQL/EndSQL) with %table%, %xfilial%, %notDel% macros instead of TCQuery. "consulta SQL", "query embutida", "migrar TCQuery para BeginSQL", "montar JOIN".
 ---
 
 # Embedded SQL in ADVPL/TLPP

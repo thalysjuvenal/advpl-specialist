@@ -1,6 +1,6 @@
 ---
 name: advpl-to-tlpp-migration
-description: Use when the user asks to migrate, convert, compatibilize, or modernize legacy ADVPL procedural code to TLPP object-oriented classes on TOTVS Protheus -- turning User Functions/Static Functions into namespaced classes with methods and data properties, replacing Private/Public scoping, and preserving backward-compatible wrappers for existing callers. Also triggers on Portuguese phrasing like "migrar para tlpp", "compatibilizar fonte", "converter prw para tlpp", "transformar em classe", "modernizar rotina", or requests naming a `custom.<agrupador>.<servico>` / `totvs.protheus.<segmento>.<agrupador>` namespace.
+description: Migrate or modernize procedural ADVPL (.prw) to TLPP classes with namespaces, keeping compatible wrappers. "migrar para tlpp", "converter prw para tlpp", "compatibilizar fonte", "transformar em classe".
 ---
 
 # ADVPL to TLPP Migration

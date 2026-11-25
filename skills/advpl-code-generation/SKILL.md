@@ -1,6 +1,6 @@
 ---
 name: advpl-code-generation
-description: Use when the user asks to generate, create, or scaffold ADVPL/TLPP code for TOTVS Protheus -- User Functions, Static Functions, TLPP classes, MVC (Model/View/Controller), REST APIs, SOAP web services, entry points (pontos de entrada), TReport/FWMsPrinter reports, jobs, or workflows. Also triggers on Portuguese phrasing like "gerar codigo", "criar rotina", "criar fonte", "novo ponto de entrada", "criar classe tlpp", "gerar api rest", "criar mvc", or routine name patterns like FATA001/MATA010. Covers naming conventions, Hungarian notation, namespace rules, identifier length limits, and mandatory User Function/error-handling structure.
+description: Generate or scaffold ADVPL/TLPP code - User Functions, TLPP classes, MVC, REST, SOAP, entry points, reports, jobs. "gerar codigo", "criar rotina", "novo ponto de entrada", "criar classe tlpp", "gerar api rest".
 ---
 
 # ADVPL/TLPP Code Generation

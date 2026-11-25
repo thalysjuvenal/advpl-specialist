@@ -1,5 +1,5 @@
 ---
-description: Gera scripts de automação de testes ADVPR (Advanced Protheus Robot) - TestSuite, TestGroup, TestCase para rotinas MVC, ExecAuto, relatórios, processamento, webservice, Smart View, TOTVS Message e SmartLink
+description: Gera scripts de teste ADVPR (TestSuite, TestGroup, TestCase) para rotinas MVC, ExecAuto, relatorios, processamento, webservice, Smart View e SmartLink
 allowed-tools: Read, Write, Glob, Grep, Agent
 argument-hint: "[--type mvc|execauto|report|processing|webservice|smartview|message|smartlink|routine-prep] [--output path]"
 ---

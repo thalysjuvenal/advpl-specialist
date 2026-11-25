@@ -1,6 +1,6 @@
 ---
 name: advpl-refactoring
-description: Use when the user asks to refactor, clean up, or restructure existing ADVPL/TLPP code on TOTVS Protheus without changing its behavior -- extracting long functions (>100 lines), simplifying deeply nested conditionals, removing dead code, improving variable naming (Hungarian notation), eliminating duplicated logic, or reducing functions with too many parameters. Also triggers on Portuguese phrasing like "refatorar rotina", "melhorar esse fonte", "extrair funcao", "remover codigo morto", "simplificar condicional", "reduzir complexidade", or "God function" complaints.
+description: Refactor or clean up ADVPL/TLPP without changing behavior - extract functions, simplify conditionals, remove dead code. "refatorar rotina", "extrair funcao", "remover codigo morto", "God function".
 ---
 
 # ADVPL/TLPP Refactoring

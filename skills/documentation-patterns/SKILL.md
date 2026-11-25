@@ -1,6 +1,6 @@
 ---
 name: documentation-patterns
-description: Use when the user wants to generate technical documentation for ADVPL/TLPP code on TOTVS Protheus -- Protheus.doc header blocks (@type, @param, @return, @author, @since, @history), complete routine documentation (tables read/written, MV_* parameters, entry points, execution flow, dependencies), or REST API endpoint documentation (path/query parameters, request/response JSON, status codes). Also triggers on Portuguese phrasing like "documentar rotina", "gerar cabecalho Protheus.doc", "documentar endpoint", "documentar API REST", or requests to add documentation to legacy/undocumented code.
+description: Document ADVPL/TLPP code - Protheus.doc headers, routine docs, REST endpoint docs. "documentar rotina", "gerar cabecalho Protheus.doc", "documentar endpoint", "documentar API REST".
 ---
 
 # ADVPL/TLPP Documentation Patterns

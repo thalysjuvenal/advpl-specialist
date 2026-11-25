@@ -1,6 +1,6 @@
 ---
 name: protheus-business
-description: Use when the user needs to understand a TOTVS Protheus ERP business process, module workflow, or cross-module integration -- covering Compras (COM), Estoque (EST), Faturamento (FAT), Financeiro (FIN), Contabilidade (CTB), Fiscal (FIS), PCP, and Manutencao de Ativos (MNT), including their main routines (e.g. MATA110, MATA460), tables/fields, and business rules. Also triggers on Portuguese phrasing like "processo de negocio", "modulo de compras/estoque/faturamento/financeiro/fiscal/contabilidade/pcp/manutencao", "como funciona o ciclo de compras", or questions about integration between modules.
+description: Explain Protheus ERP business processes and module workflows - Compras, Estoque, Faturamento, Financeiro, Fiscal, Contabilidade, PCP, MNT. "processo de negocio", "como funciona o ciclo de compras".
 ---
 
 # Protheus Business Processes

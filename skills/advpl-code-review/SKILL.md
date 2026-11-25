@@ -1,6 +1,6 @@
 ---
 name: advpl-code-review
-description: Use when the user asks to review, audit, or check the quality of ADVPL/TLPP code for TOTVS Protheus before merge or deploy -- covering best practices (RecLock/MsUnlock pairing, variable scope, area management, error handling), performance bottlenecks, security vulnerabilities (SQL injection, credential exposure), and modernization opportunities (TLPP migration readiness). Also triggers on Portuguese phrasing like "revisar codigo", "revisar fonte", "auditar rotina", "checar boas praticas", "code review advpl", or requests to apply the official TOTVS SonarQube ruleset (CA/BG/CS codes).
+description: Review or audit ADVPL/TLPP code for best practices, performance, security and SonarQube rules (CA/BG/CS). "revisar codigo", "auditar rotina", "checar boas praticas", "code review advpl".
 ---
 
 # ADVPL/TLPP Code Review

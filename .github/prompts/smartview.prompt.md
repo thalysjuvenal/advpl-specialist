@@ -1,6 +1,6 @@
 ---
 name: smartview
-description: Generate or migrate Smart View business objects (Integrated Provider) - TLPP class with getSchema/getData, callTReports menu source, and the .trp publication runbook
+description: Gera ou migra objetos de negocio Smart View (Integrated Provider) - classe TLPP getSchema/getData, menu callTReports e publicacao do .trp
 argument-hint: "[--mode generate|migrate] [--type data-grid|reports|pivot-table] [--output path]"
 agent: agent
 ---

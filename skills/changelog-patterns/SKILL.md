@@ -1,6 +1,6 @@
 ---
 name: changelog-patterns
-description: Use when the user asks to generate a changelog, release notes, or delivery notes from ADVPL/TLPP code changes on TOTVS Protheus -- analyzing diffs or a list of changed files, classifying each change (NEW/FIX/CHANGE/REMOVE/REFACTOR), assessing business impact (ALTO/MEDIO/BAIXO), and detecting affected tables. Also triggers on Portuguese phrasing like "gerar changelog", "notas de versao", "documentar entrega", "o que mudou nessa versao", or requests to audit code changes for compliance.
+description: Generate a changelog or release notes from ADVPL/TLPP code changes, classifying each change and its business impact. "gerar changelog", "notas de versao", "documentar entrega", "o que mudou".
 ---
 
 # Changelog Patterns

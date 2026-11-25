@@ -1,6 +1,6 @@
 ---
 name: advpl-debugging
-description: Use when the user asks to debug, diagnose, or fix an ADVPL/TLPP error on TOTVS Protheus -- compilation errors (syntax, missing includes, undeclared variables), runtime failures (NIL access, type mismatch, array bounds), performance issues (slow queries, memory leaks), database locks (RecLock timeouts, deadlocks), or AppServer log/crash analysis. Also triggers on Portuguese phrasing like "erro de compilacao", "erro em tempo de execucao", "travou o lock", "RecLock nao libera", "performance lenta", "analisar log do appserver", or a pasted stack trace / error message from Protheus.
+description: Debug ADVPL/TLPP errors - compilation, runtime (NIL, type mismatch), slow queries, locks, AppServer logs and stack traces. "erro de compilacao", "travou o lock", "performance lenta", "analisar log".
 ---
 
 # ADVPL/TLPP Debugging

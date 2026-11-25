@@ -1,5 +1,5 @@
 ---
-description: Gera ou migra rotinas Smart X (telas web modernas a partir de metadados) - modelo, interface e launcher TLPP; conversão de mBrowse/AxCadastro/MVC para Smart X
+description: Gera ou migra rotinas Smart X (telas web por metadados) - modelo, interface e launcher TLPP; converte mBrowse/AxCadastro/MVC para Smart X
 allowed-tools: Read, Write, Glob, Grep, Agent
 argument-hint: "[--mode generate|migrate] [--output path]"
 ---

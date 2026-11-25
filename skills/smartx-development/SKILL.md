@@ -1,6 +1,6 @@
 ---
 name: smartx-development
-description: Use when the user wants to build, migrate, or troubleshoot a Smart X routine -- TOTVS's metadata-driven UI framework that generates modern PO-UI screens from a data dictionary Object/Model/Interface/Launcher chain. Covers the model.tlpp/interface.tlpp/launcher artifacts, ADVPL function integration via pageActions/tableActions/onChange, converting a legacy MVC browse to Smart X, and common troubleshooting. Also triggers on Portuguese phrasing like "tela Smart X", "gerar tela por metadados", "migrar MVC para Smart X", "criar Modelo e Interface Smart X", "launcher Smart X", or names like FINA050SM/MATA110SX.
+description: Build, migrate or troubleshoot Smart X routines (metadata-driven PO-UI screens) - model, interface, launcher. NOT Smart View. "tela Smart X", "migrar MVC para Smart X", "launcher Smart X".
 ---
 
 # Smart X

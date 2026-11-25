@@ -1,6 +1,6 @@
 ---
 name: tdn-lookup
-description: Use as the escalation strategy when local ADVPL/TLPP reference material lacks an answer -- a tiered approach (local cache first, then TDN Confluence REST API via WebFetch, then Playwright against the API, then WebSearch, then visual site search) for looking up native functions, entry points, unknown errors, or business processes on TDN (tdn.totvs.com). Also triggers on Portuguese phrasing like "buscar documentacao no TDN", "nao encontrei na referencia local", "pesquisar funcao no TDN", "documentacao oficial TOTVS", or "erro desconhecido nao listado".
+description: Search TDN (tdn.totvs.com) as a fallback when local reference lacks the answer - functions, entry points, unknown errors. "buscar documentacao no TDN", "nao encontrei na referencia local", "pesquisar funcao no TDN".
 ---
 
 # TDN Lookup — Online Search Strategy

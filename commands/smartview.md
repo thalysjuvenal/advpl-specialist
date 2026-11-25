@@ -1,5 +1,5 @@
 ---
-description: Gera ou migra objetos de negocio Smart View (Integrated Provider) - classe TLPP com getSchema/getData, fonte de menu callTReports e roteiro de publicacao do recurso .trp
+description: Gera ou migra objetos de negocio Smart View (Integrated Provider) - classe TLPP getSchema/getData, menu callTReports e publicacao do .trp
 allowed-tools: Read, Write, Glob, Grep, Agent
 argument-hint: "[--mode generate|migrate] [--type data-grid|reports|pivot-table] [--output path]"
 ---

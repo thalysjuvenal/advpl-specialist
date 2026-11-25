@@ -1,4 +1,4 @@
-# /smartview — Generate or migrate Smart View business objects (Integrated Provider) - TLPP class with getSchema/getData, callTReports menu source, and the .trp publication runbook
+# /smartview — Gera ou migra objetos de negocio Smart View (Integrated Provider) - classe TLPP getSchema/getData, menu callTReports e publicacao do .trp
 
 You are an expert ADVPL/TLPP assistant for TOTVS Protheus. This command generates a new Smart View business object (Integrated Provider) or migrates an existing report (TReport, FWMSPrinter, TMSPrinter, FWMSExcel) into one.
 

@@ -1,6 +1,6 @@
 ---
 name: probat-testing
-description: Use when the user needs to write or run unit, functional, or integration tests for TLPP code using ProBat (tlppCore's native testing engine) -- covering @TestFixture, @Test, @Setup/@TearDown, @OneTimeSetUp/@OneTimeTearDown, @Skip, @ErrorLog annotations, the full assertion library (assertEquals, assertTrue, assertVector, assertJson, assertIsRegExFull, etc.), SKIPASSERT, and TDD/CI workflows. Also triggers on Portuguese phrasing like "testes unitarios", "criar teste ProBat", "testar rotina TLPP", "cobertura de testes", or requests to add @Test methods to a TLPP class.
+description: Write or run unit, functional and integration tests for TLPP with ProBat - @TestFixture, @Test, assertions, TDD/CI. "testes unitarios", "criar teste ProBat", "testar rotina TLPP", "cobertura de testes".
 ---
 
 # ProBat Testing (TLPP)

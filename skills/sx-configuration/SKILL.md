@@ -1,6 +1,6 @@
 ---
 name: sx-configuration
-description: Use when the user needs to generate or validate Protheus data dictionary configuration scripts -- covering SX2 (table headers), SX3 (fields), SIX (indexes), SXG (field groups), SXA (form folders/tabs), SX1 (report questions), SX5 (generic tables), SXB (F3 lookup queries), and SX7 (triggers). Also triggers on Portuguese phrasing like "criar campo customizado", "cadastrar tabela customizada", "dicionario de dados", "criar indice SIX", "gatilho de campo", "tabela generica SX5", "consulta F3", or field-prefix names like ZA1/ZZ1.
+description: Generate or validate Protheus SX dictionary scripts - SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB, SX7. "criar campo customizado", "cadastrar tabela customizada", "criar indice SIX", "gatilho de campo", "consulta F3".
 ---
 
 # SX Configuration

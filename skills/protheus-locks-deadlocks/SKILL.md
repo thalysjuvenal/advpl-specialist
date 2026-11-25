@@ -1,6 +1,6 @@
 ---
 name: protheus-locks-deadlocks
-description: Use when the user needs to understand, diagnose, or prevent Protheus record locks and deadlocks -- covering RecLock/MsUnlock/SoftLock/LockByName semantics, BeginTran/EndTran transaction scoping, lock leak and deadlock diagnostics (TopMemoStatus, MonitorActiveLocks, DBAccess monitor, SQL Server/PostgreSQL/Oracle lock queries), and prevention patterns (BEGIN SEQUENCE/RECOVER, lock ordering). Also triggers on Portuguese phrasing like "registro travado", "trava de registro", "deadlock", "erro de lock", "travamento no Protheus", "quem esta travando o registro", or "RecLock nao libera".
+description: Understand, diagnose or prevent Protheus record locks and deadlocks - RecLock/MsUnlock, transactions, lock leaks. "registro travado", "deadlock", "erro de lock", "quem esta travando o registro".
 ---
 
 # Protheus Locks & Deadlocks

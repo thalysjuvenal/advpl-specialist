@@ -1,6 +1,6 @@
 ---
 name: advpr-test-automation
-description: Use when the user wants to write, run, or troubleshoot automated regression tests for Protheus routines with ADVPR (Advanced Protheus Robot) -- covering FWTestHelper API, TestSuite/GPS de Testes setup, headless execution via FwExecSuite, and per-pattern scripting (MVC, ExecAuto/MSExecAuto, reports, processing routines, webservices, SmartLink, Smart View, single-message/TOTVS Message) plus routine preparation (screen bypass) and best practices. Also triggers on Portuguese phrasing like "teste automatizado", "robo de testes", "automacao de testes Protheus", "rodar suite de testes", "FWMyTestRunner", "GPS de testes", or "preparar rotina para teste automatico". The referenced files are written in Brazilian Portuguese.
+description: Write, run or troubleshoot ADVPR (Advanced Protheus Robot) automated tests - FWTestHelper, TestSuite, FwExecSuite. "teste automatizado", "robo de testes", "GPS de testes", "rodar suite de testes".
 ---
 
 # ADVPR — Automação de Testes Protheus
