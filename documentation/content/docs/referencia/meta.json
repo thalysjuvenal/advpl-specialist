@@ -4,6 +4,7 @@
     "funcoes-nativas",
     "dicionario-sx",
     "rest-api",
-    "parametros-mv"
+    "parametros-mv",
+    "validacao"
   ]
 }

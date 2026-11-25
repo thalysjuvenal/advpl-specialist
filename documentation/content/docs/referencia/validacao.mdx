@@ -1,0 +1,104 @@
+---
+title: Validacao
+description: Hook de lint, regras ADV001 a ADV022, .advpl-specialist-ignore, /validate, .protheus-version, conversao de encoding e uso no Windows
+---
+
+# Validacao automatica
+
+O plugin valida o codigo ADVPL/TLPP que a IA grava, sem depender de compilador. Sao tres mecanismos independentes: o **hook de lint**, o **hook de encoding** e o comando `/validate`. Nenhum deles substitui a compilacao e a validacao no TDS / extensao TOTVS do VS Code, que continuam pendentes.
+
+## Hook de lint (Claude Code)
+
+Depois de cada `Write`, `Edit` ou `MultiEdit`, o hook PostToolUse roda o motor `skills/advpl-code-review/scripts/advpl-lint.sh` sobre o arquivo gravado. O hook PreToolUse guarda antes um snapshot do arquivo, para que o lint avalie so o que a IA mudou.
+
+- **Linhas introduzidas:** so sao acusadas as linhas ausentes do conteudo anterior. Codigo legado que ja estava no arquivo nao gera achado.
+- **Erros bloqueiam:** o hook devolve os achados ao Claude, que corrige as linhas.
+- **Avisos nao bloqueiam:** entram como contexto adicional para a IA avaliar e corrigir quando fizer sentido.
+- **Regras de escopo `file`:** rodam apenas em arquivo novo ou no `/validate`, nunca em edicao de arquivo existente.
+- **Extensoes:** `.prw`, `.prx`, `.tlpp` e `.th`, sem diferenciar caixa.
+
+Cada achado sai no formato `ARQUIVO:LINHA: error|warning ID MENSAGEM [REF]`, seguido do resumo `advpl-lint: N error(s), M warning(s), K suppressed`.
+
+## Regras ADV001 a ADV022
+
+A fonte unica das regras e `skills/advpl-code-review/scripts/advpl-lint.rules`, usada pelos dois motores (bash e PowerShell), que imprimem a mesma saida. A coluna Ref traz o codigo do catalogo SonarQube, quando existe. Regras `error` cobrem padroes sem uso legitimo; padroes heuristicos ou possivelmente legitimos sao `warn`.
+
+| ID | Severidade | Escopo | O que detecta | Ref |
+|---|---|---|---|---|
+| ADV001 | error | line | `#include "protheus.ch"` (obsoleto; use `totvs.ch`) | - |
+| ADV002 | error | line | include fora do padrao (diretiva ou nome em maiusculas) | CA3001 |
+| ADV003 | error | line | `ConOut()`, `OutErr()` e `?` (use `FWLogMsg()`) | CA1004 |
+| ADV004 | error | line | `StaticCall()` (funcao restrita) | CA2022 |
+| ADV005 | error | line | `PTInternal()` (funcao restrita) | CA2023 |
+| ADV006 | error | line | atribuicao a `__cUserID` (somente leitura) | CA2024 |
+| ADV007 | error | line | atribuicao a `cEmpAnt` (somente leitura) | CA2025 |
+| ADV008 | error | line | `DbSelectArea` direto em SX*, SM0 ou SIX | CA2000-CA2013 |
+| ADV009 | warn | line | `IIf()` inline | CA4000 |
+| ADV010 | error | line | `DbCreate()` e `MsCreate()` (era ISAM) | CA1000 |
+| ADV011 | warn | line | `CriaTrab()` (era ISAM) | CA1000 |
+| ADV012 | error | line | dica `WITH(NOLOCK)` | - |
+| ADV013 | error | line | `using namespace tlpp.*` (exceto `tlpp.probat`) | - |
+| ADV014 | error | line | caractere U+FFFD (arquivo salvo com encoding errado) | CA0000 |
+| ADV015 | warn | line | possivel concatenacao em SQL (injecao) | CA2050 |
+| ADV016 | error | line | `Local` redeclarando variavel de ambiente (`cEmpAnt`, `cFilAnt`, `dDataBase`...) | - |
+| ADV017 | warn | line | funcao sem suporte TOTVS (lista de funcoes restritas) | - |
+| ADV018 | warn | line | campo ausente de `sx3-common-fields.md` (campos `_X*` sao aceitos) | - |
+| ADV019 | warn | file | fonte `.tlpp` sem `#include "tlpp-core.th"` | - |
+| ADV020 | warn | file | `RecLock()` sem `MsUnlock()` correspondente na mesma funcao | - |
+| ADV021 | warn | file | variavel atribuida sem declaracao | - |
+| ADV022 | error | line | `EndSQL` que nao comeca na coluna 1 (erro C2001 do TDN) | - |
+
+As mensagens completas, em portugues, e as expressoes de cada regra estao no arquivo `advpl-lint.rules`.
+
+## .advpl-specialist-ignore
+
+Para suprimir falsos positivos, crie `.advpl-specialist-ignore` na raiz do projeto. O hook usa o arquivo quando ele existe e e legivel; o `/validate` e o motor tambem o leem a partir do diretorio de execucao. Uma diretiva por linha:
+
+| Diretiva | Efeito |
+|---|---|
+| `rule ID` | desliga a regra pelo ID (`ADV009`) ou pela referencia (`CA4000`) |
+| `field NOME` | aceita o campo no ADV018 (por exemplo, um campo que voce ja confirmou no SX3) |
+| `function NOME` | aceita a funcao na regra de funcao sem suporte (ADV017) |
+| `path GLOB` | ignora os arquivos cujo caminho casa com o glob (`legacy/**`) |
+
+Linhas iniciadas por `#` sao comentarios; linhas vazias, espacos nas pontas e CRLF sao tolerados. Uma diretiva desconhecida ou malformada gera um aviso no stderr e a linha e ignorada. Os achados suprimidos aparecem no contador `suppressed` do resumo.
+
+```text
+# Fontes legados que nao serao tocados
+path legacy/**
+rule ADV009
+field A1_XCODIGO
+function MinhaFuncaoLegada
+```
+
+## /validate
+
+O comando `/advpl-specialist:validate <arquivo|glob|diretorio>...` valida fontes sob demanda e nao edita nada. Ele roda o lint sobre o arquivo inteiro (`--scope all`, incluindo as regras de arquivo ADV019 a ADV021 que o hook pula em edicoes), depois faz uma passada semantica (S1 a S6) com as skills de referencia e fecha com um relatorio unico: resumo, erros, avisos, suprimidos pelo `.advpl-specialist-ignore` e achados semanticos. Com `--errors-only`, a secao de avisos e omitida. O relatorio sempre termina lembrando que a compilacao e a validacao no TDS continuam pendentes.
+
+Nas outras IAs, o comando e compilado a partir de `ai-commands/src/validate.md` para `.github/prompts/validate.prompt.md`, `.cursor/commands/validate.md` e `.gemini/commands/validate.toml`. Veja [Outras IAs](/docs/outras-ias).
+
+## .protheus-version
+
+Coloque na raiz do projeto um arquivo `.protheus-version` com uma unica release no formato `12.1.N`, por exemplo `12.1.2410`. Os comandos `/generate`, `/migrate` e `/smartx` leem o arquivo e consultam a tabela de `skills/protheus-reference/releases.md` para avisar quando o recurso pedido exige uma release maior (por exemplo, TLPP com MVC ou com `namespace` pedem 12.1.2410). A comparacao usa o terceiro componente como inteiro.
+
+Se o conteudo for invalido (vazio, varias linhas, `12.1` sem numero final, nao numerico), o arquivo e ignorado e a IA avisa o usuario. Sem o arquivo, o fluxo segue normal e o comando sugere criar um.
+
+## Hook de encoding
+
+O Protheus compila fontes em Windows-1252, enquanto as IAs gravam UTF-8. Depois de cada gravacao, o hook PostToolUse converte o arquivo com `skills/advpl-code-generation/scripts/convert-encoding.sh --translit`. A conversao usa um decodificador proprio, sem `iconv`.
+
+- Um caractere sem equivalente em Windows-1252 (emoji, kanji, setas) vira `?`, e uma nota visivel e nao bloqueante avisa quais arquivos tiveram essa troca.
+- Se o arquivo ja contem U+FFFD, a conversao nao roda, para nao esconder a corrupcao; o ADV014 acusa a linha.
+- Extensoes convertidas: `.prw`, `.tlpp`, `.prx`, `.ch`, `.th`, `.prg`, `.apw`, `.aph` e `.tlh`.
+- O script avulso e **estrito por padrao**: com caractere incompativel, o arquivo falha sem ser alterado, a menos que voce passe `--translit`.
+
+## Windows
+
+Os hooks sao scripts bash e precisam do Git Bash no Windows. O Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e podem nao executar ou exibir um erro nao bloqueante. Apenas o hook PreToolUse declara `onFailure: continue`; PostToolUse e SessionStart nao tem esse campo.
+
+Para uso manual sem bash, as skills trazem gemeos em PowerShell, com a mesma saida:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File skills/advpl-code-review/scripts/advpl-lint.ps1 --scope all .\src\FATA001.prw
+pwsh -NoProfile -ExecutionPolicy Bypass -File skills/advpl-code-generation/scripts/convert-encoding.ps1 .\src\FATA001.prw
+```

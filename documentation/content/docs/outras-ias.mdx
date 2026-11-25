@@ -41,8 +41,36 @@ O Codex ja e coberto pelo `AGENTS.md` combinado com as skills instaladas via `np
 
 Os comandos distribuidos em `.github/prompts/`, `.cursor/commands/` e `.gemini/commands/` sao gerados automaticamente a partir de `ai-commands/src/`, usando o compilador `scripts/build-ai-commands.mjs`. Nao edite essas saidas manualmente — qualquer ajuste deve ser feito na fonte e recompilado.
 
+## Verificacao do fonte sem hooks
+
+No Claude Code, os hooks do plugin convertem o encoding e rodam o lint a cada gravacao. As outras IAs nao tem hooks, entao as skills trazem scripts avulsos que o agente (ou voce) executa depois de gravar o fonte:
+
+| Etapa | Script bash | Script PowerShell |
+|---|---|---|
+| Encoding (UTF-8 para Windows-1252) | `skills/advpl-code-generation/scripts/convert-encoding.sh` | `skills/advpl-code-generation/scripts/convert-encoding.ps1` |
+| Lint (regras ADV001 a ADV022) | `skills/advpl-code-review/scripts/advpl-lint.sh` | `skills/advpl-code-review/scripts/advpl-lint.ps1` |
+
+```bash
+# 1. Converter para Windows-1252 (estrito por padrao; --translit troca caracteres incompativeis por ?)
+bash skills/advpl-code-generation/scripts/convert-encoding.sh src/FATA001.prw
+
+# 2. Lint do arquivo inteiro; saida 1 significa erros a corrigir
+bash skills/advpl-code-review/scripts/advpl-lint.sh --scope all src/FATA001.prw
+```
+
+```powershell
+# Windows sem bash
+pwsh -NoProfile -ExecutionPolicy Bypass -File skills/advpl-code-generation/scripts/convert-encoding.ps1 .\src\FATA001.prw
+pwsh -NoProfile -ExecutionPolicy Bypass -File skills/advpl-code-review/scripts/advpl-lint.ps1 --scope all .\src\FATA001.prw
+```
+
+As skills `advpl-code-generation`, `advpl-refactoring`, `advpl-to-tlpp-migration`, `smartx-development` e `smartview-development` trazem a secao "After writing the source" com esse roteiro: converter o encoding, rodar o lint, corrigir os erros ate zerar, avaliar os avisos, e nunca dizer que o codigo compilou, porque a compilacao e a validacao no TDS / extensao TOTVS do VS Code continuam pendentes. Falsos positivos podem ser suprimidos no `.advpl-specialist-ignore`. Detalhes das regras, das diretivas e do encoding em [Validacao](/docs/referencia/validacao).
+
+O comando `/validate` tambem existe nas outras plataformas: ele e compilado a partir de `ai-commands/src/validate.md` e distribuido como `.github/prompts/validate.prompt.md`, `.cursor/commands/validate.md` e `.gemini/commands/validate.toml`. Ele roda o lint no arquivo inteiro e faz a passada semantica S1 a S6.
+
 ## Proximos passos
 
 - [Instalacao](/docs/instalacao) — Instalacao completa no Claude Code
 - [Comandos](/docs/comandos) — Lista completa de comandos disponiveis
-- [Skills](/docs/skills) — Detalhes das 18 bases de conhecimento internas
+- [Validacao](/docs/referencia/validacao) — Regras do lint, ignore, encoding e Windows
+- [Skills](/docs/skills) — Detalhes das 19 bases de conhecimento internas
