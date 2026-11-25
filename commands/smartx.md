@@ -49,16 +49,17 @@ Se o arquivo não existir, siga normalmente e acrescente uma linha sugerindo cri
 
 ### Modo `migrate`
 
-1. **Carregar referência base** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/patterns-migration.md` e `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/troubleshooting.md`
+1. **Carregar referência base** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/patterns-migration.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/troubleshooting.md` e `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md` (modelo do relatório de lacunas)
 2. **Analisar rotina de origem** — Identificar se a origem é mBrowse, AxCadastro ou MVC (ModelDef/ViewDef/MenuDef) para mapear a estratégia de conversão
 3. **Delegar ao agent `migrator`** — Converter a rotina para a estrutura Smart X equivalente, preservando regras de negócio e apontando riscos/pontos de atenção da migração
+4. **Entregar o relatório de lacunas (obrigatório)** — Junto com os fontes, a tabela `Item | Situação | Motivo | Ação` do `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md` (situação `migrado`, `não migrável` ou `mantido no legado`), com o checklist geral daquele arquivo e as linhas do "Passo 9 — Relatório de lacunas" de `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/patterns-migration.md`
 
 ## Mapeamento --mode → arquivos
 
 | Modo | Arquivos gerados/afetados |
 |------|---------------------------|
 | `generate` | `model.tlpp` (regras de negócio e persistência), `interface.tlpp` (metadados de campos e layout), launcher (browse/entrada da rotina) |
-| `migrate` | `model.tlpp` e `interface.tlpp` convertidos a partir da rotina de origem (mBrowse/AxCadastro/MVC), launcher atualizado, relatório de pontos de atenção da migração |
+| `migrate` | `model.tlpp` e `interface.tlpp` convertidos a partir da rotina de origem (mBrowse/AxCadastro/MVC), launcher atualizado, relatório de lacunas obrigatório (formato do `gap-report.md`) |
 
 ## Exemplos
 

@@ -13,7 +13,7 @@ Locate the advpl-specialist skills (installed via `npx skills add thalysjuvenal/
 | Mode | Files to read |
 |------|----------------|
 | `generate` | `skills/smartx-development/reference.md`, `skills/smartx-development/patterns-model.md`, `skills/smartx-development/patterns-interface.md`, `skills/smartx-development/patterns-launcher-browse.md`; also `skills/smartx-development/patterns-advpl-integration.md` if the description mentions an entry point or reuse of an existing ADVPL function |
-| `migrate` | `skills/smartx-development/reference.md`, `skills/smartx-development/patterns-migration.md`, `skills/smartx-development/troubleshooting.md` |
+| `migrate` | `skills/smartx-development/reference.md`, `skills/smartx-development/patterns-migration.md`, `skills/smartx-development/troubleshooting.md`, `skills/advpl-to-tlpp-migration/gap-report.md` (gap report template) |
 
 Also consult `skills/advpl-code-generation/reference.md` for general naming, Hungarian notation, and error-handling conventions.
 
@@ -39,14 +39,15 @@ If `--mode` is not provided, infer it: mentions of an existing routine, mBrowse,
 ### Mode `migrate`
 1. Read the base reference and pattern files listed above for `migrate`.
 2. Analyze the source routine to identify whether it is mBrowse, AxCadastro, or MVC (`ModelDef`/`ViewDef`/`MenuDef`), and map the appropriate conversion strategy.
-3. Convert it to the equivalent Smart X structure, preserving business rules, and produce a report of migration risks and points of attention.
+3. Convert it to the equivalent Smart X structure, preserving business rules, and point out migration risks and points of attention.
+4. Deliver the gap report (mandatory) with the sources: the `Item | Status | Reason | Action` table of `skills/advpl-to-tlpp-migration/gap-report.md` (status `migrated`, `not migratable` or `kept in legacy`; in pt-BR, headers `Item | Situação | Motivo | Ação` and status `migrado`, `não migrável` or `mantido no legado`), filled with that file's checklist and with the rows of "Passo 9 — Relatório de lacunas" in `skills/smartx-development/patterns-migration.md`.
 
 ## Mode → output mapping
 
 | Mode | Files generated/affected |
 |------|---------------------------|
 | `generate` | `model.tlpp`, `interface.tlpp`, launcher |
-| `migrate` | `model.tlpp` and `interface.tlpp` converted from the source routine, updated launcher, migration risk report |
+| `migrate` | `model.tlpp` and `interface.tlpp` converted from the source routine, updated launcher, mandatory gap report (`gap-report.md` format) |
 
 ## Output rules
 - Every `.tlpp` file must declare `namespace custom.<agrupador>.<servico>`.

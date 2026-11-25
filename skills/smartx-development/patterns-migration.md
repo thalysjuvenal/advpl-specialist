@@ -164,6 +164,24 @@ Os PEs Smart X (`formPre`, `formPos`, `beforeCommit`, `beforeCommitInTransaction
 | **Array `aFixe`** (reordenar colunas) | Não disponível — colunas seguem a ordem do dicionário |
 | **Painel Mestre/Detalhe na mesma tela** | Deixa de existir — vira navegação drill-down |
 
+### Passo 9 — Relatório de lacunas (obrigatório)
+
+Toda migração para Smart X é entregue com o relatório de lacunas no formato do `gap-report.md` da skill `advpl-to-tlpp-migration` (`../advpl-to-tlpp-migration/gap-report.md`): tabela `Item | Situação | Motivo | Ação`, situação `migrado`, `não migrável` ou `mantido no legado`, uma linha por ocorrência. Sem o relatório, a migração não está concluída.
+
+- Rode no fonte de origem o checklist geral do `gap-report.md` (`VerifyAccess`, `SuperGetMV`/`MV_`, `FwAliasInDic`, `cPaisLoc`, pontos de entrada, `ExistBlock`, gatilhos SX7, filtros, legendas, permissões).
+- Cada recurso da tabela do Passo 8 e cada "Não faz"/"Parcial" do checklist Faz/Não-Faz (em Boas Práticas) encontrado na rotina vira uma linha: cite o recurso, o passo e a ação, sem copiar a explicação.
+- PEs do Passo 7 sem equivalente (`MODELPRE`, `FORMLINEPRE`, `FORMLINEPOS`, `BUTTONBAR`) entram como `não migrável`, ou como `mantido no legado` enquanto o MVC legado continuar no fonte.
+- No Caminho B, o `ModelDef`/`ViewDef`/`MenuDef` e o handler de ExecAuto preservados entram como `mantido no legado`.
+
+Exemplo de linhas (rotina fictícia `ZCADA01`):
+
+| Item | Situação | Motivo | Ação |
+|---|---|---|---|
+| Filtro `U_ZFiltVen()` no browse | não migrável | Expressão ADVPL deixa de funcionar no Smart X (Passo 6) | Reescrever a regra em SQL com prefixo `@`; avisar os usuários que filtros salvos precisam ser refeitos |
+| Legenda `.BMP` de `ZA1_XSTAT` | migrado | Cor PO-UI `color-07` no `AddLegend` (Passo 5) | Conferir as cores no browse |
+| Papel de Trabalho (filtro padrão, restrição de botões) | não migrável | Ignorado na conversão (Passo 8) | Comunicar às áreas; levar a regra para código ou dicionário |
+| `ModelDef`/`ViewDef`/`MenuDef` | mantido no legado | ExecAuto e PEs MVC sem equivalente dependem deles (Caminho B) | Nenhuma |
+
 ## Métodos Relevantes
 
 | Método/Função | Contexto | Descrição |

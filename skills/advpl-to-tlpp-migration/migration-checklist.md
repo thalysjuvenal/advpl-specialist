@@ -111,6 +111,18 @@ Verify that the migration is complete and correct.
 
 ---
 
+## 4. Gap Report (mandatory final step)
+
+Every migration is delivered with a gap report: the table of what did not carry over. Template, checklist and a filled example are in `gap-report.md`.
+
+- [ ] Searched the source for every item of the `gap-report.md` checklist: `VerifyAccess`, `SuperGetMV`/`GetMV`/`MV_`, `FwAliasInDic`, `cPaisLoc`, entry points (`ExecBlock`/`PARAMIXB`), `ExistBlock`, SX7 triggers, filters, legends, permissions
+- [ ] Filled the `Item | Status | Reason | Action` table, one row per occurrence, with status `migrated`, `not migratable` or `kept in legacy`
+- [ ] Every `not migratable` row has an action
+- [ ] Listed the items searched with no hit
+- [ ] Delivered the report together with the generated files
+
+---
+
 ## Quick Reference: File Checklist per Migration
 
 For each `.prw` file migrated, you should end up with:
@@ -120,3 +132,4 @@ For each `.prw` file migrated, you should end up with:
 | `ClassName.tlpp` | New TLPP class with all logic | - [ ] Created |
 | `OriginalName.prw` | Wrapper preserving `User Function` signature | - [ ] Updated |
 | Original `.prw` | Archived or removed after full rollout | - [ ] Handled |
+| Gap report | What did not carry over, in the `gap-report.md` format | - [ ] Delivered |

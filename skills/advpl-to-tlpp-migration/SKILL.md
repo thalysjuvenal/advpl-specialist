@@ -14,6 +14,7 @@ Activate this skill when the user wants an existing procedural routine converted
 | reference.md | Always -- overview, migration strategy flow, core conversion rules table, TLPP naming conventions, full before/after example, key migration decisions, common mistakes |
 | migration-rules.md | Needing the complete mapping of every ADVPL construct (preprocessor directives, database operations, error handling, UI elements) to its TLPP equivalent |
 | migration-checklist.md | Verifying a completed migration is thorough before declaring it done |
+| gap-report.md | Planning or delivering any migration (ADVPL to TLPP, Smart X, Smart View) -- mandatory gap report template, checklist of what usually gets lost, filled example |
 
 ## After writing the source (Depois de gravar o fonte)
 

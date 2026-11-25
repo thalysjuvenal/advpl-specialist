@@ -37,7 +37,7 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 4. **Search for callers** - Grep codebase for `u_FunctionName` references
 
 ### Planning Phase (REQUIRED)
-5. **Load reference** - Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/reference.md` for rules and checklist
+5. **Load reference** - Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/reference.md` for rules and checklist, and `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md` for the mandatory gap report
 6. **Enter plan mode** - Use `EnterPlanMode` to create a structured migration plan
 7. **Design class structure** - Map functions to classes and methods
 8. **Present plan** - Show the user a detailed migration plan including:
@@ -49,6 +49,7 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
    - Includes to update (TOTVS.CH -> tlpp-core.th, etc.)
    - Whether a backward compatibility wrapper is needed
    - Any risks or breaking changes
+   - Preliminary gap report: the items already visible in the source that will not carry over, in the `gap-report.md` format
 9. **Wait for approval** - The user must approve the plan before any code is written. If the user requests changes, revise the plan.
 10. **If --dry-run** - Stop here after showing the plan
 11. **Exit plan mode** - Use `ExitPlanMode` after approval
@@ -57,7 +58,7 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 12. **Execute migration** - Generate .tlpp file(s) following the approved plan and `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/reference.md`
 13. **Generate wrapper** - Create backward compatibility .prw wrapper if --wrapper
 14. **Run checklist** - Validate against `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/migration-checklist.md`
-15. **Report** - Show summary of changes
+15. **Report** - Show summary of changes, followed by the final gap report (mandatory): the `Item | Status | Reason | Action` table of `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md`, filled after running its checklist on the source
 
 ## Examples
 
@@ -80,3 +81,4 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 - `.tlpp` file with migrated class-based code
 - Optional `.prw` wrapper for backward compatibility
 - Migration summary with what changed and why
+- Gap report (mandatory, also with `--dry-run` as the preliminary version): what did not carry over, in the format of `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md` (status `migrated`, `not migratable` or `kept in legacy`; in pt-BR, `migrado`, `não migrável` or `mantido no legado`)

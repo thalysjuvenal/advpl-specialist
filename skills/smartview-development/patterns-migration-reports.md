@@ -53,7 +53,8 @@ O que **não** entra no inventário porque não sobrevive:
 
 `MSDIALOG`, telas de marcação de empresas/filiais, `FWMsgRun`, `MsgInfo`, `Alert`, `MsgYesNo`,
 `MakeDir`, `__CopyFile`, `MsExcel()` por OLE, escolha de impressora, régua de processamento.
-Tudo isso é UI ou disco do cliente e não existe em thread REST.
+Tudo isso é UI ou disco do cliente e não existe em thread REST. Fica fora do inventário, mas entra
+no relatório de lacunas como `não migrável` (ver "Relatório de lacunas (obrigatório)").
 
 ## De/para por construção
 
@@ -134,6 +135,25 @@ Checklist de homologação:
 - [ ] Colunas numéricas somando na grade
 - [ ] Volume medido em produção, não só em homologação
 
+## Relatório de lacunas (obrigatório)
+
+Toda migração para Smart View é entregue com o relatório de lacunas, no formato do `gap-report.md`
+da skill `advpl-to-tlpp-migration` (`../advpl-to-tlpp-migration/gap-report.md`): tabela
+`Item | Situação | Motivo | Ação`, situação `migrado`, `não migrável` ou `mantido no legado`, uma
+linha por ocorrência. Rode também no fonte de origem o checklist geral daquele arquivo
+(`SuperGetMV`/`MV_`, pontos de entrada, `cPaisLoc`, permissões e os demais itens).
+
+O que não tem caminho de conversão nesta skill entra assim:
+
+| Item | Situação | Motivo | Ação |
+|---|---|---|---|
+| `MSDIALOG`, `MsgYesNo`, régua, escolha de impressora | não migrável | UI não existe em thread REST (ver "Inventário do fonte de origem") | Nenhuma no objeto; as perguntas viram `setPergunte` ou `addParameter` |
+| `MsExcel()` por OLE, `MakeDir`, `__CopyFile` | não migrável | Disco ou estação do cliente | A saída passa a ser a visão publicada; avisar quem consumia o arquivo |
+| Execução em várias empresas | não migrável | Um contexto por empresa (ver "Mudança de escopo: empresa vira filial") | Avisar o usuário: uma execução por empresa |
+| *Fallback* para a empresa matriz | não migrável | O objeto lê só a empresa da sessão | `FWLogMsg` no ponto; conferir na empresa que dependia dele |
+| Fonte de origem e seu `ValidPerg` | mantido no legado | Migração aditiva; o SX1 do `setPergunte` vem dele | Retirar só depois da homologação |
+| Relatório que gera arquivo para outro sistema, grava dados ou tem anexo acordado com terceiros | mantido no legado | Não deve migrar (ver "Antes de converter") | Nenhuma |
+
 ## Caso de referência
 
 Relatório Excel de faturamento com três abas — *Vendas*, *Pedidos a Faturar* e um resumo —
@@ -175,6 +195,7 @@ retornadas em alguns segundos.
 8. Compilar no TDS, reiniciar o AppServer e o serviço do Smart View.
 9. Montar o recurso no designer web e publicar o `.trp` (ver `deploy-trp.md`).
 10. Homologar contra o original com o checklist acima.
+11. Entregar o relatório de lacunas (ver "Relatório de lacunas (obrigatório)").
 
 ## Sanitização antes de publicar exemplo
 
