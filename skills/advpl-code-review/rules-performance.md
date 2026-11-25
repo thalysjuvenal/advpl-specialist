@@ -2,6 +2,8 @@
 
 Rules for detecting performance issues in ADVPL/TLPP code. Each rule includes a detection pattern, violation example, correct example, and explanation.
 
+> Note: `EndSQL` must always be in column 1 — with a space or tab before it, the compiler reports C2001 (TDN Embedded SQL, "Erros de compilação").
+
 ---
 
 ## [PERF-001] SELECT * in Embedded SQL
@@ -23,7 +25,7 @@ User Function GetOrders()
         FROM %table:SC5% SC5
         WHERE SC5.%notDel%
         AND SC5.C5_FILIAL = %xfilial:SC5%
-    EndSQL
+EndSQL
 
 Return
 ```
@@ -34,13 +36,14 @@ Return
 User Function GetOrders()
     Local cAlias := GetNextAlias()
 
+    // C5_XTOTPED: campo customizado do cliente (o SC5 padrao nao tem total do pedido)
     BeginSQL Alias cAlias
         SELECT SC5.C5_NUM, SC5.C5_CLIENTE, SC5.C5_LOJACLI,
-               SC5.C5_EMISSAO, SC5.C5_CONDPAG, SC5.C5_TOTPED
+               SC5.C5_EMISSAO, SC5.C5_CONDPAG, SC5.C5_XTOTPED
         FROM %table:SC5% SC5
         WHERE SC5.%notDel%
         AND SC5.C5_FILIAL = %xfilial:SC5%
-    EndSQL
+EndSQL
 
 Return
 ```
@@ -99,7 +102,7 @@ User Function ListOrderItems(cOrder)
         WHERE SC6.%notDel%
         AND SC6.C6_FILIAL = %xfilial:SC6%
         AND SC6.C6_NUM = %exp:cOrder%
-    EndSQL
+EndSQL
 
     DbSelectArea(cAlias)
     While !(cAlias)->(Eof())
@@ -135,7 +138,7 @@ User Function GetDueDate()
         FROM %table:SE2% SE2
         WHERE SE2.%notDel%
         AND SE2.E2_FILIAL = %xfilial:SE2%
-    EndSQL
+EndSQL
 
     // E2_VENCTO comes back as character "20250115"
     // E2_VALOR comes back as character - arithmetic fails or gives wrong results
@@ -156,7 +159,7 @@ User Function GetDueDate()
         FROM %table:SE2% SE2
         WHERE SE2.%notDel%
         AND SE2.E2_FILIAL = %xfilial:SE2%
-    EndSQL
+EndSQL
 
     TCSetField(cAlias, "E2_VENCTO", "D")
     TCSetField(cAlias, "E2_VALOR", "N", 14, 2)
@@ -242,7 +245,7 @@ User Function HasOrders(cCodCli)
         WHERE SC5.%notDel%
         AND SC5.C5_FILIAL = %xfilial:SC5%
         AND SC5.C5_CLIENTE = %exp:cCodCli%
-    EndSQL
+EndSQL
 
     // RecCount scans all matching records just to check existence
     If (cAlias)->(RecCount()) > 0
@@ -267,7 +270,7 @@ User Function HasOrders(cCodCli)
         WHERE SC5.%notDel%
         AND SC5.C5_FILIAL = %xfilial:SC5%
         AND SC5.C5_CLIENTE = %exp:cCodCli%
-    EndSQL
+EndSQL
 
     // Eof() returns immediately - no need to count all records
     lHas := !(cAlias)->(Eof())
@@ -303,7 +306,7 @@ User Function GetRecentOrders()
         ORDER BY C5_EMISSAO DESC
         // C5_EMISSAO alone may not be an indexed column
         // This could cause a full table sort
-    EndSQL
+EndSQL
 
 Return
 ```
@@ -325,7 +328,7 @@ User Function GetRecentOrders()
         AND SC5.C5_EMISSAO >= %exp:DtoS(dDataIni)%
         ORDER BY C5_FILIAL, C5_EMISSAO DESC
         // ORDER BY matches index column order for better performance
-    EndSQL
+EndSQL
 
 Return
 ```

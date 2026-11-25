@@ -2,6 +2,8 @@
 
 Complete reference for implementing approval workflows, automatic routines (MsExecAuto), and email notifications in TOTVS Protheus.
 
+> Note: `EndSQL` must always be in column 1 — with a space or tab before it, the compiler reports C2001 (TDN Embedded SQL, "Erros de compilação").
+
 ---
 
 ## 1. Overview
@@ -321,7 +323,7 @@ Static Function fGetPendentes(cAprovador)
         AND SCR.CR_APROV  = %exp:cAprovador%
         AND SCR.CR_STATUS = %exp:cStatus%
         ORDER BY CR_EMISSAO, CR_NUM
-    EndSQL
+EndSQL
 
     While !(cAlias)->(Eof())
         aAdd(aResult, { ;
@@ -565,7 +567,7 @@ Static Function fTotalPC(cNumPC)
         WHERE SC7.%notDel%
         AND SC7.C7_FILIAL = %xfilial:SC7%
         AND SC7.C7_NUM = %exp:cNumPC%
-    EndSQL
+EndSQL
 
     If !(cAlias)->(Eof())
         nTotal := (cAlias)->TOTAL
@@ -589,7 +591,7 @@ Static Function fGetAprovador(nValor)
         AND SAK.AK_FILIAL = %xfilial:SAK%
         AND SAK.AK_LIMITE >= %exp:nValor%
         ORDER BY AK_LIMITE
-    EndSQL
+EndSQL
 
     If !(cAlias)->(Eof())
         cAprov := AllTrim((cAlias)->AK_COD)

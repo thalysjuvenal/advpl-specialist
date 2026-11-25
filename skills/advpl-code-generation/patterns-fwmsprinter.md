@@ -2,6 +2,8 @@
 
 Complete reference for implementing reports using the FWMSPrinter framework in TOTVS Protheus.
 
+> Note: `EndSQL` must always be in column 1 — with a space or tab before it, the compiler reports C2001 (TDN Embedded SQL, "Erros de compilação").
+
 All rules and signatures documented here were **verified against a running Protheus environment** (build 7.00.240223P) and represent confirmed working behavior, not theoretical documentation.
 
 ---
@@ -492,7 +494,7 @@ Static Function fPrintRpt()
             WHERE SB1.%notDel%
               AND SB1.B1_FILIAL = %xfilial:SB1%
             ORDER BY B1_TIPO, B1_COD
-        EndSQL
+EndSQL
 
         // Initialize printer
         oPrint := FWMSPrinter():New( ;

@@ -2,6 +2,8 @@
 
 Complete reference for implementing background jobs, multi-threading, and scheduled tasks in TOTVS Protheus.
 
+> Note: `EndSQL` must always be in column 1 — with a space or tab before it, the compiler reports C2001 (TDN Embedded SQL, "Erros de compilação").
+
 ---
 
 ## 1. Overview
@@ -468,7 +470,7 @@ Static Function fProcessaPendencias()
         AND ZA9.ZA9_FILIAL = %xfilial:ZA9%
         AND ZA9.ZA9_STATUS = %exp:cStatus%
         ORDER BY ZA9_CODIGO
-    EndSQL
+EndSQL
 
     While !(cAlias)->(Eof())
         FWLogMsg("INFO", /*cTransactionId*/, "zJobLoop", "fProcessaPendencias", /*cStep*/, /*cMsgId*/, "Processando: " + AllTrim((cAlias)->ZA9_CODIGO))

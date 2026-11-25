@@ -2,6 +2,8 @@
 
 Practical techniques for improving performance in ADVPL/TLPP code on TOTVS Protheus. Each tip includes a before (slow) and after (optimized) code example.
 
+> Note: `EndSQL` must always be in column 1 — with a space or tab before it, the compiler reports C2001 (TDN Embedded SQL, "Erros de compilação").
+
 ---
 
 ## 1. Index Optimization
@@ -230,7 +232,7 @@ For nI := 1 To Len(aDocs)
         FROM %table:SD1% SD1
         WHERE D1_DOC = %exp:aDocs[nI]%
           AND SD1.%notDel%
-    EndSQL
+EndSQL
     If Select("QRY_TMP") > 0
         nTotal += QRY_TMP->D1_TOTAL
         DbSelectArea("QRY_TMP")
