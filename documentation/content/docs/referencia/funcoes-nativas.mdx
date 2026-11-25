@@ -471,7 +471,7 @@ Returns the current system date.
 **Example:**
 ```c
 Local dToday := Date()
-Conout("Today is: " + DtoC(dToday))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Today is: " + DtoC(dToday))
 ```
 
 ---
@@ -644,7 +644,7 @@ Returns the day of the week as a number.
 ```c
 Local nDow := DOW(Date())
 If nDow == 1 .Or. nDow == 7
-    Conout("Weekend!")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Weekend!")
 EndIf
 ```
 
@@ -744,9 +744,9 @@ Validates whether a date is valid.
 **Example:**
 ```c
 If DateValid("29/02/2026")
-    Conout("Valid date")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Valid date")
 Else
-    Conout("Invalid date") // 2026 is not a leap year
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Invalid date") // 2026 is not a leap year
 EndIf
 ```
 
@@ -1212,7 +1212,7 @@ Evaluates a code block for each element in an array.
 **Example:**
 ```c
 Local aNames := {"Alice", "Bob", "Charlie"}
-aEval(aNames, {|cName, nIdx| Conout(Str(nIdx) + ": " + cName)})
+aEval(aNames, {|cName, nIdx| FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, Str(nIdx) + ": " + cName)})
 ```
 
 ---
@@ -1323,9 +1323,9 @@ Seeks a record by key in the current index order.
 DbSelectArea("SA1")
 DbSetOrder(1)
 If DbSeek(xFilial("SA1") + "000001" + "01")
-    Conout("Customer found: " + SA1->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer found: " + SA1->A1_NOME)
 Else
-    Conout("Customer not found")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer not found")
 EndIf
 ```
 
@@ -1348,7 +1348,7 @@ Moves the record pointer forward or backward.
 DbSelectArea("SA1")
 DbGoTop()
 While !Eof()
-    Conout(SA1->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, SA1->A1_NOME)
     DbSkip()
 EndDo
 ```
@@ -1384,7 +1384,7 @@ Moves the record pointer to the last record in the current work area.
 ```c
 DbSelectArea("SA1")
 DbGoBottom()
-Conout("Last record: " + Str(RecNo()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Last record: " + Str(RecNo()))
 ```
 
 ---
@@ -1456,7 +1456,7 @@ Returns the current record number.
 ```c
 DbSelectArea("SA1")
 DbGoTop()
-Conout("Record number: " + Str(RecNo()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Record number: " + Str(RecNo()))
 ```
 
 ---
@@ -1472,7 +1472,7 @@ Returns the total number of records in the current work area.
 **Example:**
 ```c
 DbSelectArea("SA1")
-Conout("Total records: " + Str(LastRec()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Total records: " + Str(LastRec()))
 ```
 
 ---
@@ -1530,7 +1530,7 @@ Returns whether the current record is marked for deletion.
 DbSelectArea("SA1")
 DbGoTop()
 If !Deleted()
-    Conout("Active record: " + SA1->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Active record: " + SA1->A1_NOME)
 EndIf
 ```
 
@@ -1555,7 +1555,7 @@ DbSelectArea("SA1")
 DbSetFilter({|| SA1->A1_TIPO == "F"}, 'SA1->A1_TIPO == "F"')
 DbGoTop()
 While !Eof()
-    Conout(SA1->A1_NOME) // Only physical person customers
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, SA1->A1_NOME) // Only physical person customers
     DbSkip()
 EndDo
 DbClearFilter()
@@ -1575,7 +1575,7 @@ Returns the current index order number.
 ```c
 DbSelectArea("SA1")
 DbSetOrder(3)
-Conout("Current index: " + Str(IndexOrd())) // 3
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Current index: " + Str(IndexOrd())) // 3
 ```
 
 ---
@@ -1656,7 +1656,7 @@ Returns the alias of the current or specified work area.
 **Example:**
 ```c
 DbSelectArea("SA1")
-Conout(Alias()) // "SA1"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, Alias()) // "SA1"
 ```
 
 ---
@@ -1677,7 +1677,7 @@ Returns the work area number for a given alias.
 ```c
 Local nArea := Select("SA1")
 If nArea > 0
-    Conout("SA1 is open in work area: " + Str(nArea))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SA1 is open in work area: " + Str(nArea))
 EndIf
 ```
 
@@ -1695,7 +1695,7 @@ Returns whether the current work area has a table open.
 ```c
 DbSelectArea("SA1")
 If Used()
-    Conout("SA1 is open")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SA1 is open")
 EndIf
 ```
 
@@ -1712,7 +1712,7 @@ Returns the number of fields in the current work area.
 **Example:**
 ```c
 DbSelectArea("SA1")
-Conout("Number of fields: " + Str(FCount()))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Number of fields: " + Str(FCount()))
 ```
 
 ---
@@ -1735,7 +1735,7 @@ Local nI := 0
 
 DbSelectArea("SA1")
 For nI := 1 To FCount()
-    Conout(FieldName(nI))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, FieldName(nI))
 Next nI
 ```
 
@@ -2157,7 +2157,7 @@ If nHandle >= 0
     // Read file...
     FClose(nHandle)
 Else
-    Conout("Error opening file: " + Str(FError()))
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error opening file: " + Str(FError()))
 EndIf
 ```
 
@@ -2183,7 +2183,7 @@ Local nHandle := FOpen("C:\Temp\data.txt", 0)
 Local cBuffer := Space(1024)
 Local nRead := FRead(nHandle, @cBuffer, 1024)
 cBuffer := Left(cBuffer, nRead)
-Conout(cBuffer)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(cBuffer))
 FClose(nHandle)
 ```
 
@@ -2249,7 +2249,7 @@ Deletes a file from the file system.
 **Example:**
 ```c
 If FErase("C:\Temp\old_file.txt") == 0
-    Conout("File deleted successfully")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "File deleted successfully")
 EndIf
 ```
 
@@ -2290,7 +2290,7 @@ Checks if a file exists.
 **Example:**
 ```c
 If File("C:\Temp\config.ini")
-    Conout("Configuration file found")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Configuration file found")
 EndIf
 ```
 
@@ -2314,7 +2314,7 @@ Returns an array with file and directory information.
 Local aFiles := Directory("C:\Temp\*.txt")
 Local nI
 For nI := 1 To Len(aFiles)
-    Conout(aFiles[nI][1] + " - Size: " + Str(aFiles[nI][2]))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, aFiles[nI][1] + " - Size: " + Str(aFiles[nI][2]))
 Next nI
 ```
 
@@ -2335,7 +2335,7 @@ Creates a new directory.
 **Example:**
 ```c
 If MakeDir("C:\Temp\Reports") == 0
-    Conout("Directory created")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Directory created")
 EndIf
 ```
 
@@ -2352,7 +2352,7 @@ Returns the current directory.
 **Example:**
 ```c
 Local cDir := CurDir()
-Conout("Current directory: " + cDir)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Current directory: " + cDir)
 ```
 
 ---
@@ -2372,7 +2372,7 @@ Removes an empty directory.
 **Example:**
 ```c
 If DirRemove("C:\Temp\OldReports") == 0
-    Conout("Directory removed")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Directory removed")
 EndIf
 ```
 
@@ -2397,7 +2397,7 @@ Moves the file pointer to a specified position.
 Local nHandle := FOpen("C:\Temp\data.bin", 0)
 Local nSize := FSeek(nHandle, 0, 2) // Get file size by seeking to end
 FSeek(nHandle, 0, 0)                // Return to beginning
-Conout("File size: " + Str(nSize))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "File size: " + Str(nSize))
 FClose(nHandle)
 ```
 
@@ -2444,7 +2444,7 @@ Retrieves the value of an MV_* system parameter from SX6.
 **Example:**
 ```c
 Local cState := GetMV("MV_ESTADO")
-Conout("Default state: " + cState)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Default state: " + cState)
 ```
 
 ---
@@ -2494,6 +2494,8 @@ Local cCompany := SuperGetMV("MV_NOMEMP", .F., "My Company")
 
 ### Conout
 
+> **Do not use `Conout` in new code.** It is documented here only as a reference for reading legacy sources. Use `FWLogMsg` (entry below) to write to the Protheus log.
+
 Outputs a message to the Protheus console log.
 
 **Syntax:** `Conout( cMessage [, cLogLevel] ) --> NIL`
@@ -2505,36 +2507,46 @@ Outputs a message to the Protheus console log.
 
 **Return:** NIL
 
-**Example:**
+**Example (legacy pattern, for reference only):**
+
+{/* advpl-lint: anti-exemplo */}
 ```c
 Conout("Processing started at: " + Time())
 Conout("Record count: " + Str(LastRec()))
+```
+
+**Alternative (`FWLogMsg`):**
+
+```c
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Processing started at: " + Time())
 ```
 
 ---
 
 ### FWLogMsg
 
-Writes a message to the Protheus application log with level and context.
+Writes a message to the Protheus application log (console.log) with severity and context.
 
-**Syntax:** `FWLogMsg( cLevel, cGroup, cCategory, cSource, cDetail, cLogId, cMessage ) --> NIL`
+**Syntax:** `FWLogMsg( cSeverity, [cTransactionId], cGroup, [cCategory], [cStep], [cMsgId], [cMessage], [nMensure], [nElapseTime], [aMessage] ) --> NIL`
 
 | Param | Type | Description |
 |-------|------|-------------|
-| cLevel | C | Log level: "INFO", "WARNING", "ERROR" |
-| cGroup | C | Group identifier |
-| cCategory | C | Category identifier |
-| cSource | C | Source function/class |
-| cDetail | C | Detailed description |
-| cLogId | C | Unique log ID |
-| cMessage | C | Log message |
+| cSeverity | C | Required. Severity: "INFO", "WARN", "ERROR", "FATAL" or "DEBUG" ("DEBUG" is only written when the environment has `FWLOGMSG_DEBUG=1`) |
+| cTransactionId | C | Optional. Transaction identifier; default `FWUUIDV1()` ("LAST" reuses the previous one) |
+| cGroup | C | Required. Group identifier |
+| cCategory | C | Optional. Category identifier |
+| cStep | C | Optional. Step identifier |
+| cMsgId | C | Optional. Message identifier |
+| cMessage | C | Optional. Log message (limited to 10K) |
+| nMensure | N | Optional. Measure value |
+| nElapseTime | N | Optional. Elapsed time |
+| aMessage | A | Optional. Array of key/value pairs `{ {"Key","Value"} }`; when informed, the console omits `cMessage` |
 
 **Return:** NIL
 
 **Example:**
 ```c
-FWLogMsg("ERROR", "FATURAMENTO", "NF", "MATA461", ;
-    "Error generating invoice", "001", ;
+FWLogMsg("ERROR", /*cTransactionId*/, "FATURAMENTO", "NF", /*cStep*/, /*cMsgId*/, ;
     "Invoice generation failed for order " + cOrder)
 ```
 
@@ -2551,7 +2563,7 @@ Returns the name of the current Protheus environment.
 **Example:**
 ```c
 Local cEnv := GetEnvServer()
-Conout("Running in environment: " + cEnv) // e.g., "P12"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Running in environment: " + cEnv) // e.g., "P12"
 ```
 
 ---
@@ -2616,7 +2628,7 @@ Returns the data type of an expression given as a string.
 ```c
 Local cType := Type("SA1->A1_NOME") // "C"
 If Type("cMyVar") != "U"
-    Conout("Variable exists")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Variable exists")
 EndIf
 ```
 
@@ -2637,10 +2649,10 @@ Returns the data type of a value.
 **Example:**
 ```c
 Local xVar := "Hello"
-Conout(ValType(xVar)) // "C"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ValType(xVar)) // "C"
 
 xVar := 42
-Conout(ValType(xVar)) // "N"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ValType(xVar)) // "N"
 ```
 
 ---
@@ -2659,10 +2671,10 @@ Converts any value to its character string representation.
 
 **Example:**
 ```c
-Conout(cValToChar(42))        // "42"
-Conout(cValToChar(.T.))       // ".T."
-Conout(cValToChar(Date()))    // "04/03/2026"
-Conout(cValToChar({"A","B"})) // "{...}"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(42))        // "42"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(.T.))       // ".T."
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(Date()))    // "04/03/2026"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar({"A","B"})) // "{...}"
 ```
 
 ---
@@ -2681,9 +2693,9 @@ Pauses execution for a specified number of milliseconds.
 
 **Example:**
 ```c
-Conout("Waiting 3 seconds...")
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Waiting 3 seconds...")
 Sleep(3000)
-Conout("Done!")
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Done!")
 ```
 
 ---
@@ -2703,7 +2715,7 @@ Local nEnd   := 0
 
 // ... perform operation ...
 nEnd := Seconds()
-Conout("Elapsed: " + Str(nEnd - nStart, 10, 3) + " seconds")
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Elapsed: " + Str(nEnd - nStart, 10, 3) + " seconds")
 ```
 
 ---
@@ -2812,7 +2824,7 @@ Returns the current branch code (M0_CODFIL).
 **Example:**
 ```c
 Local cCodFil := FWCodFil()
-Conout("Branch code: " + cCodFil)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Branch code: " + cCodFil)
 ```
 
 ---
@@ -2832,7 +2844,7 @@ Returns the company code (or the company group if company is not configured in t
 **Example:**
 ```c
 Local cCodEmp := FWCodEmp()
-Conout("Company: " + cCodEmp)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Company: " + cCodEmp)
 ```
 
 ---
@@ -2980,7 +2992,7 @@ Returns the size of the branch field.
 **Example:**
 ```c
 Local nFilSize := FWSizeFilial()
-Conout("Branch field size: " + cValToChar(nFilSize))
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Branch field size: " + cValToChar(nFilSize))
 ```
 
 ---
@@ -3070,7 +3082,7 @@ cSql += "AND A1_COD = '000001' AND A1_LOJA = '01' "
 cSql += "AND D_E_L_E_T_ = ' '"
 
 If TCSqlExec(cSql) < 0
-    Conout("SQL execution failed: " + TCSqlError())
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SQL execution failed: " + TCSqlError())
 EndIf
 ```
 
@@ -3121,7 +3133,7 @@ Executes a stored procedure.
 ```c
 Local nRet := TCSPExec("sp_update_balance", "000001", 1500.00)
 If nRet < 0
-    Conout("Stored procedure failed")
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Stored procedure failed")
 EndIf
 ```
 
@@ -3180,7 +3192,7 @@ Local nResult := Eval(bCalc, 5, 3) // 25
 
 Local bValid := {|cVal| !Empty(cVal)}
 If Eval(bValid, cName)
-    Conout("Name is valid")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Name is valid")
 EndIf
 ```
 
@@ -3217,52 +3229,49 @@ MsExecAuto({|x,y| MATA030(x,y)}, aFields, 3) // Insert
 
 If lMsErroAuto
     cError := GetAutoGRLog()
-    Conout("Error in MsExecAuto: " + cError)
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error in MsExecAuto: " + cError)
 EndIf
 ```
 
 ---
 
-### FWMVCRotAuto
+### FWMVCRotAuto (restricted)
 
-Executes MVC model operations automatically (batch mode).
+> **Restricted function.** `FWMVCRotAuto` is for internal TOTVS use since 2019 (listed as a restricted resource, without support, in the TOTVS "Funcoes, classes e variaveis de propriedade interna" article). Do not use it in customizations. See `restricted-functions.md`. Use `MsExecAuto` following the documented example of the routine, or, for MVC routines, the model API below.
 
-**Syntax:** `FWMVCRotAuto( oModel, cModelId, nOperation, aFieldValues [, lVerbose] ) --> lSuccess`
+**Alternative (MVC model API):** `FWLoadModel( cSource ) --> oModel`, then `SetOperation`, `Activate`, `SetValue`, `VldData`, `CommitData` and `DeActivate`, following the documented example of the target routine.
 
-| Param | Type | Description |
-|-------|------|-------------|
-| oModel | O | MVC model object (or NIL to use cModelId) |
-| cModelId | C | Model identifier (function name) |
-| nOperation | N | Operation: MODEL_OPERATION_INSERT (3), _UPDATE (4), _DELETE (5) |
-| aFieldValues | A | Array of `{cFormId, {{"field", value}, ...}}` |
-| lVerbose | L | Display log messages |
+| Step | Method | Description |
+|------|--------|-------------|
+| 1 | `FWLoadModel( cSource )` | Loads the model of the MVC routine |
+| 2 | `oModel:SetOperation( nOperation )` | MODEL_OPERATION_INSERT (3), _UPDATE (4), _DELETE (5) |
+| 3 | `oModel:Activate()` | Activates the model |
+| 4 | `oModel:SetValue( cFormId, cField, xValue )` | Fills the fields of each form |
+| 5 | `oModel:VldData()` | Validates the data (`.T.` if valid) |
+| 6 | `oModel:CommitData()` | Persists the data |
+| 7 | `oModel:DeActivate()` | Deactivates the model |
 
-**Return:** L - .T. if operation succeeded.
-
-**Example:**
+**Example:** (validation in TDS/VSCode TOTVS pending)
 ```c
-Local aData   := {}
-Local aHeader := {}
-Local aItems  := {}
-Local lRet    := .F.
-Local oModel  := NIL
-Local cError  := ""
+Local oModel := FWLoadModel("MATA030")
+Local aError := {}
+Local lRet   := .F.
 
-// Header data (FormGrid)
-aAdd(aHeader, {"A1_FILIAL", xFilial("SA1")})
-aAdd(aHeader, {"A1_COD",    "000200"})
-aAdd(aHeader, {"A1_LOJA",   "01"})
-aAdd(aHeader, {"A1_NOME",   "MVC Customer"})
+oModel:SetOperation(MODEL_OPERATION_INSERT)
+oModel:Activate()
 
-aAdd(aData, {"SA1MASTER", aHeader})
+oModel:SetValue("SA1MASTER", "A1_COD",  "000200")
+oModel:SetValue("SA1MASTER", "A1_LOJA", "01")
+oModel:SetValue("SA1MASTER", "A1_NOME", "MVC Customer")
 
-lRet := FWMVCRotAuto(NIL, "MATA030", MODEL_OPERATION_INSERT, aData)
-
-If !lRet
-    oModel := FWLoadModel("MATA030")
-    cError := oModel:GetErrorMessage()
-    Conout("MVC Error: " + cError)
+If oModel:VldData()
+    lRet := oModel:CommitData()
+Else
+    aError := oModel:GetErrorMessage()
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "MVC Error: " + cValToChar(aError[6]))
 EndIf
+
+oModel:DeActivate()
 ```
 
 ---
@@ -3313,9 +3322,9 @@ Local cResponse := ""
 Local aHeaders  := {"Content-Type: application/json", "Authorization: Bearer token123"}
 
 If HttpGet(cUrl, "", 30, aHeaders, @cResponse)
-    Conout("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 Else
-    Conout("HTTP GET failed")
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "HTTP GET failed")
 EndIf
 ```
 
@@ -3345,7 +3354,7 @@ Local cResponse := ""
 Local aHeaders  := {"Content-Type: application/json"}
 
 If HttpPost(cUrl, cBody, 30, aHeaders, @cResponse)
-    Conout("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 EndIf
 ```
 
@@ -3365,8 +3374,8 @@ Framework class for building REST API services (server-side).
 
 **Example:**
 ```c
-#Include "tlpp-core.th"
-#Include "tlpp-rest.th"
+#include "tlpp-core.th"
+#include "tlpp-rest.th"
 
 @Get("/api/v1/customers")
 User Function getCustomers()
@@ -3449,8 +3458,8 @@ Local cJson := '{"name": "John", "age": 30, "active": true}'
 Local oResult
 
 If FWJsonDeserialize(cJson, @oResult)
-    Conout("Name: " + oResult:name)
-    Conout("Age: " + Str(oResult:age))
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Name: " + oResult:name)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Age: " + Str(oResult:age))
 EndIf
 ```
 
@@ -3479,7 +3488,7 @@ oData["age"]  := 30
 oData["items"] := {"A", "B", "C"}
 
 cJson := FWJsonSerialize(oData, .T.)
-Conout(cJson)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cJson)
 ```
 
 ---
@@ -3508,7 +3517,7 @@ cJson := oJson:toJson()
 
 // Parse from string
 oJson2:fromJson('{"status": "ok", "count": 42}')
-Conout(oJson2["status"]) // "ok"
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cValToChar(oJson2["status"])) // "ok"
 
 FreeObj(oJson)
 FreeObj(oJson2)
@@ -3538,9 +3547,9 @@ oRest:AddHeader("Authorization", "Bearer " + cToken)
 lRet := oRest:Execute()
 If lRet
     cResponse := oRest:GetResult()
-    Conout("Response: " + cResponse)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Response: " + cResponse)
 Else
-    Conout("Error: " + Str(oRest:GetStatusCode()))
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Error: " + Str(oRest:GetStatusCode()))
 EndIf
 ```
 
@@ -3657,7 +3666,7 @@ Returns the last SQL error message.
 **Example:**
 ```c
 If TCSqlExec(cSql) < 0
-    Conout("SQL Error: " + TCSqlError())
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SQL Error: " + TCSqlError())
 EndIf
 ```
 
@@ -3689,7 +3698,7 @@ cQuery += " ORDER BY A1_COD"
 DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
 
 While !(cAlias)->(Eof())
-    Conout((cAlias)->A1_COD + " - " + (cAlias)->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, (cAlias)->A1_COD + " - " + (cAlias)->A1_NOME)
     (cAlias)->(DbSkip())
 EndDo
 
@@ -3740,7 +3749,7 @@ Positions on a record and returns a field value from any table.
 ```c
 // Get customer name without changing current work area
 Local cName := Posicione("SA1", 1, xFilial("SA1") + "000001" + "01", "A1_NOME")
-Conout("Customer: " + cName)
+FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer: " + cName)
 ```
 
 ---
@@ -3763,7 +3772,7 @@ Checks if a value exists in a specific table field.
 ```c
 // Check if customer code exists
 If ExistCpo("SA1", "00000101")
-    Conout("Customer exists")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Customer exists")
 EndIf
 ```
 
@@ -3797,7 +3806,7 @@ oMaster:SetValue("A1_NOME", "Model Customer")
 If oModel:VldData()
     oModel:CommitData()
 Else
-    Conout("Validation error: " + oModel:GetErrorMessage())
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Validation error: " + oModel:GetErrorMessage())
 EndIf
 
 oModel:DeActivate()
@@ -3829,7 +3838,7 @@ cQuery += " WHERE D_E_L_E_T_ = ' '"
 MsOpenQuery(cQuery, cAlias)
 
 While !(cAlias)->(Eof())
-    Conout((cAlias)->A1_COD + " - " + (cAlias)->A1_NOME)
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, (cAlias)->A1_COD + " - " + (cAlias)->A1_NOME)
     (cAlias)->(DbSkip())
 EndDo
 
@@ -3854,8 +3863,8 @@ MsExecAuto({|x,y| MATA030(x,y)}, aFields, 3)
 
 If lMsErroAuto
     cLog := GetAutoGRLog()
-    Conout("MsExecAuto errors:")
-    Conout(cLog)
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "MsExecAuto errors:")
+    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, cLog)
 EndIf
 ```
 
@@ -3890,8 +3899,8 @@ Class for creating customizable reports, replacing SetPrint, SetDefault, RptStat
 
 **Example:**
 ```c
-#Include "TOTVS.CH"
-#Include "rptdef.ch"
+#include "totvs.ch"
+#include "rptdef.ch"
 
 Local oReport  := NIL
 Local oSection := NIL
@@ -4064,7 +4073,7 @@ Class providing a grid browse object with side buttons and column details based 
 
 **Example:**
 ```c
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function MyBrowse()
     Local oBrowse := FWMBrowse():New()
@@ -4158,7 +4167,7 @@ StartJob("u_ProcessBatch", GetEnvServer(), .F., "SA1", Date())
 // Synchronous job (waits for completion)
 Local lOk := StartJob("u_GenerateReport", GetEnvServer(), .T., cReportId)
 If !lOk
-    Conout("Job failed to start")
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Job failed to start")
 EndIf
 ```
 
@@ -4195,7 +4204,7 @@ User Function MyJob(cParam)
 
     lEnv := RpcSetEnv("99", "01")
     If !lEnv
-        Conout("Failed to open environment")
+        FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Failed to open environment")
         Return
     EndIf
 
@@ -4323,7 +4332,7 @@ oServer:Init("", "smtp.gmail.com", "user@gmail.com", "password", 0, 465)
 // Connect
 nErr := oServer:SmtpConnect()
 If nErr != 0
-    Conout("SMTP Error: " + oServer:GetErrorString(nErr))
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SMTP Error: " + oServer:GetErrorString(nErr))
     Return
 EndIf
 
@@ -4340,7 +4349,7 @@ oMessage:cBody    := "The monthly report is attached."
 // Send
 nErr := oServer:SendMail(oMessage)
 If nErr != 0
-    Conout("Send Error: " + oServer:GetErrorString(nErr))
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Send Error: " + oServer:GetErrorString(nErr))
 EndIf
 
 oServer:SmtpDisconnect()
@@ -4532,7 +4541,7 @@ If oWsdl:ParseURL(cUrl)
     oWsdl:SetOperation("OPERACAO")
     If oWsdl:SendSoapMsg(cEnvelope)
         If !Empty(oWsdl:cFaultCode)
-            Conout("SOAP Fault: " + oWsdl:cFaultCode + " - " + oWsdl:cFaultString)
+            FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "SOAP Fault: " + oWsdl:cFaultCode + " - " + oWsdl:cFaultString)
         Else
             cResp := oWsdl:GetParsedResponse()
         EndIf
@@ -4560,11 +4569,25 @@ Executes a Static Function from another source file. **COMPILATION BLOCKED since
 
 > **CRITICAL: StaticCall() has its compilation BLOCKED since release 12.1.33.** It is listed as TOTVS internal property. Refactor to use public User Functions or namespaced TLPP calls instead.
 
-**Example (legacy — for reference only, DO NOT use in new code):**
+For alternatives, see [TOTVS documentation on StaticCall replacement](https://centraldeatendimento.totvs.com/hc/pt-br/articles/4411463269911). If you need to call a function from another source, make it a `User Function` or use TLPP namespaces.
+
+**Example (legacy, for reference only; DO NOT use in new code):**
+
+{/* advpl-lint: anti-exemplo */}
 ```c
 // Call a Static Function from another program
 Local aMenu := StaticCall(MATA030, MenuDef)
 
 // Call with parameters
 Local xRet := StaticCall(MyProgram, MyStaticFunc, "param1", 42)
+```
+
+**Alternative:**
+
+```c
+// Call as User Function
+Local aMenu := U_MenuDef()
+
+// In TLPP, use a namespace
+// Local aMenu := custom.modulo.MenuDef()
 ```
