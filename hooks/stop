@@ -5,26 +5,34 @@
 # Converts the session's pending sources back to Windows-1252 at the end of
 # the turn. post-tool-use (each Write|Edit|MultiEdit of a source the converter
 # handles) and post-tool-use-read (a Read of a Windows-1252 source, where
-# Claude is told to run --to-utf8) put them on
+# Claude is told to run --to-utf8) put their absolute paths on
 # ${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}/advpl-specialist-pending/<session_id>
 # (advpl_pending_list in post-tool-use). Converting once at the end of the
 # turn, not after each edit, keeps the source in UTF-8 while Claude edits it:
 # Claude Code's Edit refuses a file that is not valid UTF-8.
 #
 # By hook_event_name of the stdin JSON:
-#   Stop        background_tasks not empty: a background agent or shell may
-#               still edit those files, so nothing is done and the list stays
-#               for a later Stop. Empty or absent: the files are converted.
-#   SessionEnd  the files are converted.
+#   Stop        agent work among background_tasks (a background subagent,
+#               teammate, workflow... may still edit those files): nothing is
+#               converted, the list stays for a later Stop and, when some
+#               listed source is still in UTF-8, a systemMessage says so.
+#               Only "shell", "monitor" and "MCP task" entries are not agent
+#               work; a missing or any other type is (conservative). No agent
+#               work, an empty array or no background_tasks: converted.
+#   SessionEnd  converted.
 #   any other   nothing is done (SubagentStop is not registered: the main
 #               agent's Stop converts what its subagents edited).
-# Conversion: the list is taken over (renamed) first, so a line appended
-# meanwhile waits for the next Stop. Every listed path, duplicates dropped,
-# that is still a readable regular file goes through one convert-encoding.sh
-# --translit run; the converter leaves alone the extensions it does not
-# handle ("skipped") and the files already in Windows-1252. A file with U+FFFD
-# bytes (EF BF BD) is not converted, as post-tool-use announced: "?" would
-# hide the corruption from ADV014. Then the taken list is removed.
+# Conversion: the list is first renamed to a work file <list>.<pid>, so a
+# line appended meanwhile waits for the next run. Work files left by a run
+# that was killed (SessionEnd has a 1.5 s default budget, which a plugin
+# hook's timeout cannot raise) are taken in too, and every work file is
+# removed only after the conversion. Each listed path, duplicates dropped,
+# that is absolute (advpl_is_abs_path: a relative one would resolve against
+# this hook's working directory) and still a readable regular file goes
+# through one convert-encoding.sh --translit run; the converter leaves alone
+# the extensions it does not handle ("skipped") and the files already in
+# Windows-1252. A valid UTF-8 file holding U+FFFD (EF BF BD) is not converted,
+# as post-tool-use announced: "?" would hide the corruption from ADV014.
 # Notes: one line per U+FFFD file and per "translit:" or "failed:" line of the
 # converter's report. On Stop they reach the user as {"systemMessage": "..."}
 # on stdout: the hooks reference lists systemMessage among the fields every
@@ -32,8 +40,7 @@
 # output, so there the notes go to stderr. Never "decision" nor
 # additionalContext: on Stop both make Claude continue the turn.
 #
-# Never blocks: always exit 0. A single converter run keeps SessionEnd within
-# its 1.5 s default budget for the usual handful of files.
+# Never blocks: always exit 0.
 
 set -u
 
@@ -45,27 +52,66 @@ esac
 # shellcheck source=/dev/null
 . "$HOOK_DIR/post-tool-use" 2>/dev/null || exit 0
 
-# background_busy JSON: succeeds when background_tasks is a non-empty array.
-background_busy() {
+# agents_busy JSON: succeeds when background_tasks holds agent work, i.e. an
+# entry whose type is not "shell", "monitor" nor "MCP task" (types listed by
+# the hooks reference: shell, subagent, monitor, workflow, teammate, cloud
+# session, MCP task; a missing type or a non-object entry counts as agent).
+agents_busy() {
   local n=""
   if [ "${ADVPL_HOOK_NO_JQ:-0}" != 1 ] && command -v jq >/dev/null 2>&1; then
-    n=$(printf '%s' "$1" | jq -r '(.background_tasks // []) | length' 2>/dev/null) || n=""
+    n=$(printf '%s' "$1" | jq -r '[(.background_tasks // [])[] | (.type? // "")
+      | select(. != "shell" and . != "monitor" and . != "MCP task")] | length' 2>/dev/null) || n=""
     n=${n%$'\r'}   # jq.exe on Windows: CRLF
   fi
   case $n in
     0) return 1 ;;
     [1-9]*) return 0 ;;
   esac
-  # Without jq: the first "background_tasks" key (an escaped occurrence inside
-  # a string is followed by \" and never matches), with the input joined into
-  # one line because the array may span several; busy when the first
-  # non-blank character after its "[" is not "]".
+  # Without jq: the input joined into one line (the array may span several),
+  # the first "background_tasks" key (an escaped occurrence inside a string is
+  # followed by \" and never matches), then its array scanned with strings
+  # skipped whole, so "]", "}" or "type" inside a description do not count.
   printf '%s\n' "$1" | awk '
     { s = s $0 " " }
     END {
-      if (!match(s, /"background_tasks"[ \t\r]*:[ \t\r]*\[[ \t\r]*/)) exit 1
-      exit (substr(s, RSTART + RLENGTH, 1) == "]")
+      if (!match(s, /"background_tasks"[ \t\r]*:[ \t\r]*\[/)) exit 1
+      n = length(s); i = RSTART + RLENGTH; depth = 1; agent = 0
+      while (i <= n && depth > 0) {
+        c = substr(s, i, 1)
+        if (c == "\"") {
+          str = ""
+          for (i++; i <= n; i++) {
+            c = substr(s, i, 1)
+            if (c == "\\") { str = str c substr(s, i + 1, 1); i++; continue }
+            if (c == "\"") break
+            str = str c
+          }
+          j = i + 1
+          while (j <= n && index(" \t\r", substr(s, j, 1)) > 0) j++
+          if (substr(s, j, 1) == ":") key = str
+          else if (depth == 2 && key == "type") { type = str; typed = 1 }
+          else if (depth == 1) agent = 1
+        } else if (c == "{" || c == "[") {
+          if (depth == 1) { if (c == "[") agent = 1; key = ""; type = ""; typed = 0 }
+          depth++
+        } else if (c == "}" || c == "]") {
+          depth--
+          if (depth == 1 && c == "}" && (!typed || (type != "shell" && type != "monitor" && type != "MCP task")))
+            agent = 1
+        } else if (depth == 1 && index(" \t\r,", c) == 0) agent = 1
+        i++
+      }
+      exit !agent
     }'
+}
+
+# listed_files WORK...: the absolute paths of the work files, duplicates
+# dropped, that are still readable regular files, one per line.
+listed_files() {
+  local p
+  cat -- "$@" 2>/dev/null | awk '!seen[$0]++' | while IFS= read -r p; do
+    if advpl_is_abs_path "$p" && [ -f "$p" ] && [ -r "$p" ]; then printf '%s\n' "$p"; fi
+  done
 }
 
 # add_note TEXT: appends one line to $notes (advpl_stop's local).
@@ -75,30 +121,53 @@ add_note() {
 }
 
 advpl_stop() {
-  local input list event work paths p files report rc line notes=""
+  local input event list work w p n report rc line works files notes=""
   input=$(cat)
-  list=$(advpl_pending_list "$input")
-  [ -f "$list" ] || return 0
   event=$(advpl_hook_string .hook_event_name hook_event_name "$input")
   case $event in
-    Stop) if background_busy "$input"; then return 0; fi ;;
-    SessionEnd) ;;
+    Stop | SessionEnd) ;;
     *) return 0 ;;
   esac
-  work="$list.$$"
-  mv -f -- "$list" "$work" 2>/dev/null || return 0
-  paths=$(awk '!seen[$0]++' <"$work")
-  rm -f -- "$work"
+  list=$(advpl_pending_list "$input")
+
+  if [ "$event" = Stop ] && agents_busy "$input"; then
+    files=()
+    while IFS= read -r p; do
+      [ -z "$p" ] || files[${#files[@]}]=$p
+    done <<<"$(listed_files "$list" "$list".*)"
+    n=0
+    if [ "${#files[@]}" -gt 0 ]; then
+      n=$(convert_encoding --dry-run --translit -- "${files[@]}" 2>/dev/null |
+        grep -c -e '^converted: ' -e '^translit: ')
+    fi
+    if [ "$n" -gt 0 ]; then
+      printf '{"systemMessage":"%s"}\n' \
+        "advpl-specialist: $n fonte(s) ainda em UTF-8; a reconversao para Windows-1252 ocorre quando as tarefas em segundo plano terminarem"
+    fi
+    return 0
+  fi
+
+  if [ -f "$list" ]; then
+    work="$list.$$"
+    [ ! -e "$work" ] || work="$list.$$-$RANDOM"
+    mv -f -- "$list" "$work" 2>/dev/null
+  fi
+  works=()
+  for w in "$list".*; do
+    [ ! -f "$w" ] || works[${#works[@]}]=$w
+  done
+  [ "${#works[@]}" -gt 0 ] || return 0
 
   files=()
   while IFS= read -r p; do
-    [ -n "$p" ] && [ -f "$p" ] && [ -r "$p" ] || continue
-    if grep -q -e "$ADVPL_FFFD" -- "$p" 2>/dev/null; then
+    [ -n "$p" ] || continue
+    if grep -q -e "$ADVPL_FFFD" -- "$p" 2>/dev/null &&
+      advpl_utf8_fffd "$p" "$(convert_encoding --dry-run -- "$p" 2>/dev/null)"; then
       add_note "advpl-specialist: reconversao para Windows-1252 nao executada em $p: o arquivo contem U+FFFD (bytes EF BF BD); restaure os caracteres originais e rode convert-encoding.sh nele"
       continue
     fi
     files[${#files[@]}]=$p
-  done <<<"$paths"
+  done <<<"$(listed_files "${works[@]}")"
 
   if [ "${#files[@]}" -gt 0 ]; then
     report=$(convert_encoding --translit -- "${files[@]}" 2>/dev/null)
@@ -121,6 +190,7 @@ $(convert_encoding --translit -- "$p" 2>/dev/null)"
       esac
     done <<<"$report"
   fi
+  rm -f -- "${works[@]}"
 
   [ -n "$notes" ] || return 0
   if [ "$event" = Stop ]; then

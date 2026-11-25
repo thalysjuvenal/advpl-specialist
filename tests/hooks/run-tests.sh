@@ -86,21 +86,28 @@ pending_count() {
   if [ -f "$PEND_DIR/$SID" ]; then wc -l <"$PEND_DIR/$SID" | tr -d ' '; else echo 0; fi
 }
 pending_gone() { [ ! -e "$PEND_DIR/$SID" ]; }
+# pending_none: neither the list nor a work file ($SID.*) of the session is left
+pending_none() {
+  local w
+  for w in "$PEND_DIR/$SID" "$PEND_DIR/$SID".*; do [ ! -e "$w" ] || return 1; done
+}
 # pending_set PATH...: the session's list, written by hand
 pending_set() { mkdir -p "$PEND_DIR" && printf '%s\n' "$@" >"$PEND_DIR/$SID"; }
 
-# stop_json EVENT [BG]: payload of EVENT (Stop, SessionEnd or another one) for
-# session $SID. BG: "busy" (one task in flight), "absent" (no
-# background_tasks key) or empty (no task). last_assistant_message carries an
-# escaped decoy "background_tasks" with the opposite value, before the real key.
+# Background task entries (background_tasks of the Stop input)
+# (a shell task whose strings and nested object mention another "type")
+T_SHELL='{"id":"b1","type":"shell","status":"running","description":"tail ] } \"type\": \"subagent\"","command":"echo \"type\":\"subagent\" [x]","meta":{"type":"subagent","tags":["]","}"]}}'
+T_SUBAGENT='{"id":"b2","type":"subagent","status":"running","description":"revisa os fontes","agent_type":"code-reviewer"}'
+
+# stop_json EVENT [TASKS]: payload of EVENT (Stop, SessionEnd or another one)
+# for session $SID. TASKS: the raw background_tasks array ("[]" when omitted)
+# or "absent" (no key). last_assistant_message carries escaped decoy
+# "background_tasks" keys before the real one, an empty array first (a parser
+# that took it would never defer), then a subagent.
 stop_json() {
-  local bg='"background_tasks":[],' decoy='[{\"id\":\"x\"}]'
-  case ${2:-} in
-    busy)
-      bg='"background_tasks":[{"id":"b1","type":"shell","status":"running","description":"tail logs","command":"tail -f log"}],'
-      decoy='[]' ;;
-    absent) bg='' ;;
-  esac
+  local tasks="${2:-[]}" bg decoy='[] e \"background_tasks\": [{\"type\":\"subagent\"}]'
+  bg="\"background_tasks\":$tasks,"
+  [ "$tasks" != absent ] || bg=''
   if [ "$1" = SessionEnd ]; then
     printf '{"session_id":"%s","transcript_path":"/t.jsonl","cwd":"%s","hook_event_name":"SessionEnd","reason":"other"}' \
       "$(json_quote "$SID")" "$(json_quote "$TMP_DIR")"
@@ -110,7 +117,7 @@ stop_json() {
   fi
 }
 
-# stop_hook EVENT [BG]: run hooks/stop; sets RC, OUT, ERR and SYS (decoded
+# stop_hook EVENT [TASKS]: run hooks/stop; sets RC, OUT, ERR and SYS (decoded
 # systemMessage)
 stop_hook() {
   stop_json "$@" | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>"$TMP_DIR/stop.err"
@@ -793,8 +800,11 @@ case_stop() {
   printf '#define CMSG "a\347\343o"\n' >"$d/b.esperado"
   utf8_pair
   pending_set "$a" "$gone" "$b" "$a"
-  stop_hook Stop busy
-  check "stop-ocupado: exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  stop_hook Stop "[$T_SUBAGENT]"
+  check "stop-ocupado: exit 0 sem stderr" [ "$RC$ERR" = 0 ]
+  check "stop-ocupado: JSON valido (so systemMessage)" valid_stop_json "$OUT"
+  check "stop-ocupado: avisa os 2 fontes ainda em UTF-8" \
+    contains "$SYS" "2 fonte(s) ainda em UTF-8; a reconversao para Windows-1252 ocorre quando as tarefas em segundo plano terminarem"
   check "stop-ocupado: nada convertido" has_bytes "$UTF8_ACENTO" "$a"
   check "stop-ocupado: .ch tambem nao" has_bytes "$UTF8_ACENTO" "$b"
   check "stop-ocupado: lista mantida" [ "$(pending_count)" = 4 ]
@@ -850,6 +860,161 @@ case_sessao() {
   SID="$saved"
 }
 
+case_stop_tarefas() {
+  # only agent work in background_tasks defers the conversion; shell, monitor
+  # and MCP task entries do not; a missing or unknown type counts as agent
+  local d="$TMP_DIR/$MODE/stop-tarefas" f c t
+  mkdir -p "$d"; f="$d/FATA050.prw"; c="$d/FATA051.prw"
+  new_session stop-tarefas
+  utf8_one() { printf '// importa\303\247\303\243o\n' >"$f"; pending_set "$f"; }
+  utf8_one
+  stop_hook Stop "[$T_SHELL]"
+  check "tarefas-shell: exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "tarefas-shell: so shell converte" has_bytes "$CP_ACENTO" "$f"
+  check "tarefas-shell: lista removida" pending_gone
+  utf8_one
+  stop_hook Stop '[{"id":"m1","type":"monitor","status":"running","command":"tail -f x"},{"id":"p1","type":"MCP task","status":"running","server":"s","tool":"t"}]'
+  check "tarefas-monitor-mcp: converte" has_bytes "$CP_ACENTO" "$f"
+  for t in "$T_SUBAGENT" '{"id":"t1","type":"teammate"}' '{"id":"w1","type":"workflow","name":"w"}' \
+    '{"id":"c1","type":"cloud session"}' '{"id":"x1","status":"running"}' '{"id":"u1","type":"novo-tipo"}' \
+    "$T_SHELL,$T_SUBAGENT"; do
+    utf8_one
+    stop_hook Stop "[$t]"
+    check "tarefas-adia ($t): exit 0 sem stderr" [ "$RC$ERR" = 0 ]
+    check "tarefas-adia ($t): systemMessage com 1 fonte" contains "$SYS" "1 fonte(s) ainda em UTF-8"
+    check "tarefas-adia ($t): nada convertido, lista mantida" has_bytes "$UTF8_ACENTO" "$f"
+    check "tarefas-adia ($t): lista mantida" pending_has "$f"
+  done
+  # deferred with nothing in UTF-8 (only a Windows-1252 source listed): silent
+  legacy_cp1252 "$c"; pending_set "$c"
+  stop_hook Stop "[$T_SUBAGENT]"
+  check "tarefas-adia-sem-utf8: exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "tarefas-adia-sem-utf8: lista mantida" pending_has "$c"
+  rm -f "$PEND_DIR/$SID"
+}
+
+case_caminho_relativo() {
+  # only absolute paths go on the list, and Stop never resolves a listed path
+  # against its own working directory
+  local d="$TMP_DIR/$MODE/relativo" a out
+  mkdir -p "$d"; a="$d/FATA041.prw"
+  new_session relativo
+  printf '// importa\303\247\303\243o\n' >"$d/FATA040.prw"
+  cd "$d" || return
+  pre FATA040.prw Write
+  post FATA040.prw Write
+  cd "$TMP_DIR" || return
+  check "relativo: post com caminho relativo nao entra na lista" pending_gone
+  printf '// importa\303\247\303\243o\n' >"$a"
+  pending_set FATA040.prw "$a"
+  cd "$d" || return
+  stop_hook Stop
+  cd "$TMP_DIR" || return
+  check "relativo: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "relativo: entrada relativa nao convertida no cwd do Stop" has_bytes "$UTF8_ACENTO" "$d/FATA040.prw"
+  check "relativo: entrada absoluta convertida" has_bytes "$CP_ACENTO" "$a"
+  check "relativo: lista removida" pending_gone
+  # advpl_pending_add: absolute = "/..." or a Windows drive path "C:\..." / "c:/..."
+  # shellcheck disable=SC2016 # $1, $p and $SID_JSON belong to the inner script
+  out="$(SID_JSON="{\"session_id\":\"$SID\"}" ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" -c '
+    . "$1"
+    for p in "/abs/F.prw" "C:\\dir\\F.prw" "c:/dir/F.prw" "F.prw" "dir/F.prw" "C:F.prw" "\\\\srv\\s\\F.prw" "./F.prw"; do
+      advpl_pending_add "$SID_JSON" "$p"
+    done' _ "$POST" 2>&1)"
+  check "relativo: advpl_pending_add sem saida" [ -z "$out" ]
+  check "relativo: so caminhos absolutos (/ e unidade do Windows) na lista" \
+    [ "$(cat "$PEND_DIR/$SID" 2>/dev/null)" = '/abs/F.prw
+C:\dir\F.prw
+c:/dir/F.prw' ]
+  rm -f "$PEND_DIR/$SID"
+}
+
+case_stop_interrompido() {
+  # a run killed mid-conversion (SessionEnd budget) leaves its work file
+  # behind: the next Stop folds it in, converts its paths and removes it
+  local d="$TMP_DIR/$MODE/interrompido" a b
+  mkdir -p "$d" "$PEND_DIR"; a="$d/FATA060.prw"; b="$d/FATA061.prw"
+  new_session interrompido
+  printf '// importa\303\247\303\243o\n' >"$a"
+  printf '%s\n' "$a" >"$PEND_DIR/$SID.4242"
+  stop_hook Stop "[$T_SUBAGENT]"
+  check "interrompido: adiado conta o arquivo de trabalho" contains "$SYS" "1 fonte(s) ainda em UTF-8"
+  check "interrompido: adiado mantem o arquivo de trabalho" [ -f "$PEND_DIR/$SID.4242" ]
+  stop_hook Stop
+  check "interrompido: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "interrompido: caminho do arquivo de trabalho convertido" has_bytes "$CP_ACENTO" "$a"
+  check "interrompido: arquivo de trabalho removido" [ ! -e "$PEND_DIR/$SID.4242" ]
+  # a leftover and a fresh list together
+  printf '// importa\303\247\303\243o\n' >"$a"; printf '// importa\303\247\303\243o\n' >"$b"
+  printf '%s\n' "$a" >"$PEND_DIR/$SID.4243"; pending_set "$b"
+  stop_hook SessionEnd
+  check "interrompido+lista: os dois convertidos" has_bytes "$CP_ACENTO" "$a"
+  check "interrompido+lista: lista nova convertida" has_bytes "$CP_ACENTO" "$b"
+  check "interrompido+lista: nada sobra" pending_none
+}
+
+case_stop_fallback() {
+  # the converter run over every file exits 2 (a path vanished meanwhile):
+  # Stop goes one file at a time; the work file exists while the converter
+  # runs and is removed only after
+  local d="$TMP_DIR/$MODE/fallback" s a e
+  s="$d/root/skills/advpl-code-generation/scripts"
+  mkdir -p "$s"; a="$d/FATA070.prw"; e="$d/FATA071.prw"
+  new_session fallback
+  # shellcheck disable=SC2016 # $@, $a, $n belong to the generated wrapper
+  printf '#!/bin/sh\nls "%s" | grep -c -F -- "%s." >>"%s/runs"\nn=0\nfor a in "$@"; do case $a in -*) ;; *) n=$((n + 1)) ;; esac; done\n[ "$n" -le 1 ] || { echo "convert-encoding: cannot read PATH: x" >&2; exit 2; }\nexec "%s" "%s" "$@"\n' \
+    "$PEND_DIR" "$SID" "$d" "$HOOK_BASH" "$CONV" >"$s/convert-encoding.sh"
+  printf '// importa\303\247\303\243o\n' >"$a"
+  printf '// foguete \360\237\232\200\n' >"$e"
+  pending_set "$a" "$e"
+  CLAUDE_PLUGIN_ROOT="$d/root" stop_hook Stop
+  check "fallback: exit 0 sem stderr" [ "$RC$ERR" = 0 ]
+  check "fallback: 3 execucoes (1 com todos + 1 por arquivo)" [ "$(wc -l <"$d/runs" | tr -d ' ')" = 3 ]
+  check "fallback: arquivo de trabalho presente em cada execucao" [ "$(sort -u "$d/runs")" = 1 ]
+  check "fallback: .prw convertido" has_bytes "$CP_ACENTO" "$a"
+  check "fallback: emoji convertido para ?" [ "$(cat "$e")" = "// foguete ?" ]
+  check "fallback: systemMessage com o translit:" contains "$SYS" "translit: $e (1)"
+  check "fallback: lista e arquivo de trabalho removidos depois" pending_none
+}
+
+case_fffd_cp1252() {
+  # Windows-1252 file holding the bytes EF BF BD as legacy text: not U+FFFD
+  # (the file is not UTF-8), so no notice, and the Stop leaves it as it is
+  local d="$TMP_DIR/$MODE/fffd-cp1252" f
+  mkdir -p "$d"; f="$d/FATA080.prw"
+  new_session fffd-cp1252
+  printf '#include "totvs.ch"\n// legado %s e a\347\343o\nUser Function FATA080()\n\tLocal nX := 0\nReturn nX\n' "$FFFD" >"$f"
+  pre "$f"
+  set_line "$f" 4 "$(printf '\tLocal nX := 1')"
+  post "$f"
+  check "fffd-cp1252: post exit 0 sem saida (sem aviso de U+FFFD)" [ "$RC$OUT$ERR" = 0 ]
+  check "fffd-cp1252: na lista" pending_has "$f"
+  cp "$f" "$d/antes"
+  stop_hook Stop
+  check "fffd-cp1252: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "fffd-cp1252: bytes identicos" cmp -s "$f" "$d/antes"
+  check "fffd-cp1252: lista removida" pending_gone
+}
+
+case_avisos_mesclados() {
+  # lint warning and the Windows-1252 warning of the same edit: one JSON
+  local d="$TMP_DIR/$MODE/mesclados" f ctx
+  mkdir -p "$d"; f="$d/FATA090.prw"
+  new_session mesclados
+  printf '#include "totvs.ch"\n\nUser Function FATA090()\n\tLocal nX := 0\n\tLocal lOk := .T.\nReturn nX\n' >"$f"
+  pre "$f"
+  insert_after "$f" 5 "$(printf '\tnX := IIf(lOk, 1, 2) // \360\237\232\200')"
+  post "$f"
+  ctx="$(json_context "$OUT")"
+  check "mesclados: exit 0 sem stderr" [ "$RC$ERR" = 0 ]
+  check "mesclados: um JSON valido" valid_hook_json "$OUT"
+  check "mesclados: aviso do lint (linha 6)" contains "$ctx" "FATA090.prw:6: warning ADV009"
+  check "mesclados: aviso de Windows-1252" contains "$ctx" "$f tem caracteres sem representacao em Windows-1252"
+  check "mesclados: lint primeiro, depois o aviso de Windows-1252" \
+    [ "$(printf '%s\n' "$ctx" | grep -n 'warning ADV009' | cut -d: -f1)" -lt \
+      "$(printf '%s\n' "$ctx" | grep -n 'sem representacao' | cut -d: -f1)" ]
+}
+
 run_cases() {
   echo "[parser: $MODE]"
   case_write_novo
@@ -877,6 +1042,12 @@ run_cases() {
   case_tres_edits
   case_stop
   case_sessao
+  case_stop_tarefas
+  case_caminho_relativo
+  case_stop_interrompido
+  case_stop_fallback
+  case_fffd_cp1252
+  case_avisos_mesclados
 }
 
 check_hooks_json() {
@@ -952,14 +1123,15 @@ crlf_json() {
     "$1" "${3:-Edit}" "$(json_quote "$2")"
 }
 
-# crlf_stop_json busy|empty: Stop payload without session_id, one key per
-# line, CRLF line endings, background_tasks spread over several lines
+# crlf_stop_json TYPE: Stop payload without session_id, one key per line,
+# CRLF line endings, background_tasks spread over several lines: one task of
+# TYPE (subagent, shell) or none (empty)
 crlf_stop_json() {
   local nl=$'\r\n' bg
-  if [ "$1" = busy ]; then
-    bg="[$nl    {$nl      \"id\": \"b1\",$nl      \"type\": \"subagent\"$nl    }$nl  ]"
-  else
+  if [ "$1" = empty ]; then
     bg="[$nl  ]"
+  else
+    bg="[$nl    {$nl      \"id\": \"b1\",$nl      \"type\": \"$1\",$nl      \"description\": \"a ] b }\"$nl    }$nl  ]"
   fi
   printf '{\r\n  "hook_event_name": "Stop",\r\n  "stop_hook_active": false,\r\n  "background_tasks": %s,\r\n  "session_crons": []\r\n}\r\n' "$bg"
 }
@@ -1021,14 +1193,16 @@ check_crlf() {
       [ "$(cat "$PEND_DIR/nosession" 2>/dev/null)" = "$f
 $d/FATA009.prw" ]
     cp "$d/FATA009.prw" "$d/FATA009.original"
-    crlf_stop_json busy | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>&1
-    check "crlf-$p: Stop com tarefa exit 0 sem saida" [ "$?$(cat "$TMP_DIR/stop.out")" = 0 ]
-    check "crlf-$p: Stop com tarefa (array em varias linhas) nao converte" has_bytes "$UTF8_ACENTO" "$f"
-    check "crlf-$p: Stop com tarefa mantem a lista" [ -f "$PEND_DIR/nosession" ]
-    crlf_stop_json empty | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>&1
-    check "crlf-$p: Stop vazio (array em varias linhas) exit 0 sem saida" [ "$?$(cat "$TMP_DIR/stop.out")" = 0 ]
-    check "crlf-$p: Stop vazio converte" has_bytes "$CP_ACENTO" "$f"
-    check "crlf-$p: Stop vazio mantem o CP1252 lido" cmp -s "$d/FATA009.prw" "$d/FATA009.original"
+    crlf_stop_json subagent | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>&1
+    check "crlf-$p: Stop com subagente exit 0" [ "$?" = 0 ]
+    check "crlf-$p: Stop com subagente avisa 1 fonte em UTF-8 (o CP1252 lido nao conta)" \
+      contains "$(cat "$TMP_DIR/stop.out")" '"systemMessage":"advpl-specialist: 1 fonte(s) ainda em UTF-8'
+    check "crlf-$p: Stop com subagente (array em varias linhas) nao converte" has_bytes "$UTF8_ACENTO" "$f"
+    check "crlf-$p: Stop com subagente mantem a lista" [ -f "$PEND_DIR/nosession" ]
+    crlf_stop_json shell | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>&1
+    check "crlf-$p: Stop so com shell (array em varias linhas) exit 0 sem saida" [ "$?$(cat "$TMP_DIR/stop.out")" = 0 ]
+    check "crlf-$p: Stop so com shell converte" has_bytes "$CP_ACENTO" "$f"
+    check "crlf-$p: Stop so com shell mantem o CP1252 lido" cmp -s "$d/FATA009.prw" "$d/FATA009.original"
     check "crlf-$p: lista removida" [ ! -e "$PEND_DIR/nosession" ]
   done
   PATH="$saved_path"

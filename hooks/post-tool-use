@@ -9,14 +9,16 @@
 #      listed files back to Windows-1252 at the end of the turn. The file is
 #      not converted here: Claude Code's Edit refuses a file that is not valid
 #      UTF-8, so a source converted after each Edit could not take the next one.
-#   2. Notes on that source (non-blocking):
-#      - U+FFFD bytes (EF BF BD): the end-of-turn conversion skips the file
-#        too, so the corruption is not transliterated away; ADV014 reports it
-#        in step 4 when it is on an introduced line (U+FFFD already in the
-#        snapshot is legacy).
-#      - otherwise, characters without a Windows-1252 representation (the dry
-#        run reports "failed: FILE (incompatible char)"): they become "?" at
-#        the end of the turn, so Claude is asked to replace them now.
+#   2. Notes on that source (non-blocking), when it is valid UTF-8 with
+#      characters outside Windows-1252 (the dry run reports "failed: FILE
+#      (incompatible char)"):
+#      - U+FFFD bytes (EF BF BD) among them: the end-of-turn conversion skips
+#        the file too, so the corruption is not transliterated away; ADV014
+#        reports it in step 4 when it is on an introduced line (U+FFFD
+#        already in the snapshot is legacy). In a Windows-1252 file the same
+#        bytes are legacy text, not U+FFFD: no note.
+#      - otherwise: they become "?" at the end of the turn, so Claude is asked
+#        to replace them now.
 #   3. Introduced lines: numbers of the lines of the file whose text occurs
 #      nowhere in the snapshot. Both are compared as Windows-1252: copies named
 #      with the file's extension go through convert-encoding.sh --translit, so
@@ -85,16 +87,35 @@ advpl_pending_list() {
   printf '%s/advpl-specialist-pending/%s' "${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}" "${id:-nosession}"
 }
 
+# advpl_is_abs_path PATH: succeeds for "/..." or a Windows drive path "C:\..."
+# or "C:/...". The pending list holds only those: hooks/stop runs in a working
+# directory of its own and must never resolve a relative path against it.
+advpl_is_abs_path() {
+  case $1 in /* | [A-Za-z]:[\\/]*) return 0 ;; esac
+  return 1
+}
+
 # advpl_pending_add JSON FILE: puts FILE on the session's list unless it is
 # already there, one path per line. Hooks of parallel tool calls may append at
 # the same time: each appends one line with a single printf >> (hooks/stop
-# drops duplicates anyway). A path with a line break cannot be listed.
+# drops duplicates anyway). A relative path or one with a line break is not
+# listed.
 advpl_pending_add() {
   local list
+  advpl_is_abs_path "$2" || return 1
   case $2 in *$'\n'*) return 1 ;; esac
   list=$(advpl_pending_list "$1")
   if [ -f "$list" ] && grep -qxF -e "$2" -- "$list" 2>/dev/null; then return 0; fi
   (umask 077 && mkdir -p "${list%/*}" && printf '%s\n' "$2" >>"$list") 2>/dev/null
+}
+
+# advpl_utf8_fffd FILE REPORT: succeeds when FILE, whose strict --dry-run
+# report is REPORT, is valid UTF-8 holding U+FFFD (bytes EF BF BD). U+FFFD has
+# no Windows-1252 form, so such a file always reports "failed: FILE
+# (incompatible char)"; the same bytes in a Windows-1252 file (reported
+# "already-cp1252") are legacy text, not U+FFFD.
+advpl_utf8_fffd() {
+  [ "$2" = "failed: $1 (incompatible char)" ] && grep -q -e "$ADVPL_FFFD" -- "$1" 2>/dev/null
 }
 
 # introduced_lines SNAPSHOT FILE: 1-based numbers of the FILE lines whose text
@@ -157,7 +178,7 @@ case $report in
   "" | "skipped: "*) ;;   # not a source the converter handles
   *)
     advpl_pending_add "$input" "$file"
-    if grep -q -e "$ADVPL_FFFD" -- "$file"; then
+    if advpl_utf8_fffd "$file" "$report"; then
       notes="advpl-specialist: conversao para Windows-1252 nao executada em $file: o arquivo contem U+FFFD (bytes EF BF BD); restaure os caracteres originais (com U+FFFD, a reconversao do fim do turno tambem pula o arquivo)"
     elif [ "$report" = "failed: $file (incompatible char)" ]; then
       notes="advpl-specialist: $file tem caracteres sem representacao em Windows-1252; no fim do turno, quando o plugin reconverte o arquivo para Windows-1252, eles viram '?'. Troque-os agora por caracteres que existem no Windows-1252"
