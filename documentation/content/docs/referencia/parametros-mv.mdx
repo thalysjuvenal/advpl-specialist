@@ -101,10 +101,11 @@ PutMV("MV_ESTADO", "RJ")  // Altera o parametro de estado para "RJ"
 
 ---
 
-## Leitura Direta da SX6
+## Leitura Direta da SX6 (nao recomendada)
 
-Em situacoes especiais (como consultas em lote), e possivel acessar a SX6 diretamente:
+> **Aviso**: o acesso direto a SX6 via `DbSelectArea`/`DbSeek` e o padrao desencorajado (bloqueado pelas regras SonarQube da TOTVS). Para ler ou gravar um parametro, use `SuperGetMV()`, `GetMV()` e `PutMV()`; para checar existencia, `FWSX6Util():ExistsParam()`. Nao ha API documentada para listar parametros por prefixo, entao o exemplo abaixo serve apenas para ilustrar a estrutura da tabela.
 
+{/* advpl-lint: anti-exemplo */}
 ```c
 // Listar parametros MV por prefixo
 User Function ListMVParams(cPrefix)
@@ -115,10 +116,11 @@ User Function ListMVParams(cPrefix)
     DbSeek(xFilial("SX6") + cPrefix)
 
     While !Eof() .And. Left(AllTrim(SX6->X6_VAR), Len(cPrefix)) == cPrefix
-        ConOut("Param: " + AllTrim(SX6->X6_VAR) + ;
-               " | Type: " + SX6->X6_TIPO + ;
-               " | Value: " + AllTrim(SX6->X6_CONTEUD) + ;
-               " | Desc: " + AllTrim(SX6->X6_DESCRIC))
+        FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, ;
+            "Param: " + AllTrim(SX6->X6_VAR) + ;
+            " | Type: " + SX6->X6_TIPO + ;
+            " | Value: " + AllTrim(SX6->X6_CONTEUD) + ;
+            " | Desc: " + AllTrim(SX6->X6_DESCRIC))
         DbSkip()
     EndDo
 
