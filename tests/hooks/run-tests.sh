@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Runner for hooks/pre-tool-use + hooks/post-tool-use + hooks/post-tool-use-read
-# + hooks/stop: simulates the stdin JSON Claude Code sends to
-# PreToolUse/PostToolUse for Write|Edit|MultiEdit, to PostToolUse for Read and
-# to Stop/SessionEnd, in a temporary directory, and checks exit codes,
-# stderr/stdout, file bytes and the session's pending list (files converted
-# back to Windows-1252 at the end of the turn). Also checks hooks/hooks.json
-# and hooks/session-start.
+# + hooks/post-tool-use-bash + hooks/stop: simulates the stdin JSON Claude Code
+# sends to PreToolUse/PostToolUse for Write|Edit|MultiEdit, to PostToolUse for
+# Read and Bash and to Stop/SessionEnd, in a temporary directory, and checks
+# exit codes, stderr/stdout, file bytes and the session's pending list (files
+# converted back to Windows-1252 at the end of the turn). Also checks
+# hooks/hooks.json and hooks/session-start.
 #
 # Usage: bash tests/hooks/run-tests.sh
 #   HOOK_BASH  interpreter for the hooks (default /bin/bash: bash 3.2 on macOS)
@@ -21,6 +21,7 @@ HOOK_BASH="${HOOK_BASH:-/bin/bash}"
 PRE="$ROOT/hooks/pre-tool-use"
 POST="$ROOT/hooks/post-tool-use"
 READ="$ROOT/hooks/post-tool-use-read"
+BASHHOOK="$ROOT/hooks/post-tool-use-bash"
 STOP="$ROOT/hooks/stop"
 # the converter as the Read hint names it (symbolic links resolved)
 CONV="$(cd "$ROOT/skills/advpl-code-generation/scripts" && pwd -P)/convert-encoding.sh"
@@ -1015,6 +1016,163 @@ case_avisos_mesclados() {
       "$(printf '%s\n' "$ctx" | grep -n 'sem representacao' | cut -d: -f1)" ]
 }
 
+# --- PostToolUse(Bash): targets of convert-encoding.sh --to-utf8 --------------
+
+# json_text TEXT: TEXT as the body of a JSON string (\ and " escaped, line
+# breaks as \n)
+json_text() {
+  printf '%s\n' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' |
+    awk '{ printf "%s%s", (NR > 1 ? "\\n" : ""), $0 }'
+}
+
+# bash_json COMMAND [CWD]: PostToolUse payload of a Bash call run in CWD
+# ($TMP_DIR when omitted); the description (before the real key) and
+# tool_response carry an escaped "command" decoy with a --to-utf8 run of
+# /decoy.prw
+bash_json() {
+  local decoy='say \"command\": \"bash convert-encoding.sh --to-utf8 /decoy.prw\"'
+  printf '{"session_id":"%s","transcript_path":"/t.jsonl","cwd":"%s","permission_mode":"default","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"description":"%s","command":"%s"},"tool_response":{"stdout":"%s","stderr":"","interrupted":false,"isImage":false},"tool_use_id":"toolu_01"}' \
+    "$(json_quote "$SID")" "$(json_quote "${2-$TMP_DIR}")" "$decoy" "$(json_text "$1")" "$decoy"
+}
+
+# bash_hook COMMAND [CWD]: run post-tool-use-bash; sets RC, OUT, ERR
+bash_hook() {
+  bash_json "$@" | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$BASHHOOK" >"$TMP_DIR/bash.out" 2>"$TMP_DIR/bash.err"
+  RC=$?
+  OUT="$(cat "$TMP_DIR/bash.out")"
+  ERR="$(cat "$TMP_DIR/bash.err")"
+}
+
+case_bash_registra() {
+  # converter runs as Claude types them: every target with a lint extension
+  # goes on the list as an absolute path, and the hook prints nothing
+  local d="$TMP_DIR/$MODE/bash-registra"
+  mkdir -p "$d/sub" "$d/com espaco"
+  new_session bash-registra
+  bash_hook "bash \"$CONV\" --to-utf8 \"$d/FATA001.prw\""
+  check "bash-registra: exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "bash-registra: aspas duplas, caminho absoluto" pending_has "$d/FATA001.prw"
+  bash_hook "bash \"$CONV\" --to-utf8 sub/FATA002.PRW" "$d"
+  check "bash-registra: relativo vira absoluto com o cwd" pending_has "$d/sub/FATA002.PRW"
+  bash_hook "bash \"$CONV\" --to-utf8 ./FATA003.prx" "$d"
+  check "bash-registra: ./ do relativo removido" pending_has "$d/FATA003.prx"
+  bash_hook "bash '$CONV' --to-utf8 '$d/com espaco/FATA004.prw'"
+  check "bash-registra: aspas simples (caminho com espaco)" pending_has "$d/com espaco/FATA004.prw"
+  bash_hook "bash \"$CONV\" --to-utf8 \"$d/FATA005.tlpp\" \"$d/defs.TH\""
+  check "bash-registra: dois arquivos, o primeiro" pending_has "$d/FATA005.tlpp"
+  check "bash-registra: dois arquivos, o segundo (.TH)" pending_has "$d/defs.TH"
+  bash_hook "bash \"$CONV\" --dry-run --to-utf8 \"$d/FATA006.prw\""
+  check "bash-registra: --dry-run --to-utf8 tambem registra" pending_has "$d/FATA006.prw"
+  bash_hook "bash \"\${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/scripts/convert-encoding.sh\" --to-utf8 \"$d/FATA007.prw\""
+  check "bash-registra: \${CLAUDE_PLUGIN_ROOT} no caminho do script (passo dos comandos)" pending_has "$d/FATA007.prw"
+  bash_hook "\"$CONV\" --to-utf8 -- -FATA008.prw" "$d"
+  check "bash-registra: script executado direto, caminho com - depois de --" pending_has "$d/-FATA008.prw"
+  bash_hook "bash \"$CONV\" \\
+  --to-utf8\\
+  \"$d/FATA009.prw\" 2>&1"
+  check "bash-registra: linhas continuadas com \\ (com e sem espaco antes) e 2>&1" pending_has "$d/FATA009.prw"
+  bash_hook "cd \"$d\" && bash \"$CONV\" --to-utf8 \"$d/FATA010.prw\"; echo feito" "$d"
+  check "bash-registra: comando composto, caminho absoluto" pending_has "$d/FATA010.prw"
+  bash_hook "bash \"$CONV\" --to-utf8 \"C:\\\\src\\\\FATA011.prw\" 'D:\\src\\FATA012.tlpp'"
+  check "bash-registra: caminho do Windows entre aspas duplas (\\\\)" pending_has 'C:\src\FATA011.prw'
+  check "bash-registra: caminho do Windows entre aspas simples" pending_has 'D:\src\FATA012.tlpp'
+  bash_hook "bash \"$CONV\" --to-utf8 \"$d/FATA013.prw\" # converte (|) antes do Edit"
+  check "bash-registra: comentario no fim ignorado" pending_has "$d/FATA013.prw"
+  bash_hook "bash \"$CONV\" --to-utf8 $d/FATA#014.prw"
+  check "bash-registra: # no meio da palavra nao abre comentario" pending_has "$d/FATA#014.prw"
+  bash_hook "bash \"$CONV\" --to-utf8 \"$d/FATA001.prw\""
+  check "bash-registra: exit 0 sem saida no fim" [ "$RC$OUT$ERR" = 0 ]
+  check "bash-registra: 15 entradas, sem repeticao" [ "$(pending_count)" = 15 ]
+  check "bash-registra: o decoy fica de fora" not pending_has /decoy.prw
+}
+
+case_bash_nada() {
+  # nothing registered and nothing printed: no --to-utf8 run, no lint
+  # extension, expansions, constructs the hook cannot read, other commands
+  local d="$TMP_DIR/$MODE/bash-nada" f
+  mkdir -p "$d"; f="$d/FATA001.prw"
+  new_session bash-nada
+  legacy_cp1252 "$f"; cp "$f" "$d/original"
+  quiet_none() { [ "$RC$OUT$ERR" = 0 ] && pending_none; }
+  nada() { # nada LABEL COMMAND [CWD]; the list is cleared after each check
+    bash_hook "$2" "${3-$TMP_DIR}"
+    check "bash-nada: $1" quiet_none
+    rm -f "$PEND_DIR/$SID"
+  }
+  nada "sem --to-utf8" "bash \"$CONV\" \"$f\""
+  nada "--to-utf8 depois de -- (e um caminho)" "bash \"$CONV\" -- --to-utf8 \"$f\""
+  nada "arquivos nao ADVPL (.ch, .txt)" "bash \"$CONV\" --to-utf8 \"$d/defs.ch\" \"$d/notas.txt\""
+  nada "\$VAR entre aspas" "bash \"$CONV\" --to-utf8 \"\$DIR/FATA001.prw\""
+  nada "\$VAR em um argumento anula os outros" "bash \"$CONV\" --to-utf8 \"$f\" \$HOME/FATA002.prw"
+  nada "\${VAR}" "bash \"$CONV\" --to-utf8 \"\${DIR}/FATA001.prw\""
+  nada "glob *" "bash \"$CONV\" --to-utf8 \"$d\"/*.prw"
+  nada "glob ?" "bash \"$CONV\" --to-utf8 \"$d\"/FATA00?.prw"
+  nada "til" "bash \"$CONV\" --to-utf8 ~/FATA001.prw"
+  nada "chaves" "bash \"$CONV\" --to-utf8 \"$d\"/FATA00{1,2}.prw"
+  nada "\$(...)" "bash \"$CONV\" --to-utf8 \"\$(pwd)/FATA001.prw\""
+  nada "crase" "bash \"$CONV\" --to-utf8 \`pwd\`/FATA001.prw"
+  nada "\${VAR:-x} no script" "bash \"\${ROOT:-/x}/convert-encoding.sh\" --to-utf8 \"$f\""
+  nada "pipe" "bash \"$CONV\" --to-utf8 \"$f\" | tee log"
+  nada "segundo plano (&)" "bash \"$CONV\" --to-utf8 \"$f\" &"
+  nada "subshell" "(bash \"$CONV\" --to-utf8 \"$f\")"
+  nada "heredoc" "bash \"$CONV\" --to-utf8 \"$f\" <<EOF
+x
+EOF"
+  nada "aspas sem fim" "bash \"$CONV\" --to-utf8 \"$f"
+  nada "-r em diretorio" "bash \"$CONV\" --to-utf8 -r \"$d\""
+  nada "opcao desconhecida (erro de uso)" "bash \"$CONV\" --to-utf8 --force \"$f\""
+  nada "--translit com --to-utf8 (erro de uso)" "bash \"$CONV\" --translit --to-utf8 \"$f\""
+  nada "--help" "bash \"$CONV\" --to-utf8 --help \"$f\""
+  nada "relativo sem cwd" "bash \"$CONV\" --to-utf8 FATA001.prw" ""
+  nada "relativo com cwd relativo" "bash \"$CONV\" --to-utf8 FATA001.prw" "proj/src"
+  nada "relativo em comando composto (cd)" "cd \"$d\" && bash \"$CONV\" --to-utf8 FATA001.prw"
+  nada "echo do comando" "echo bash \"$CONV\" --to-utf8 \"$f\""
+  nada "grep com os dois nomes" "grep -n -- --to-utf8 \"$CONV\" \"$f\""
+  nada "comentario" "ls # bash \"$CONV\" --to-utf8 \"$f\""
+  nada "outro comando (ls)" "ls -la \"$d\""
+  nada "outro comando (git status)" "git status"
+  printf '{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{}}' |
+    ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$BASHHOOK" >"$TMP_DIR/bash.out" 2>&1
+  check "bash-nada: payload sem command" [ "$?$(cat "$TMP_DIR/bash.out")" = 0 ]
+  printf 'convert-encoding.sh --to-utf8 {"command":' |
+    ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$BASHHOOK" >"$TMP_DIR/bash.out" 2>&1
+  check "bash-nada: payload que nao e JSON" [ "$?$(cat "$TMP_DIR/bash.out")" = 0 ]
+  check "bash-nada: nada na lista" pending_none
+  check "bash-nada: arquivo intocado" cmp -s "$f" "$d/original"
+}
+
+case_bash_fluxo() {
+  # --to-utf8 through Bash with no Read before it and no Edit after it: the
+  # Bash hook alone puts the files on the list (it never runs the command),
+  # and Stop gives back the original Windows-1252 bytes
+  local d="$TMP_DIR/$MODE/bash-fluxo" a b c
+  mkdir -p "$d/sub"; a="$d/FATA001.prw"; b="$d/sub/FATA002.tlpp"; c="$d/FATA003.prw"
+  new_session bash-fluxo
+  legacy_cp1252 "$a"; cp "$a" "$d/a.original"
+  legacy_cp1252 "$b"; cp "$b" "$d/b.original"
+  legacy_cp1252 "$c"; cp "$c" "$d/c.original"
+  bash_hook "bash \"$CONV\" --to-utf8 \"$a\"; touch \"$d/executado\"" "$d"
+  check "bash-fluxo: o hook nao executa o comando" [ ! -e "$d/executado" ]
+  check "bash-fluxo: o hook nao converte" cmp -s "$a" "$d/a.original"
+  check "bash-fluxo: absoluto na lista" pending_has "$a"
+  # the runs themselves, as the Bash tool makes them
+  "$HOOK_BASH" "$CONV" --to-utf8 "$a" >/dev/null
+  (cd "$d" && "$HOOK_BASH" "$CONV" --to-utf8 sub/FATA002.tlpp >/dev/null)
+  bash_hook "bash \"$CONV\" --to-utf8 sub/FATA002.tlpp" "$d"
+  check "bash-fluxo: relativo na lista" pending_has "$b"
+  "$HOOK_BASH" "$CONV" --dry-run --to-utf8 "$c" >/dev/null
+  bash_hook "bash \"$CONV\" --dry-run --to-utf8 \"$c\"" "$d"
+  check "bash-fluxo: --dry-run na lista" pending_has "$c"
+  check "bash-fluxo: absoluto em UTF-8" has_bytes "$UTF8_ACENTO" "$a"
+  check "bash-fluxo: relativo em UTF-8" has_bytes "$UTF8_ACENTO" "$b"
+  stop_hook Stop
+  check "bash-fluxo: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "bash-fluxo: absoluto de volta, bytes identicos" cmp -s "$a" "$d/a.original"
+  check "bash-fluxo: relativo de volta, bytes identicos" cmp -s "$b" "$d/b.original"
+  check "bash-fluxo: --dry-run intocado (already-cp1252)" cmp -s "$c" "$d/c.original"
+  check "bash-fluxo: lista removida" pending_gone
+}
+
 run_cases() {
   echo "[parser: $MODE]"
   case_write_novo
@@ -1048,13 +1206,16 @@ run_cases() {
   case_stop_fallback
   case_fffd_cp1252
   case_avisos_mesclados
+  case_bash_registra
+  case_bash_nada
+  case_bash_fluxo
 }
 
 check_hooks_json() {
   local j="$ROOT/hooks/hooks.json" c
   echo "[hooks.json]"
   check "hooks.json: post-tool-use-encoding removido" [ ! -e "$ROOT/hooks/post-tool-use-encoding" ]
-  for c in session-start pre-tool-use post-tool-use post-tool-use-read stop; do
+  for c in session-start pre-tool-use post-tool-use post-tool-use-read post-tool-use-bash stop; do
     check "hooks.json: comando bash \"\${CLAUDE_PLUGIN_ROOT}/hooks/$c\"" \
       grep -qF "\"command\": \"bash \\\"\${CLAUDE_PLUGIN_ROOT}/hooks/$c\\\"\"" "$j"
     check "hooks.json: hooks/$c existe" [ -f "$ROOT/hooks/$c" ]
@@ -1073,6 +1234,12 @@ check_hooks_json() {
         == [["command", "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-read\"", false]]' "$j"
     check "hooks.json: Read fora do PreToolUse" \
       jq -e '[.hooks.PreToolUse[] | select(.matcher | test("Read"))] == []' "$j"
+    # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in hooks.json
+    check "hooks.json: PostToolUse Bash -> so post-tool-use-bash" \
+      jq -e '[.hooks.PostToolUse[] | select(.matcher == "Bash") | .hooks[] | [.type, .command, .async]]
+        == [["command", "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-bash\"", false]]' "$j"
+    check "hooks.json: Bash fora do PreToolUse" \
+      jq -e '[.hooks.PreToolUse[] | select(.matcher | test("Bash"))] == []' "$j"
     # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in hooks.json
     check "hooks.json: Stop e SessionEnd -> so hooks/stop (sincrono)" \
       jq -e '["command", "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/stop\"", false] as $s
@@ -1134,6 +1301,13 @@ crlf_stop_json() {
     bg="[$nl    {$nl      \"id\": \"b1\",$nl      \"type\": \"$1\",$nl      \"description\": \"a ] b }\"$nl    }$nl  ]"
   fi
   printf '{\r\n  "hook_event_name": "Stop",\r\n  "stop_hook_active": false,\r\n  "background_tasks": %s,\r\n  "session_crons": []\r\n}\r\n' "$bg"
+}
+
+# crlf_bash_json CWD COMMAND: PostToolUse payload of a Bash call without
+# session_id, one key per line, CRLF line endings
+crlf_bash_json() {
+  printf '{\r\n  "hook_event_name": "PostToolUse",\r\n  "tool_name": "Bash",\r\n  "cwd": "%s",\r\n  "tool_input": {\r\n    "command": "%s"\r\n  }\r\n}\r\n' \
+    "$(json_quote "$1")" "$(json_text "$2")"
 }
 
 # jq.exe on Windows writes CRLF (text-mode stdout). A jq wrapper first in PATH
@@ -1204,6 +1378,14 @@ $d/FATA009.prw" ]
     check "crlf-$p: Stop so com shell converte" has_bytes "$CP_ACENTO" "$f"
     check "crlf-$p: Stop so com shell mantem o CP1252 lido" cmp -s "$d/FATA009.prw" "$d/FATA009.original"
     check "crlf-$p: lista removida" [ ! -e "$PEND_DIR/nosession" ]
+    # Bash: a command continued over two lines (the wrapper ends the inner
+    # line with CRLF too) and a relative path joined to cwd
+    crlf_bash_json "$d" "bash \"$CONV\" \\
+  --to-utf8 FATA010.prw" | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$BASHHOOK" >"$TMP_DIR/bash.out" 2>&1
+    check "crlf-$p: Bash exit 0 sem saida" [ "$?$(cat "$TMP_DIR/bash.out")" = 0 ]
+    check "crlf-$p: Bash poe o caminho exato (sem CR) na lista nosession" \
+      [ "$(cat "$PEND_DIR/nosession" 2>/dev/null)" = "$d/FATA010.prw" ]
+    rm -f "$PEND_DIR/nosession"
   done
   PATH="$saved_path"
 }

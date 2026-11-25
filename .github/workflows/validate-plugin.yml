@@ -130,7 +130,7 @@ jobs:
       - name: Validate shell scripts syntax
         run: |
           set -e
-          for f in hooks/session-start hooks/pre-tool-use hooks/post-tool-use hooks/lib/*.sh; do
+          for f in hooks/session-start hooks/pre-tool-use hooks/post-tool-use hooks/post-tool-use-bash hooks/lib/*.sh; do
             [ -f "$f" ] || continue
             bash -n "$f" || { echo "ERROR: $f has syntax errors"; exit 1; }
           done

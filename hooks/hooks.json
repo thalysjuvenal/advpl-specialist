@@ -45,6 +45,16 @@
             "async": false
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-bash\"",
+            "async": false
+          }
+        ]
       }
     ],
     "Stop": [
