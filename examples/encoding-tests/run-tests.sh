@@ -648,6 +648,56 @@ set_mode() {
   chmod "$1" "$CS/$2"
   if [ -n "$PS_BIN" ]; then chmod "$1" "$CP/$2"; fi
 }
+# no_temp: no temporary file of the atomic write (.convert-encoding.*) is
+# left in the bash copy nor in the PowerShell twin
+no_temp() {
+  local d
+  for d in "$CS" ${PS_BIN:+"$CP"}; do
+    [ -z "$(find "$d" -name '.convert-encoding.*' -print 2>/dev/null)" ] || return 1
+  done
+  return 0
+}
+# has_mode MODE FILE: FILE's permission bits are exactly MODE (find -perm)
+has_mode() { [ -n "$(find "$2" -prune -perm "$1" -print 2>/dev/null)" ]; }
+
+case_atomic() {
+  new_case atomic
+  step 02-acentos-ptbr.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout "converted: 02-acentos-ptbr.prw"
+  step --to-utf8 02-acentos-ptbr.prw
+  expect_rc 0
+  expect_stdout "converted: 02-acentos-ptbr.prw"
+  expect_that "02-acentos-ptbr.prw: round trip changed the bytes" same_file "$BASE/02-acentos-ptbr.prw" "$CS/02-acentos-ptbr.prw"
+  expect_that "a temporary .convert-encoding.* file was left behind" no_temp
+  if [ "$PS_WIN" = 1 ]; then
+    # Git Bash chmod on NTFS only toggles the read-only attribute and ln -s
+    # copies the file: the mode and link checks need a Unix file system.
+    echo "  - atomic write: mode and symbolic link checks skipped (Windows)"
+  else
+    set_mode 640 02-acentos-ptbr.prw
+    step 02-acentos-ptbr.prw
+    expect_rc 0
+    expect_stdout "converted: 02-acentos-ptbr.prw"
+    expect_that "mode 0640 not kept (bash)" has_mode 0640 "$CS/02-acentos-ptbr.prw"
+    if [ -n "$PS_BIN" ]; then
+      expect_that "mode 0640 not kept (ps1)" has_mode 0640 "$CP/02-acentos-ptbr.prw"
+    fi
+    ln -s 02-acentos-ptbr.prw "$CS/link.prw"
+    if [ -n "$PS_BIN" ]; then ln -s 02-acentos-ptbr.prw "$CP/link.prw"; fi
+    step --to-utf8 link.prw
+    expect_rc 0
+    expect_stdout "converted: link.prw"
+    expect_that "link.prw is no longer a symbolic link (bash)" [ -L "$CS/link.prw" ]
+    if [ -n "$PS_BIN" ]; then
+      expect_that "link.prw is no longer a symbolic link (ps1)" [ -L "$CP/link.prw" ]
+    fi
+    expect_that "the link target was not written" same_file "$BASE/02-acentos-ptbr.prw" "$CS/02-acentos-ptbr.prw"
+    expect_that "a temporary .convert-encoding.* file was left behind" no_temp
+  fi
+  end_case "atomic write: no temporary file left, mode kept, a symbolic link stays a link"
+}
 
 case_unreadable() {
   if [ "$(id -u)" = 0 ]; then
@@ -699,7 +749,19 @@ case_unreadable() {
   set_mode 644 tree/sub/deep/c.ch
   untouched tree/sub/B.TLPP tree/sub/deep/c.ch "tree/x y.prw"
   expect_that "a.prw: round trip changed the bytes" same_file "$BASE/tree/a.prw" "$CS/tree/a.prw"
-  end_case "-r: unreadable file = read error, read-only file = write error, run goes on, exit 1 (both directions)"
+  expect_that "a write error left a temporary .convert-encoding.* file behind" no_temp
+  # a directory that takes no new file: no temporary file, written in place
+  set_mode 555 tree/sub/deep
+  step --to-utf8 tree/sub/deep/c.ch
+  expect_rc 0
+  expect_stdout "converted: tree/sub/deep/c.ch"
+  step tree/sub/deep/c.ch
+  expect_rc 0
+  expect_stdout "converted: tree/sub/deep/c.ch"
+  set_mode 755 tree/sub/deep
+  untouched tree/sub/deep/c.ch
+  expect_that "a temporary .convert-encoding.* file was left behind" no_temp
+  end_case "-r: unreadable file = read error, read-only file = write error, run goes on, exit 1 (both directions); read-only directory = in place"
 }
 
 # ---- run -------------------------------------------------------------------------
@@ -732,6 +794,7 @@ case_round_trip
 case_to_utf8_dry_run
 case_to_utf8_recursive
 case_to_utf8_usage
+case_atomic
 case_unreadable
 
 echo ""

@@ -5,8 +5,9 @@
 # TOTVS Protheus compiles ADVPL/TLPP sources as Windows-1252 while AI tools
 # write UTF-8. This script and its PowerShell twin convert-encoding.ps1 (same
 # CLI, byte-identical stdout, stderr, exit codes and resulting files) convert
-# them back. The advpl-specialist PostToolUse hook calls this script with
-# --translit; any other agent can run it by hand after editing a source.
+# them back. The advpl-specialist Stop and SessionEnd hooks call this script
+# with --translit at the end of the turn (the PostToolUse hook only runs it
+# with --dry-run); any other agent can run it by hand after editing a source.
 # --to-utf8 serves an editor that refuses files that are not UTF-8: convert,
 # edit, then run the normal mode to get Windows-1252 back.
 #
@@ -64,8 +65,8 @@
 # CP1252_EXTRA. CR, LF and a missing final newline are kept, so the normal
 # mode (without --translit) gives back the original bytes.
 #
-# Requirements: bash 3.2+, od, awk (POSIX), grep, find, sort, mktemp (no
-# `file`, iconv, jq, Node or Python).
+# Requirements: bash 3.2+, od, awk (POSIX), grep, find, sort, mktemp, cp,
+# mv, dirname (no `file`, iconv, jq, Node or Python).
 
 set -u
 export LC_ALL=C
@@ -169,13 +170,39 @@ from_cp1252() {
 fail() { report "failed: $1 ($2)"; failed=1; }
 
 # write_out FILE: $TMPD/out -> FILE unless --dry-run; reports a write error.
-# In place, not via temp file + rename: keeps inode, owner, permissions and
-# links, at the cost of atomicity (an interrupted write truncates the file).
+# Atomic: the bytes go to a temporary file in FILE's own directory
+# (.convert-encoding.XXXXXX), which first gets a copy of FILE with its mode
+# (cp -p), and that file is then renamed over FILE, so an interrupted write
+# never leaves a truncated source. A read-only FILE still fails (the copy is
+# read-only too). The rename gives FILE a new inode: another hard link keeps
+# the old bytes, and the owner is kept only when cp -p can keep it. Written
+# in place as before (not atomic) when FILE is a symbolic link (the link
+# stays a link) or the directory does not take a new file. convert-encoding.ps1
+# follows the same steps.
 write_out() {
-  if [ "$dry_run" = 0 ] && ! { cat "$TMPD/out" >"$1"; } 2>/dev/null; then
+  local d tmp
+  [ "$dry_run" = 0 ] || return 0
+  if [ ! -L "$1" ]; then
+    d=$(dirname -- "$1")
+    tmp=$(mktemp -- "$d/.convert-encoding.XXXXXX" 2>/dev/null) || tmp=
+  else
+    tmp=
+  fi
+  if [ -z "$tmp" ]; then
+    if ! { cat "$TMPD/out" >"$1"; } 2>/dev/null; then
+      fail "$1" "write error"
+      return 1
+    fi
+    return 0
+  fi
+  CUR_TMP=$tmp
+  if ! { cp -p -- "$1" "$tmp" && cat "$TMPD/out" >"$tmp" && mv -f -- "$tmp" "$1"; } 2>/dev/null; then
+    rm -f -- "$tmp" 2>/dev/null
+    CUR_TMP=
     fail "$1" "write error"
     return 1
   fi
+  CUR_TMP=
   return 0
 }
 
@@ -261,7 +288,9 @@ TMPD=$(mktemp -d -- "${TMPDIR:-/tmp}/convert-encoding.XXXXXX") || {
   printf 'convert-encoding: cannot create a temporary directory\n' >&2
   exit 2
 }
-trap 'rm -rf "$TMPD"' EXIT
+# CUR_TMP: the temporary file of a write_out in progress (removed on any exit)
+CUR_TMP=
+trap 'rm -rf "$TMPD"; if [ -n "$CUR_TMP" ]; then rm -f -- "$CUR_TMP"; fi' EXIT
 
 for p in "${paths[@]}"; do
   if [ -d "$p" ]; then

@@ -149,14 +149,57 @@ function Set-Failed([string]$line) {
   $script:Failed = $true
 }
 
+# Deletes the temporary file of a failed Save-Bytes (read-only attribute
+# cleared first: Windows refuses to delete a read-only file).
+function Remove-Temp([string]$t) {
+  try {
+    if ([System.IO.File]::Exists($t)) {
+      [System.IO.File]::SetAttributes($t, [System.IO.FileAttributes]::Normal)
+      [System.IO.File]::Delete($t)
+    }
+  } catch {
+    return
+  }
+}
+
 # $out -> $p unless --dry-run; $false after a "write error" line.
-# In place, not via temp file + rename: keeps inode, owner, permissions and
-# links, at the cost of atomicity (an interrupted write truncates the file).
+# Atomic, the same steps as write_out in convert-encoding.sh: the bytes go to
+# a temporary file in the directory of $p (.convert-encoding.<random>), which
+# first gets a copy of $p (File.Copy keeps the mode on Unix and the
+# attributes on Windows), and File.Replace (a rename) then puts it in place
+# of $p, so an interrupted write never leaves a truncated source. A
+# read-only $p still fails (the copy is read-only too). Written in place as
+# before (not atomic) when $p is a symbolic link or the directory does not
+# take a new file.
 function Save-Bytes([string]$p, [byte[]]$out) {
   if ($script:DryRun) { return $true }
+  $full = [System.IO.Path]::GetFullPath($p)
+  $tmp = $null
+  if (-not (Test-Link $p)) {
+    $name = [System.IO.Path]::Combine([System.IO.Path]::GetDirectoryName($full), '.convert-encoding.' + [System.IO.Path]::GetRandomFileName())
+    try {
+      $fs = New-Object System.IO.FileStream -ArgumentList $name, ([System.IO.FileMode]::CreateNew), ([System.IO.FileAccess]::Write)
+      $fs.Dispose()
+      $tmp = $name
+    } catch {
+      $tmp = $null
+    }
+  }
+  if ($null -eq $tmp) {
+    try {
+      [System.IO.File]::WriteAllBytes($p, $out)
+    } catch {
+      Set-Failed ('failed: ' + $p + ' (write error)')
+      return $false
+    }
+    return $true
+  }
   try {
-    [System.IO.File]::WriteAllBytes($p, $out)
+    [System.IO.File]::Copy($full, $tmp, $true)
+    [System.IO.File]::WriteAllBytes($tmp, $out)
+    [System.IO.File]::Replace($tmp, $full, [NullString]::Value)
   } catch {
+    Remove-Temp $tmp
     Set-Failed ('failed: ' + $p + ' (write error)')
     return $false
   }
