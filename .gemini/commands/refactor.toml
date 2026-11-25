@@ -39,7 +39,7 @@ RF-007 to RF-012 run only with `--focus modernize`.
 2. Map the findings with the table in "Finding candidates" of `skills/advpl-refactoring/patterns-modernization.md`: ADV015 → RF-007, ADV003 → RF-009, ADV010/ADV011 → RF-010, ADV009 → RF-011, ADV008 → RF-012. RF-008 has no lint rule: in `.tlpp` targets, search for `ErrorBlock(`; never propose RF-008 for `.prw`. Findings with other IDs are fixes, not refactorings: list them apart as outside this focus.
 3. Check each candidate against the pattern's "Do not apply when" list (for example `IIf` inside a code block or dictionary expression, static SQL with internal values only, `CriaTrab(NIL, .F.)` used only for a file name). Report excluded candidates with the reason; do not change them.
 4. Plan each remaining candidate with `FILE:LINE`, the engine line verbatim, the RF ID, before/after, the risk and the "Same behavior" checks of the pattern. Wait for approval (stop here with `--dry-run`).
-5. Apply one pattern in one function at a time. After each change, re-run the lint engine on that file: the finding must be gone and no new error may appear.
+5. Apply one pattern in one function at a time. After each change, re-run the lint engine on that file: the finding must be gone and no new error may appear; otherwise the change goes back to the plan.
 6. Report the engine summary line before and after, the warnings kept and why, and the "Same behavior" tests the user must run.
 
 ## Output rules

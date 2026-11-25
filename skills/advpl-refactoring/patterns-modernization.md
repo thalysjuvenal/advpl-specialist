@@ -151,9 +151,9 @@ Return nSaldo
 
 **Do not apply when:**
 
-- The SQL is static and every value is internal (literals, `xFilial()`, `DtoS()` of a date, numbers the routine computes): `FWPreparedStatement` is not required. Use After B (`BeginSQL` with `%exp:`) or leave the warning with that justification.
+- After A does not apply when the SQL is static and every value is internal (literals, `xFilial()`, `DtoS()` of a date, numbers the routine computes): `FWPreparedStatement` is not required there. After B remains an option; otherwise keep the ADV015 warning and report that justification.
 - A fragment of SQL (column list, `ORDER BY`, table, a whole `WHERE` clause) comes from the caller: it cannot become a `?` parameter. Building the clause from fixed text in the routine changes the design; report it instead of refactoring.
-- The SQL text contains a literal `?`: `BeginSQL` reserves `?` (TDN "Embedded SQL"), so After B is not an option.
+- After B does not apply when the SQL text, or any value passed through `%exp:`, contains `?`: Embedded SQL reserves `?` (TDN "Embedded SQL"; see "Restrictions and Gotchas" in `skills/embedded-sql/reference.md`), and in that case the TDN recommends `FWPreparedStatement`.
 
 ## RF-008: ErrorBlock + Begin Sequence → Try/Catch, TLPP only (Complexity: MEDIUM)
 
@@ -211,7 +211,7 @@ user function gravaPed(cPedido as character) as logical
 return lRet
 ```
 
-`RestArea()` stays after `EndTry`, in the same place as after `End Sequence`. Move it to `Finally` only when the `Try` block has a `Return`.
+`RestArea()` stays after `EndTry`, in the same place as after `End Sequence`. Keep a single exit point (the final `return`) and do not add a `Return` inside `Try` or `Catch`: how a `Return` there interacts with `Finally` is not shown on the TDN page (a confirmar no TDS). If the original already returns from inside the sequence, keep that path as it is and report it.
 
 **Risk:**
 
@@ -392,7 +392,7 @@ Return
 
 **Detect:** `IIf(` in ordinary statements.
 **Lint:** ADV009 (warn, CA4000).
-**Action:** replace the assignment with an `If`/`Else`/`EndIf` block that assigns the same variable in every branch. Turn nested `IIf` into `Do Case`. When the `IIf` sits inside an argument, compute the value in a variable first.
+**Action:** replace the assignment with an `If`/`Else`/`EndIf` block that assigns the same variable in every branch. Turn nested `IIf` into `Do Case`. When the `IIf` sits inside an argument, compute the value in a variable first. When the `IIf` initializes a `Local` (`Local cSituac := IIf(...)`), keep the declaration with a neutral initial value (`Local cSituac := ""`) and put the `If` block after the last `Local` declaration: every `Local` must be declared before the first executable statement of the function.
 
 Before:
 
@@ -439,17 +439,17 @@ EndCase
 
 **Detect:** `DbSelectArea("SX?")`, `DbSelectArea("SM0")` or `DbSelectArea("SIX")` followed by `DbSeek` and field reads.
 **Lint:** ADV008 (error, CA2000–CA2013).
-**Action:** read the same information through the framework API (`skills/protheus-reference/sx-dictionary.md`, catalog G4):
+**Action:** read the same information through the framework API (`skills/protheus-reference/sx-dictionary.md`, catalog G4). RF-012 covers reads only; code that writes to the dictionary is out of scope (see "Do not apply when").
 
-| Table | Catalog | Use instead |
+| Table | Catalog | Read with |
 |---|---|---|
 | SX1 | CA2002 | `Pergunte()`, `FWSX1Util` |
 | SX2 | CA2003 | `RetSqlName()`, `X2Nome()`, `FWSX2Util` |
-| SX3 | CA2004 | `FWSX3Util`, `GetSX3Cache()`, `FWFormStruct()` in MVC |
-| SX5 | CA2009 | `FWGetSX5()`, `X5Descri()`, `FwPutSX5()` |
-| SX6 | CA2010 | `SuperGetMV()`, `GetMV()`, `PutMV()`, `FWSX6Util` |
-| SIX | CA2001 | `FWSIXUtil` |
-| SX9 | CA2006 | `FWSX9Util` |
+| SX3 | CA2004 | `TamSX3()` (size), `GetSX3Cache()`, `FWSX3Util`, `FWFormStruct()` in MVC |
+| SX5 | CA2009 | `FWGetSX5()`, `X5Descri()` |
+| SX6 | CA2010 | `SuperGetMV()`, `GetMV()`, `FWSX6Util` |
+| SIX | CA2001 | `FWSIXUtil`: its methods (`ExistIndex`, `GetAliasIndexes`) appear only in `sx-dictionary.md`, with no entry in `native-functions.md` (a confirmar no TDS) |
+| SX9 | CA2006 | `FWSX9Util`: the plugin documents only `SearchX9Paths` (relationship paths between two tables); it is not a field reader, so reading other SX9 data has no API in the plugin references (a confirmar no TDS) |
 | SXG | CA2011 | `FWSXGUtil` |
 | SM0 | CA2000 | `FWSM0Util` |
 | SXD | CA2012 | `SchedDef` |
@@ -491,9 +491,7 @@ User Function ZTAMDOC()
     Local nTam  := 0
     Local nDias := 0
 
-    If FWSX3Util():SeekX3File("E1_NUM")
-        nTam := GetSX3Cache("E1_NUM", "X3_TAMANHO")
-    EndIf
+    nTam  := TamSX3("E1_NUM")[1]
     nDias := SuperGetMV("MV_XDIASVC", .F., 0)
 Return {nTam, nDias}
 ```
@@ -501,7 +499,7 @@ Return {nTam, nDias}
 **Risk:**
 
 - Type: the original converted the parameter with `Val(SX6->X6_CONTEUD)`. `SuperGetMV`/`GetMV` return a value whose type depends on the parameter definition (`X6_TIPO`). If the parameter is character, keep the `Val()`.
-- Missing entries: the original returned `0` silently. `SuperGetMV` shows a help when the parameter is missing unless `lHelp` is `.F.`, and returns the default. What `GetSX3Cache` returns for a missing field is not documented in the plugin references (a confirmar no TDS), so keep a guard such as `SeekX3File` when the field may not exist (custom `_X*` fields).
+- Missing entries: the original returned `0` silently. `SuperGetMV` shows a help when the parameter is missing unless `lHelp` is `.F.`, and returns the default. `E1_NUM` is a standard field. For a field that may not exist (custom `_X*`), what `TamSX3()` or `GetSX3Cache()` return is not documented in the plugin references (a confirmar no TDS): confirm the field in the customer's dictionary first ("Field Name Validation" in `skills/advpl-code-generation/critical-rules.md`). A runtime check such as `FWSX3Util():SeekX3File()` appears only in `sx-dictionary.md` (a confirmar no TDS).
 - Branch: the original searched only the key `xFilial("SX6") + name`. Compare the value returned in each branch you use.
 - Cache: `SuperGetMV` caches values. If the routine writes the parameter with `PutMV` and reads it again, check the value it gets (a confirmar no TDS).
 - Positioning: code after the original may read other fields of the positioned SX record (`SX3->X3_TITULO`...). Map every field read, not only the first one.
@@ -514,5 +512,5 @@ Return {nTam, nDias}
 
 **Do not apply when:**
 
-- The code creates or updates dictionary entries (SX3 fields, SX6 parameters) instead of reading them: that is dictionary configuration, see `skills/sx-configuration/`.
+- The code writes to the dictionary instead of reading it (creates or changes SX3 fields, SX6 parameters or their values, SX5 entries): RF-012 covers reads only. Dictionary configuration is in `skills/sx-configuration/`, and the write APIs (`PutMV()`, `FwPutSX5()`) are listed in `skills/protheus-reference/sx-dictionary.md`.
 - No API in the plugin references covers what the code reads (see the last row of the table): do not invent one. Keep the code, report the ADV008 finding as open and confirm the API on TDN.
