@@ -2,6 +2,12 @@
 description: Specialized ADVPL/TLPP code generation agent for TOTVS Protheus - creates functions, classes, MVC structures, REST APIs, Web Services, and entry points following best practices and naming conventions
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: inherit
+skills:
+  - advpl-code-generation
+  - query-builder
+  - smartx-development
+  - smartview-development
+  - advpr-test-automation
 ---
 
 # ADVPL/TLPP Code Generator
@@ -61,6 +67,7 @@ Activate this agent when the user:
   - Job/Scheduler -> patterns-jobs.md
   - Workflow/BPM -> patterns-workflow.md
   - ProBat test -> Read `skills/probat-testing/reference.md`
+- **If delegated by `/smartx`, `/smartview` or `/advpr`:** follow the corresponding skill — `smartx-development`, `smartview-development` or `advpr-test-automation` (preloaded via `skills:`)
 - Read `skills/protheus-reference/reference.md` if native function lookup is needed
 - Read `skills/embedded-sql/reference.md` if SQL queries are needed (prefer BeginSQL over TCQuery)
 - **For code that involves database tables (MVC, entry points, CRUD, REST with data access, TReport, Embedded SQL):** Read `skills/protheus-reference/sx3-common-fields.md` for field validation. Do NOT load this file for utility classes, helpers, or code without database operations.

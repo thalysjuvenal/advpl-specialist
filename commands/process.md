@@ -1,8 +1,7 @@
 ---
 description: Consult Protheus ERP business processes, module workflows, routines and integrations
-allowed-tools: Read, Glob, Grep, WebSearch, WebFetch, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_fill_form, mcp__playwright__browser_click, mcp__playwright__browser_close
+allowed-tools: Read, Glob, Grep, WebSearch, WebFetch, Bash, Agent, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_fill_form, mcp__playwright__browser_click, mcp__playwright__browser_close, mcp__plugin_playwright_playwright__browser_navigate, mcp__plugin_playwright_playwright__browser_snapshot, mcp__plugin_playwright_playwright__browser_take_screenshot, mcp__plugin_playwright_playwright__browser_fill_form, mcp__plugin_playwright_playwright__browser_click, mcp__plugin_playwright_playwright__browser_close
 argument-hint: "<process|routine|module> [--type process|routine|module|integration]"
-agent: process-consultant
 ---
 
 # /advpl-specialist:process
@@ -32,17 +31,18 @@ Consult Protheus ERP business processes, module workflows, routines, and integra
    - Contains module name (Compras, Faturamento, Estoque, etc.) -> module
    - Contains two module names or keywords like "integracao" / "integration" -> integration
    - Otherwise -> process
-4. **Search local reference** - Check `skills/protheus-business/` module files (modulo-compras.md, modulo-estoque.md, etc.)
-5. **Search TDN** - If not found locally, search TDN online:
+4. **Delegate to process-consultant agent** - Pass the query and its type to the process-consultant agent for the local and TDN searches (steps 5-6); the Playwright fallback (step 7) runs in this command, which holds the Playwright tools
+5. **Search local reference** - Check `skills/protheus-business/` module files (modulo-compras.md, modulo-estoque.md, etc.)
+6. **Search TDN** - If not found locally, search TDN online:
    - Process: `site:tdn.totvs.com "<process>" protheus fluxo`
    - Routine: `site:tdn.totvs.com "<ROUTINE_CODE>" rotina`
    - Module: `site:tdn.totvs.com "<module>" modulo protheus`
    - Integration: `site:tdn.totvs.com "<moduleA>" "<moduleB>" integracao`
-6. **Playwright fallback** - If WebSearch/WebFetch fail:
+7. **Playwright fallback** - If WebSearch/WebFetch fail:
    - If URL available: `browser_navigate` -> `browser_snapshot` -> `browser_take_screenshot` if needed
    - If no URL: `browser_navigate` to `https://tdn.totvs.com` -> `browser_fill_form` search -> `browser_click` submit -> `browser_snapshot` results -> navigate to best result
    - **Always** `browser_close` when finished to release resources
-7. **Deliver answer** - Format response based on query type
+8. **Deliver answer** - Format response based on query type
 
 ## Response Format
 
