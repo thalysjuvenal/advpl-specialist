@@ -4,12 +4,14 @@
 
 Embedded SQL allows writing SQL queries directly in ADVPL/TLPP code using `BeginSQL ... EndSQL` blocks with special macro expressions. It replaces error-prone string concatenation (`cQuery += "SELECT..."`) with readable, type-safe, and maintainable SQL blocks.
 
+`%exp:` inserts a value into the SQL text — it is **not** a bind parameter. Values typed by the user or received from outside go through `FWPreparedStatement` (see [SQL Injection and User Input](#sql-injection-and-user-input)).
+
 ## When to Use
 
-- Writing any SQL query in ADVPL/TLPP (prefer over string concatenation)
+- Writing SQL queries whose text is fixed and whose values are internal to the routine (prefer over string concatenation)
 - Need to query with proper filial filtering, deletion handling, and table naming
 - Building reports with complex SELECT, JOIN, GROUP BY
-- Any situation where `TCQuery` with concatenated strings is currently used
+- Replacing `TCQuery` with concatenated strings (when a value comes from the user or from outside, migrate to `FWPreparedStatement` instead)
 - When readability and maintainability of SQL code matters
 
 ## BeginSQL vs TCQuery (String Concatenation)
@@ -20,12 +22,12 @@ Embedded SQL allows writing SQL queries directly in ADVPL/TLPP code using `Begin
 | Table names | `%table:SE2%` automatic | `RetSqlName("SE2")` manual |
 | Filial filter | `%xfilial:SE2%` automatic | `xFilial("SE2")` manual |
 | Deletion filter | `%notDel%` automatic | `D_E_L_E_T_ = ' '` manual |
-| Variable binding | `%exp:cVar%` | `"'" + cVar + "'"` (SQL injection risk) |
+| Variable values | `%exp:cVar%` (value inserted into the SQL text, no manual quoting) | `"'" + cVar + "'"` (manual quoting) |
 | Column types | `column X as Date` | `TCSetField` manual |
 | Maintenance | Easy to read and modify | Hard to find errors in strings |
-| SQL Injection | Protected via macros | Vulnerable if not careful |
+| SQL injection | `%exp:` is not a bind parameter: internal values only; user/external input → `FWPreparedStatement` | Vulnerable |
 
-**Always prefer BeginSQL for new code.**
+**Prefer BeginSQL for new code with internal values; use `FWPreparedStatement` for user/external input.**
 
 ## Core Syntax
 
@@ -44,6 +46,7 @@ EndSQL
 
 ```advpl
 Local cAlias := GetNextAlias()
+Local aNomes := {}
 
 BeginSQL Alias cAlias
     SELECT A1_COD, A1_LOJA, A1_NOME
@@ -54,7 +57,7 @@ EndSQL
 
 DbSelectArea(cAlias)
 While !Eof()
-    Conout(cAlias->A1_NOME)
+    aAdd(aNomes, (cAlias)->A1_NOME)
     DbSkip()
 EndDo
 DbCloseArea()
@@ -96,17 +99,19 @@ Filters out logically deleted records.
 -- Input:
 WHERE SA1.%notDel%
 
--- Expands to:
-WHERE SA1.D_E_L_E_T_ <> '*'
+-- Expands to (TDN):
+WHERE SA1.D_E_L_E_T_ = ' '
 ```
 
 **Always include this.** Protheus uses logical deletion, not physical.
 
 ### %exp:EXPRESSION%
 
-Binds ADVPL variables, expressions, or function results into the SQL.
+Inserts the value of an ADVPL variable, expression, or function result into the SQL text. Accepted value types are C, D, N, and L; any other type aborts with `Query Argument Error: Invalid Value Type` (TDN).
 
 ```advpl
+// Internal values (literals and a date built by the routine).
+// Text typed by the user or received from outside goes through FWPreparedStatement.
 Local cCodCli := "000001"
 Local cLoja   := "01"
 Local dDataIni := CtoD("01/01/2026")
@@ -122,7 +127,9 @@ BeginSQL Alias cAlias
 EndSQL
 ```
 
-**Note:** `%exp:%` handles quoting automatically for character fields. For dates, use `DtoS()` to convert.
+**`%exp:` is not a bind parameter.** The precompiler turns `%exp:cVar%` into `'+___SQLGetValue(CVAR)+'`: the value is concatenated into the statement text at run time (precompiled code shown on the TDN "Embedded SQL" page). Character values come out delimited by `___SQLGetValue()` (the precompiled code adds no quotes around it), so the examples write no quotes; how a `'` inside the value is treated is not documented (a confirmar no TDS). TDN sources also wrap a raw SQL fragment as `"%" + cFragmento + "%"`, which suggests that a value starting and ending with `%` (such as a LIKE pattern) reaches the SQL unquoted (a confirmar no TDS).
+
+Use `%exp:` only with values the routine itself controls (literals, `DtoS()` of a date, numbers it computes, `xFilial()`); user/external input goes through `FWPreparedStatement` — see [SQL Injection and User Input](#sql-injection-and-user-input). For dates, use `DtoS()` to convert.
 
 ### %Order:TABLE%
 
@@ -140,6 +147,10 @@ ORDER BY %Order:SE2%
 Declare result column types to avoid manual `TCSetField` calls:
 
 ```advpl
+Local cAlias   := GetNextAlias()
+Local dEmissao := CtoD("")
+Local nValor   := 0
+
 BeginSQL Alias cAlias
     column E2_EMISSAO as Date
     column E2_VENCTO  as Date
@@ -154,8 +165,8 @@ EndSQL
 // Columns are automatically typed - no TCSetField needed
 DbSelectArea(cAlias)
 While !Eof()
-    Local dEmissao := (cAlias)->E2_EMISSAO   // Already Date type
-    Local nValor   := (cAlias)->E2_VALOR      // Already Numeric
+    dEmissao := (cAlias)->E2_EMISSAO   // Already Date type
+    nValor   := (cAlias)->E2_VALOR     // Already Numeric
     DbSkip()
 EndDo
 ```
@@ -245,8 +256,8 @@ EndSQL
 ## Complete Pattern: Query with Cursor Iteration
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 User Function QueryEx()
     Local cAlias := GetNextAlias()
@@ -264,7 +275,7 @@ User Function QueryEx()
                SE2.E2_FORNECE, SE2.E2_LOJA,
                SE2.E2_EMISSAO, SE2.E2_VENCTO,
                SE2.E2_VALOR,
-               (SE2.E2_VALOR - SE2.E2_PAGO) AS SALDO,
+               SE2.E2_SALDO AS SALDO,
                SA2.A2_NOME
         FROM %table:SE2% SE2
         INNER JOIN %table:SA2% SA2
@@ -275,7 +286,7 @@ User Function QueryEx()
         WHERE SE2.%notDel%
         AND SE2.E2_FILIAL = %xfilial:SE2%
         AND SE2.E2_EMISSAO >= %exp:DtoS(dDataIni)%
-        AND (SE2.E2_VALOR - SE2.E2_PAGO) > 0
+        AND SE2.E2_SALDO > 0
         ORDER BY SE2.E2_VENCTO
     EndSQL
 
@@ -308,39 +319,74 @@ Return aResult
 | Do NOT use `SELECT *` | Specify columns explicitly for performance and clarity |
 | Date values must use `DtoS()` | Database stores dates as YYYYMMDD strings |
 | `column` declarations go BEFORE the SELECT | They define result types, not query columns |
+| `%exp:` only with internal values | It is not a bind parameter; user/external input goes through `FWPreparedStatement` |
+| Do NOT use `?` in the query text or in `%exp:` values | `?` is reserved by Embedded SQL (TDN); in that case the TDN recommends `FWPreparedStatement` or `FWExecStatement` |
+
+## SQL Injection and User Input
+
+Embedded SQL removes manual quoting and the `RetSqlName`/`xFilial`/`D_E_L_E_T_` boilerplate, but `%exp:` still inserts each value into the SQL text (see `%exp:EXPRESSION%` above). Choose by the origin of each value:
+
+| Value | Use |
+|---|---|
+| Fixed text, `xFilial()`, `DtoS()` of a date, numbers computed by the routine | `BeginSQL` + `%exp:` |
+| Typed by the user (screen field, `Pergunte` answers in `MV_PAR*`), received from outside (REST/SOAP payload, file, integration), or any free text | `FWPreparedStatement` with `?` parameters |
+| A raw SQL fragment received from the caller or built from user text | Never — build the clause from fixed text in the routine and pass only the values as `?` parameters |
+
+> The TDN "Embedded SQL" examples pass `MV_PAR*` answers through `%exp:`. Since the escaping done by `___SQLGetValue()` is not documented (a confirmar no TDS), this plugin treats `Pergunte` answers as user input.
+
+```advpl
+// cNome is typed by the user: it goes as a ? parameter, never through %exp:
+Local cAlias := GetNextAlias()
+Local oStmt  := FWPreparedStatement():New()
+Local cQuery := ""
+
+cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME FROM " + RetSqlName("SA1") + " SA1 "
+cQuery += "WHERE SA1.D_E_L_E_T_ = ' ' AND SA1.A1_FILIAL = ? AND SA1.A1_NOME LIKE ? "
+
+oStmt:SetQuery(cQuery)
+oStmt:SetString(1, xFilial("SA1"))
+oStmt:SetString(2, AllTrim(cNome) + "%")   // a ' typed in cNome stays part of the value (TDN)
+DbUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+// ... read (cAlias)->A1_COD, (cAlias)->A1_NOME ...
+(cAlias)->(DbCloseArea())
+oStmt:Destroy()
+```
+
+Full patterns (JOIN, DML, LIKE, IN-list): `skills/query-builder/patterns-fwpreparedstatement.md` (query-builder skill).
 
 ## DML Operations
 
-For INSERT, UPDATE, DELETE use `TCSqlExec` instead of BeginSQL:
+**BeginSQL is for SELECT only.** For UPDATE/DELETE use `TCSqlExec`, with the values passed as `FWPreparedStatement` parameters:
 
 ```advpl
-// INSERT
-Local cSql := "INSERT INTO " + RetSqlName("ZZ1") + " "
-cSql += "(ZZ1_FILIAL, ZZ1_CODIGO, ZZ1_DESCRI, D_E_L_E_T_, R_E_C_N_O_) "
-cSql += "VALUES ('" + xFilial("ZZ1") + "', '001', 'Teste', ' ', " + cValToChar(GetSxeNum("ZZ1","ZZ1_CODIGO")) + ")"
-nRet := TCSqlExec(cSql)
+// UPDATE: values go as ? parameters
+Local oStmt := FWPreparedStatement():New()
+Local cSql  := ""
+Local nRet  := 0
 
-// UPDATE
-cSql := "UPDATE " + RetSqlName("ZZ1") + " SET "
-cSql += "ZZ1_DESCRI = 'Novo Valor' "
-cSql += "WHERE ZZ1_FILIAL = '" + xFilial("ZZ1") + "' "
-cSql += "AND ZZ1_CODIGO = '001' "
-cSql += "AND D_E_L_E_T_ = ' '"
-nRet := TCSqlExec(cSql)
+cSql := "UPDATE " + RetSqlName("ZZ1") + " SET ZZ1_DESCRI = ? "
+cSql += "WHERE ZZ1_FILIAL = ? AND ZZ1_CODIGO = ? AND D_E_L_E_T_ = ' '"
+
+oStmt:SetQuery(cSql)
+oStmt:SetString(1, cDescri)
+oStmt:SetString(2, xFilial("ZZ1"))
+oStmt:SetString(3, cCodigo)
+nRet := TCSqlExec(oStmt:GetFixQuery())
+oStmt:Destroy()
 
 If nRet < 0
-    Conout("SQL Error: " + TCSqlError())
+    FWLogMsg("ERROR", /*cTransactionId*/, "EMBEDDEDSQL", "DML", /*cStep*/, /*cMsgId*/, "SQL Error: " + TCSqlError())
 EndIf
 ```
 
-**BeginSQL is for SELECT only.** Use `TCSqlExec` for DML (INSERT/UPDATE/DELETE).
+To insert a record, do not build an `INSERT` by hand: use the work area (`RecLock(cAlias, .T.)` + `MsUnlock()`, see `skills/query-builder/patterns-workarea.md`, Pattern 1.4). More `TCSqlExec` patterns: `skills/query-builder/patterns-fwpreparedstatement.md`.
 
 ## Performance Tips
 
 1. **Use `column` declarations** to avoid post-query type conversions
 2. **Use JOINs** instead of subqueries when possible
 3. **Filter early** with WHERE, not after reading all rows in ADVPL
-4. **Use NOLOCK** hint for read-only queries (SQL Server): `FROM %table:SA1% SA1 WITH(NOLOCK)`
+4. **No locking hints**: do not hard-code `WITH(NOLOCK)` — it exists only on SQL Server and allows dirty reads. `ChangeQuery()`, which Embedded SQL applies unless `%noparser%` is used, removes `NOLOCK`/`(NOLOCK)` from the query, and the TDN documents no `%nolock%` macro
 5. **Use TOP N** when you only need limited results
 6. **Close aliases** immediately after use to free work areas
 7. **Avoid loops with BeginSQL inside** - build one query that returns all needed data
@@ -348,6 +394,8 @@ EndIf
 ## Migration from TCQuery to BeginSQL
 
 **Before (string concatenation):**
+
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 Local cQuery := ""
 cQuery += "SELECT A1_COD, A1_NOME "
@@ -358,9 +406,11 @@ cQuery += "AND A1_TIPO = '" + cTipo + "'"
 TCQuery cQuery New Alias "QRY_CLI"
 ```
 
-**After (Embedded SQL):**
+**After (Embedded SQL) — `cTipo` is an internal value of the routine:**
+
 ```advpl
 Local cAlias := GetNextAlias()
+Local cTipo  := "F"   // set by the routine, not typed by the user
 
 BeginSQL Alias cAlias
     SELECT A1_COD, A1_NOME
@@ -371,4 +421,6 @@ BeginSQL Alias cAlias
 EndSQL
 ```
 
-Benefits: No manual `RetSqlName`, no `D_E_L_E_T_`, no `xFilial()`, no string quoting, no SQL injection risk.
+If `cTipo` comes from the user or from outside, migrate to `FWPreparedStatement` instead (see [SQL Injection and User Input](#sql-injection-and-user-input)).
+
+Benefits: no manual `RetSqlName`, no `D_E_L_E_T_`, no `xFilial()`, no manual quoting. `%exp:` does not make the query injection-proof — it is not a bind parameter.

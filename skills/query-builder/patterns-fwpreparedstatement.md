@@ -1,15 +1,15 @@
 # Pattern: FWPreparedStatement (SQL Injection Prevention)
 
-`FWPreparedStatement` is the Protheus framework's parameterized-query API. It produces a fully-bound SQL string via `:GetFixQuery()` that can be passed to `TCGenQry()` (SELECT) or `TCSqlExec()` (DML).
+`FWPreparedStatement` is the Protheus framework's parameterized-query API. `:GetFixQuery()` returns the query with the `?` parameters already handled and substituted, ready for the database (TDN), and the result can be passed to `TCGenQry()` (SELECT) or `TCSqlExec()` (DML).
 
 **Always use `FWPreparedStatement` when any value in the query comes from outside the function:**
 
-- Form fields, REST payloads, SOAP arguments
+- Form fields, `Pergunte` answers (`MV_PAR*`), REST payloads, SOAP arguments
 - `MV_*` parameters (`GetMV()` results)
 - Field values read from other tables at runtime
 - Anything the operator can influence
 
-> **When BeginSQL/EndSQL fits, prefer it** — it has macro safety (`%exp:%`) and automatic `ChangeQuery()`. Use raw `FWPreparedStatement` for cases BeginSQL macros do not handle (dynamic table names, optional WHERE blocks built at runtime, DML).
+> **BeginSQL/EndSQL fits static queries whose values are internal to the routine** (literals, `xFilial()`, `DtoS()` of a date, numbers it computes) and applies `ChangeQuery()` automatically. Its `%exp:` is **not** a bind parameter: the value is inserted into the SQL text (TDN "Embedded SQL", precompiled code with `___SQLGetValue`), so it does not replace this class for the values listed above — see `skills/embedded-sql/reference.md`. `FWPreparedStatement` is also the tool for what BeginSQL does not handle: optional WHERE blocks built at runtime and DML.
 
 ## API Quick Reference
 
@@ -17,16 +17,19 @@
 |---|---|
 | `:New()` | Create instance |
 | `:SetQuery(cQuery)` | Set query template with `?` placeholders |
-| `:SetString(n, cValue)` | Bind 1-based parameter `n` to a string |
-| `:SetNumeric(n, nValue)` | Bind to numeric |
-| `:SetDate(n, dValue)` | Bind to date |
-| `:GetFixQuery()` | Return the fully-bound, escaped SQL string |
+| `:SetString(n, cValue)` | Set 1-based parameter `n` to a string — a `'` inside `cValue` stays part of the value, not a delimiter (TDN) |
+| `:SetNumeric(n, nValue)` | Set to numeric |
+| `:SetDate(n, dValue)` | Set to date (Protheus date) |
+| `:SetIn(n, aValues)` | Set an IN parameter from an array (see Pattern 2.6) |
+| `:SetUnsafe(n, xValue)` | Insert the value without treatment — TDN: never with values received from a request; only for trusted values such as a dynamic table name |
+| `:GetFixQuery()` | Return the query with the parameters handled and substituted |
+| `:Destroy()` | Destroy the object when done |
 
 ## Pattern 2.1 — SELECT with FWPreparedStatement
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 User Function GetCustBalance(cCustCode, cLoja)
     Local nBalance := 0
@@ -54,6 +57,7 @@ User Function GetCustBalance(cCustCode, cLoja)
     EndIf
 
     (cAlias)->(DBCloseArea())
+    oStmt:Destroy()
 Return nBalance
 ```
 
@@ -61,14 +65,15 @@ Return nBalance
 
 - `?` placeholders are 1-based, in order of appearance.
 - Bind **every** dynamic value — including `xFilial()`, even though it's framework-generated, to keep the pattern uniform.
+- Only the physical table name (`RetSqlName()`, a framework value) is concatenated into the template; values never are.
 - The result is read via `(cAlias)->FIELD`, never via `&` macro.
-- Always close the alias.
+- Always close the alias and call `oStmt:Destroy()`.
 
 ## Pattern 2.2 — Multi-Table JOIN
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 User Function InvoiceDetails(cInvDoc, cSerie)
     Local aResult := {}
@@ -114,6 +119,7 @@ User Function InvoiceDetails(cInvDoc, cSerie)
     EndDo
 
     (cAlias)->(DBCloseArea())
+    oStmt:Destroy()
 Return aResult
 ```
 
@@ -128,8 +134,8 @@ Return aResult
 `TCSqlExec` bypasses Protheus dictionary triggers and validations. Use it only when those side effects are explicitly not desired (bulk operations, system-level fixes). Otherwise, prefer Workarea + `RecLock`/`MsUnlock`.
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 User Function UpdateCustFlag(cCustCode, cLoja, cFlag)
     Local nResult := 0
@@ -150,9 +156,10 @@ User Function UpdateCustFlag(cCustCode, cLoja, cFlag)
     oStmt:SetString(4, cLoja)
 
     nResult := TCSqlExec(oStmt:GetFixQuery())
+    oStmt:Destroy()
 
     If nResult < 0
-        ConOut("[UpdateCustFlag] SQL error: " + TCSqlError())
+        FWLogMsg("ERROR", /*cTransactionId*/, "QUERYBUILDER", "UpdateCustFlag", /*cStep*/, /*cMsgId*/, "SQL error: " + TCSqlError())
     EndIf
 Return (nResult == 0)
 ```
@@ -209,12 +216,13 @@ User Function CountActiveCust()
     EndIf
 
     (cAlias)->(DBCloseArea())
+    oStmt:Destroy()
 Return nCount
 ```
 
 ## Pattern 2.6 — IN-List with Dynamic Length
 
-`FWPreparedStatement` does not natively expand a list parameter. Build the placeholders dynamically and bind one-by-one:
+The TDN documents `SetIn(nParam, aValues)` for an IN parameter, but does not show whether the `?` must be written inside parentheses (a confirmar no TDS). The pattern below uses only `SetString`: build one `?` per item and bind them one by one:
 
 ```advpl
 Local aCodes      := { "000001", "000002", "000003" }
@@ -222,7 +230,10 @@ Local cPlacehld   := ""
 Local nI
 
 For nI := 1 To Len(aCodes)
-    cPlacehld += If(nI > 1, ",", "") + "?"
+    If nI > 1
+        cPlacehld += ","
+    EndIf
+    cPlacehld += "?"
 Next
 
 cQuery := "SELECT A1_COD, A1_NOME "
@@ -245,8 +256,11 @@ Next
 | Mistake | Problem | Fix |
 |---|---|---|
 | Mixing `?` with `'" + cVar + "'"` | Defeats the purpose — injection still possible | Bind every dynamic value |
+| Passing user/external input through BeginSQL `%exp:` | `%exp:` is not a bind parameter — the value is inserted into the SQL text (TDN "Embedded SQL") | Use `?` + `Set*` in `FWPreparedStatement` |
+| `SetUnsafe` with a value from the user or a request | The value goes in without treatment (TDN) — injection | `SetString`/`SetNumeric`/`SetDate`; `SetUnsafe` only for trusted values such as a table name |
 | Wrong placeholder count vs `SetString` calls | Runtime error or silent wrong binding | Count `?` and `Set*` calls match |
 | Using `SetString` for numeric/date | Wrong type — silent or runtime error | Use `SetNumeric` / `SetDate` |
 | Forgetting `:GetFixQuery()` | Passing the raw template to `TCGenQry` — placeholders not substituted | Always call `:GetFixQuery()` |
 | Not closing the alias | Alias leak | `(cAlias)->(DBCloseArea())` in all paths |
+| Not destroying the statement | Object kept alive after use | `oStmt:Destroy()` when done (TDN) |
 | `TCSqlExec` for CRUD that should fire triggers | Bypasses SX7 + dictionary validation | Use Workarea + `RecLock` instead |

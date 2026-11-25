@@ -17,7 +17,7 @@ Avoid Workarea when:
 ## Pattern 1.1 — Single Record Lookup by Index
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function GetCustomerName(cCustCode, cLoja)
     Local cName    := ""
@@ -46,7 +46,7 @@ Return cName
 ## Pattern 1.2 — Sequential Scan with Range Filter
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function ListReceivablesDue(dDataIni, dDataFim)
     Local aResult  := {}
@@ -88,7 +88,7 @@ Return aResult
 `RecLock` fires SX7 triggers, dictionary validations, and is the standard Protheus way to update a single record.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function FlagCustomer(cCustCode, cLoja, cFlag)
     Local lOk      := .F.
@@ -121,7 +121,7 @@ Return lOk
 ## Pattern 1.4 — Insert via RecLock
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function CreateCustomCode(cCod, cDesc)
     Local lOk     := .F.

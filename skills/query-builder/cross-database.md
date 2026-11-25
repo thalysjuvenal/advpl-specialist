@@ -1,14 +1,14 @@
 # Cross-Database Compatibility
 
-Protheus officially supports **PostgreSQL**, **Microsoft SQL Server**, and **Oracle**. Generated code must run unmodified across all three. Use the framework tools below — `ChangeQuery()`, `TCGetDB()`, DBAccess macros — to abstract differences. When no portable alternative exists, branch with `Do Case` on `TCGetDB()`.
+Protheus officially supports **PostgreSQL**, **Microsoft SQL Server**, and **Oracle**. Generated code must run unmodified across all three. Use the framework tools below — `ChangeQuery()`, `TCGetDB()`, Embedded SQL macros — to abstract differences. When no portable alternative exists, branch with `Do Case` on `TCGetDB()`.
 
 ## ChangeQuery() — Dialect Translation
 
 `ChangeQuery(cQuery)` translates a SQL string to the active database dialect before execution. It rewrites syntax such as `TOP n` → `LIMIT n` (PG) / `FETCH FIRST n ROWS ONLY` (Oracle), some date functions, and string operations.
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 Local cQuery := ""
 cQuery += "SELECT TOP 10 A1_COD, A1_NOME "
@@ -40,18 +40,20 @@ EndCase
 
 > Prefer ANSI alternatives (`COALESCE`) over branching whenever possible — keeps code shorter and easier to test.
 
-## DBAccess Macros (used in SQL strings)
+## Embedded SQL Macros (BeginSQL/EndSQL)
 
-These macros are translated by DBAccess per database. Available in **both** raw SQL strings and `BeginSQL/EndSQL` blocks:
+The TDN documents these `%...%` expressions for Embedded SQL (`BeginSQL`/`EndSQL`), where they are replaced by framework calls — the same on every database. In a raw SQL string (`TCQuery`, `TCGenQry`, `FWPreparedStatement`) use the equivalent functions (`RetSqlName()`, `xFilial()`, `D_E_L_E_T_ = ' '`).
 
-| Macro | Expansion (MSSQL) | Expansion (PG/Oracle) | Purpose |
-|---|---|---|---|
-| `%nolock%` | `WITH (NOLOCK)` | _ignored_ (MVCC) | Read without lock contention |
-| `%notDel%` | `D_E_L_E_T_ = ' '` | same | Soft-delete filter |
-| `%table:XXX%` | physical table name | same | `RetSqlName('XXX')` |
-| `%xfilial:XXX%` | branch literal | same | `xFilial('XXX')` |
-| `%Order:XXX%` | index-ordered column list | same | `SqlOrder(XXX->(IndexKey()))` |
-| `%exp:cVar%` | quoted, escaped value | same | Safe value injection (BeginSQL only) |
+| Macro | Replaced by (TDN) | Purpose |
+|---|---|---|
+| `%notDel%` | `D_E_L_E_T_ = ' '` | Soft-delete filter |
+| `%table:XXX%` | `RetSqlName('XXX')` | Physical table name |
+| `%xfilial:XXX%` | `xFilial('XXX')`, as a quoted literal | Branch filter |
+| `%Order:XXX%` | `SqlOrder(XXX->(IndexKey()))` | Index-ordered column list |
+| `%exp:cVar%` | the value, inserted into the SQL text (`___SQLGetValue()`) | Internal values only — not a bind parameter; user/external input goes through `FWPreparedStatement` ([`patterns-fwpreparedstatement.md`](patterns-fwpreparedstatement.md)) |
+| `%noparser%` | — | Skips `ChangeQuery()`: the query reaches the database without dialect translation |
+
+> The TDN documents no `%nolock%` macro (a confirmar no TDS) — see the locking-hint row in [Anti-Patterns](#anti-patterns).
 
 ## Cross-Database Function Equivalents
 
@@ -101,6 +103,8 @@ cQuery := ChangeQuery(cQuery)   // Translates to LIMIT/OFFSET on PG
 ```
 
 > `OFFSET ... FETCH NEXT ... ROWS ONLY` is ANSI-compatible (SQL:2008). `ChangeQuery()` adapts it for PG (`LIMIT/OFFSET`).
+>
+> The raw strings on this page concatenate only framework values (`RetSqlName()`, `xFilial()`) and numbers computed by the routine. Text typed by the user or received in a request goes as a `?` parameter of `FWPreparedStatement` — see [`patterns-fwpreparedstatement.md`](patterns-fwpreparedstatement.md).
 
 ## Temporary Tables
 
@@ -123,7 +127,7 @@ oTmp:Delete()
 |---|---|---|
 | Raw `GETDATE()` in SQL | Breaks PG/Oracle | Use ANSI `CURRENT_DATE` or branch on `TCGetDB()` |
 | `+` for string concat in SQL | Breaks PG/Oracle (need `\|\|`) | Use `CONCAT()` or build on AdvPL side |
-| Hardcoded `WITH (NOLOCK)` | PG/Oracle parse error | Use `%nolock%` macro |
+| Hardcoded `WITH (NOLOCK)` | SQL Server-only hint: breaks PG/Oracle when the query skips `ChangeQuery()`, and allows dirty reads | Do not hard-code locking hints. `ChangeQuery()` removes `NOLOCK`/`(NOLOCK)` from the query (TDN), and the TDN documents no `%nolock%` macro |
 | `ISNULL` outside MSSQL branch | Breaks PG/Oracle | Use `COALESCE` |
 | `LIMIT n` without `ChangeQuery()` | Breaks MSSQL | Either `ChangeQuery()` or use `FETCH FIRST` |
 | Building SQL strings dialect-aware by hand | Maintenance burden, easy to miss a path | Always run through `ChangeQuery()` and use macros |
