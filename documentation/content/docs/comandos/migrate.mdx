@@ -82,5 +82,5 @@ Converte codigo ADVPL procedural para TLPP com padroes orientados a objetos.
 
 ## Notas de migracao
 
-- Tratamento de erros em `.tlpp` usa `Try`/`Catch`/`EndTry`; `ErrorBlock` com `Begin Sequence` fica no ADVPL (`.prw`).
+- Tratamento de erros: em `.tlpp`, prefira `Try`/`Catch`/`EndTry` (`Begin Sequence` continua valido); `ErrorBlock` e preservado; o wrapper `.prw` usa `Begin Sequence`/`Recover`.
 - Includes em minusculas; `protheus.ch` e obsoleto.
