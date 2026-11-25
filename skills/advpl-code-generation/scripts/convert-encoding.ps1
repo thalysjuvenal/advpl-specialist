@@ -1,14 +1,16 @@
 # convert-encoding.ps1 - converts ADVPL/TLPP sources from UTF-8 to Windows-1252
+# (and, with --to-utf8, from Windows-1252 to UTF-8)
 #
 # PowerShell twin of convert-encoding.sh: same CLI, same report lines on
 # stdout (byte for byte), same stderr messages, same exit codes and the same
 # resulting file bytes. See convert-encoding.sh for the options, the report
-# lines, the exit codes and the translit mapping; any change there must be
+# lines (already-utf8 and "undefined byte" included), the exit codes, the
+# translit mapping and the --to-utf8 rules; any change there must be
 # mirrored here. examples/encoding-tests/run-tests.sh compares both scripts
 # step by step whenever pwsh or powershell is installed.
 #
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File convert-encoding.ps1
-#          [--dry-run] [--translit] [-r] PATH...
+#          [--dry-run] [--translit | --to-utf8] [-r] PATH...
 # (pwsh works the same way.)
 #
 # Compatibility: Windows PowerShell 5.1 (.NET Framework) and PowerShell 7+
@@ -29,6 +31,12 @@
 #   disagreement with the table fails loudly instead of writing a "?". On
 #   .NET (pwsh 7) the code page needs CodePagesEncodingProvider, registered
 #   only where that type exists (Windows PowerShell 5.1 has 1252 built in);
+# - --to-utf8: the same UTF8Encoding decides validity. A file that is not
+#   valid UTF-8 is read as Latin-1 (28591: one char per byte, same value,
+#   built into both runtimes), the bytes the table leaves undefined fail it,
+#   the 27 other bytes 0x80-0x9F become their table chars (the code page
+#   decoder is not used: it would take the five undefined bytes as C1
+#   controls) and the text is written as UTF-8 without BOM;
 # - output: UTF-8 bytes with LF line ends written straight to the standard
 #   streams (no console encoding, no CRLF).
 
@@ -36,31 +44,46 @@ Set-StrictMode -Version 3.0
 $ErrorActionPreference = 'Stop'
 
 $script:Argv = @($args)
-$script:Usage = 'usage: convert-encoding [--dry-run] [--translit] [-r] PATH...'
+$script:Usage = 'usage: convert-encoding [--dry-run] [--translit | --to-utf8] [-r] PATH...'
 $script:StdOut = [Console]::OpenStandardOutput()
 $script:StdErr = [Console]::OpenStandardError()
 $script:Utf8 = New-Object System.Text.UTF8Encoding -ArgumentList $false
 $script:Utf8Strict = New-Object System.Text.UTF8Encoding -ArgumentList $false, $true
+$script:Latin1 = [System.Text.Encoding]::GetEncoding(28591)
 $script:Exts = New-Object 'System.Collections.Generic.HashSet[string]' -ArgumentList ([System.StringComparer]::Ordinal)
 foreach ($e in @('prw', 'tlpp', 'prx', 'ch', 'prg', 'apw', 'aph', 'tlh', 'th')) { [void]$script:Exts.Add($e) }
-# One match per code point outside Windows-1252: a surrogate pair (one code
-# point above U+FFFF) or a BMP char outside U+0000-U+007F, U+00A0-U+00FF and
-# the 27 code points of the bytes 0x80-0x9F (same list as CP1252_EXTRA in
-# convert-encoding.sh). Built from numbers so that this file stays ASCII.
+# Windows-1252 bytes 0x80-0x9F and their Unicode code points (decimal BYTE:CP):
+# the same text as CP1252_EXTRA in convert-encoding.sh. Everything below is
+# built from these numbers, so that this file stays ASCII.
+$script:Cp1252Extra = '128:8364 130:8218 131:402 132:8222 133:8230 134:8224 135:8225 136:710 137:8240 138:352 139:8249 140:338 142:381 145:8216 146:8217 147:8220 148:8221 149:8226 150:8211 151:8212 152:732 153:8482 154:353 155:8250 156:339 158:382 159:376'
+# RxOutside: one match per code point outside Windows-1252, a surrogate pair
+# (one code point above U+FFFF) or a BMP char outside U+0000-U+007F,
+# U+00A0-U+00FF and the 27 code points of the table. C1Byte/C1Char: the table
+# as chars (Latin-1 char of the byte, Unicode char). Undefined: the bytes
+# 0x80-0x9F the table lacks (0x81 0x8D 0x8F 0x90 0x9D).
 $cls = New-Object System.Text.StringBuilder
 [void]$cls.Append('[^\x00-\x7F\xA0-\xFF')
-foreach ($cp in @(0x0152, 0x0153, 0x0160, 0x0161, 0x0178, 0x017D, 0x017E, 0x0192, 0x02C6, 0x02DC,
-    0x2013, 0x2014, 0x2018, 0x2019, 0x201A, 0x201C, 0x201D, 0x201E, 0x2020, 0x2021, 0x2022,
-    0x2026, 0x2030, 0x2039, 0x203A, 0x20AC, 0x2122)) {
-  [void]$cls.Append([char]$cp)
+$script:C1Byte = New-Object 'System.Collections.Generic.List[char]'
+$script:C1Char = New-Object 'System.Collections.Generic.List[char]'
+foreach ($pr in ($script:Cp1252Extra -split ' ')) {
+  $kv = $pr -split ':'
+  $script:C1Byte.Add([char][int]($kv[0]))
+  $script:C1Char.Add([char][int]($kv[1]))
+  [void]$cls.Append([char][int]($kv[1]))
 }
 [void]$cls.Append(']')
 $pair = '[' + [char]0xD800 + '-' + [char]0xDBFF + '][' + [char]0xDC00 + '-' + [char]0xDFFF + ']'
 $script:RxOutside = New-Object System.Text.RegularExpressions.Regex -ArgumentList ($pair + '|' + $cls.ToString())
+$undef = New-Object 'System.Collections.Generic.List[char]'
+for ($b = 0x80; $b -le 0x9F; $b++) {
+  if (-not $script:C1Byte.Contains([char]$b)) { $undef.Add([char]$b) }
+}
+$script:Undefined = $undef.ToArray()
 $script:Seps = [char[]]@('/')
 if ([System.IO.Path]::DirectorySeparatorChar -ne '/') { $script:Seps = [char[]]@('/', [System.IO.Path]::DirectorySeparatorChar) }
 $script:DryRun = $false
 $script:Translit = $false
+$script:ToUtf8 = $false
 $script:Failed = $false
 $script:Cp1252 = $null
 
@@ -126,6 +149,35 @@ function Set-Failed([string]$line) {
   $script:Failed = $true
 }
 
+# $out -> $p unless --dry-run; $false after a "write error" line.
+# In place, not via temp file + rename: keeps inode, owner, permissions and
+# links, at the cost of atomicity (an interrupted write truncates the file).
+function Save-Bytes([string]$p, [byte[]]$out) {
+  if ($script:DryRun) { return $true }
+  try {
+    [System.IO.File]::WriteAllBytes($p, $out)
+  } catch {
+    Set-Failed ('failed: ' + $p + ' (write error)')
+    return $false
+  }
+  return $true
+}
+
+# --to-utf8 for a file that is not valid UTF-8: every byte, from the first
+# one, read as Windows-1252 and written as UTF-8 without BOM.
+function Convert-ToUtf8([string]$p, [byte[]]$bytes) {
+  $text = $script:Latin1.GetString($bytes)
+  if ($text.IndexOfAny($script:Undefined) -ge 0) {
+    Set-Failed ('failed: ' + $p + ' (undefined byte)')
+    return
+  }
+  for ($i = 0; $i -lt $script:C1Byte.Count; $i++) {
+    $text = $text.Replace($script:C1Byte[$i], $script:C1Char[$i])
+  }
+  $out = $script:Utf8.GetBytes($text)
+  if (Save-Bytes $p $out) { Write-Report ('converted: ' + $p) }
+}
+
 function Convert-File([string]$p) {
   if (-not (Test-Advpl $p)) {
     Write-Report ('skipped: ' + $p + ' (not advpl)')
@@ -140,9 +192,22 @@ function Convert-File([string]$p) {
   $n = $bytes.Length
   $start = 0
   if ($n -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { $start = 3 }
+  $valid = $true
   try {
     $text = $script:Utf8Strict.GetString($bytes, $start, $n - $start)
   } catch {
+    $valid = $false
+  }
+  # the same decoder decides in both directions
+  if ($script:ToUtf8) {
+    if ($valid) {
+      Write-Report ('already-utf8: ' + $p)
+    } else {
+      Convert-ToUtf8 $p $bytes
+    }
+    return
+  }
+  if (-not $valid) {
     Write-Report ('already-cp1252: ' + $p)
     return
   }
@@ -165,16 +230,7 @@ function Convert-File([string]$p) {
     Set-Failed ('failed: ' + $p + ' (incompatible char)')
     return
   }
-  # In place, not via temp file + rename: keeps inode, owner, permissions and
-  # links, at the cost of atomicity (an interrupted write truncates the file).
-  if (-not $script:DryRun) {
-    try {
-      [System.IO.File]::WriteAllBytes($p, $out)
-    } catch {
-      Set-Failed ('failed: ' + $p + ' (write error)')
-      return
-    }
-  }
+  if (-not (Save-Bytes $p $out)) { return }
   if ($q -gt 0) {
     Write-Report ('translit: ' + $p + ' (' + $q + ')')
   } else {
@@ -193,6 +249,7 @@ function Invoke-Main {
       if ($a -ceq '--') { $optsDone = $true; continue }
       if ($a -ceq '--dry-run') { $script:DryRun = $true; continue }
       if ($a -ceq '--translit') { $script:Translit = $true; continue }
+      if ($a -ceq '--to-utf8') { $script:ToUtf8 = $true; continue }
       if ($a -ceq '-r') { $recurse = $true; continue }
       if ($a -ceq '-h' -or $a -ceq '--help') {
         Write-Report $script:Usage
@@ -202,6 +259,7 @@ function Invoke-Main {
     }
     $paths.Add($a)
   }
+  if ($script:Translit -and $script:ToUtf8) { Exit-Usage '--to-utf8 cannot be combined with --translit' }
   if ($paths.Count -eq 0) { Exit-Usage 'no PATH given' }
   foreach ($p in $paths) {
     if ($p.Length -gt 0 -and [System.IO.Directory]::Exists($p)) {

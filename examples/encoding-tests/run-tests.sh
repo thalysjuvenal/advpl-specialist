@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Fixture-based runner for the standalone UTF-8 -> Windows-1252 converters
+# Fixture-based runner for the standalone UTF-8 <-> Windows-1252 converters
+# (UTF-8 -> Windows-1252 by default, Windows-1252 -> UTF-8 with --to-utf8)
 #   skills/advpl-code-generation/scripts/convert-encoding.sh
 #   skills/advpl-code-generation/scripts/convert-encoding.ps1
 # Usage: bash examples/encoding-tests/run-tests.sh   (on macOS, /bin/bash = 3.2)
@@ -73,6 +74,11 @@ decodes_to() {
   rm -f "$1.decoded"
   return $rc
 }
+# is_utf8_of CP1252_FILE FILE: FILE holds the UTF-8 of CP1252_FILE read as
+# Windows-1252 (the --to-utf8 oracle, same exact decode direction).
+is_utf8_of() {
+  iconv -f WINDOWS-1252 -t UTF-8 <"$1" >"$TMP_DIR/utf8-of" && cmp "$TMP_DIR/utf8-of" "$2"
+}
 first3() { head -c 3 "$1" | od -An -tx1 | tr -d ' \n'; }
 no_bom() { [ "$(first3 "$1")" != efbbbf ]; }
 # shellcheck disable=SC2059  # byte sequences are passed as printf escapes
@@ -97,6 +103,10 @@ tree_sum() {   # DIR: "PATH CRC SIZE" for every file, sorted
 }
 
 # ---- inputs --------------------------------------------------------------------
+# Windows-1252 bytes 0x80-0x9F and their code points (decimal BYTE:CP), written
+# here from the code page itself, independently of the converters; the other
+# 5 bytes of that range (0x81 0x8D 0x8F 0x90 0x9D) are undefined.
+CP1252_TABLE='128:8364 130:8218 131:402 132:8222 133:8230 134:8224 135:8225 136:710 137:8240 138:352 139:8249 140:338 142:381 145:8216 146:8217 147:8220 148:8221 149:8226 150:8211 151:8212 152:732 153:8482 154:353 155:8250 156:339 158:382 159:376'
 # $BASE = fixtures/ + generated inputs; every case copies it.
 BASE="$TMP_DIR/base"
 make_base() {
@@ -130,9 +140,8 @@ make_base() {
   mkdir -p "$BASE/-dir"
   printf '// a\303\247\303\243o\n' >"$BASE/-dir/y.prw"
   # every code point U+0080..U+FFFF (no surrogates) + 3 astral, one per line,
-  # and the expected Windows-1252 result of --translit (the CP1252 table is
-  # written here from the code page itself, independently of the converters)
-  LC_ALL=C awk -v want="$BASE/sweep.expected" '
+  # and the expected Windows-1252 result of --translit (from CP1252_TABLE)
+  LC_ALL=C awk -v table="$CP1252_TABLE" -v want="$BASE/sweep.expected" '
     function u(c) {
       if (c < 2048) printf "%c%c", 192 + int(c / 64), 128 + c % 64
       else if (c < 65536) printf "%c%c%c", 224 + int(c / 4096), 128 + int(c / 64) % 64, 128 + c % 64
@@ -143,11 +152,55 @@ make_base() {
       else printf "?\n" > want
     }
     BEGIN {
-      n = split("128:8364 130:8218 131:402 132:8222 133:8230 134:8224 135:8225 136:710 137:8240 138:352 139:8249 140:338 142:381 145:8216 146:8217 147:8220 148:8221 149:8226 150:8211 151:8212 152:732 153:8482 154:353 155:8250 156:339 158:382 159:376", t, " ")
+      n = split(table, t, " ")
       for (i = 1; i <= n; i++) { split(t[i], p, ":"); cp[p[2] + 0] = p[1] + 0 }
       for (c = 128; c <= 65535; c++) if (c < 55296 || c > 57343) u(c)
       u(65536); u(128640); u(1114111)
     }' >"$BASE/sweep.prw"
+  # ---- --to-utf8 inputs: not valid UTF-8, so taken as Windows-1252 ----
+  # accents, C1 punctuation (curly quotes, en dash, euro, ellipsis), NBSP,
+  # ordinal, y diaeresis, CRLF, no final newline; expected UTF-8 byte by byte
+  printf '#include "totvs.ch"\r\n// Fun\347\343o \223a\347\343o\224 \226 \200 10\205 N\272\2401 \377\r\nUser Function CPACE()\r\nReturn Nil' >"$BASE/cp-acentos.prw"
+  printf '#include "totvs.ch"\r\n// Fun\303\247\303\243o \342\200\234a\303\247\303\243o\342\200\235 \342\200\223 \342\202\254 10\342\200\246 N\302\272\302\2401 \303\277\r\nUser Function CPACE()\r\nReturn Nil' >"$BASE/cp-acentos.expected"
+  # BOM bytes before Windows-1252 text: the file is not valid UTF-8, so these
+  # 3 bytes are Windows-1252 too (the normal mode leaves them as they are)
+  printf '\357\273\277// a\347\343o\r\n' >"$BASE/bom-cp1252.prw"
+  printf '\303\257\302\273\302\277// a\303\247\303\243o\r\n' >"$BASE/bom-cp1252.expected"
+  # Windows-1252 e acute that becomes C3 A9 across byte offset 1024
+  cp "$BASE/boundary.expected" "$BASE/cp-boundary.prw"
+  # the 5 bytes Windows-1252 leaves undefined, one per file, after valid text
+  printf '// a\347\343o \201 fim\n' >"$BASE/undef-81.prw"
+  printf '// a\347\343o \215 fim\n' >"$BASE/undef-8d.prw"
+  printf '// a\347\343o \217 fim\n' >"$BASE/undef-8f.prw"
+  printf '// a\347\343o \220 fim\n' >"$BASE/undef-90.prw"
+  printf '// a\347\343o \235 fim\n' >"$BASE/undef-9d.prw"
+  # mixed directory for --to-utf8 -r: CP1252 with CRLF and uppercase
+  # extension, UTF-8, ASCII, CP1252 .txt, undefined byte, CP1252 .th
+  mkdir -p "$BASE/mixed/sub"
+  printf '#include "totvs.ch"\r\n// a\347\343o\r\nReturn Nil\r\n' >"$BASE/mixed/a.PRW"
+  printf '#include "totvs.ch"\r\n// a\303\247\303\243o\r\nReturn Nil\r\n' >"$BASE/mixed-a.expected"
+  printf '// a\303\247\303\243o\n' >"$BASE/mixed/b.tlpp"
+  printf '// ascii\n' >"$BASE/mixed/c.ch"
+  printf 'a\347\343o\n' >"$BASE/mixed/notes.txt"
+  printf '// \347 \201\n' >"$BASE/mixed/sub/d.prw"
+  printf '// \351\n' >"$BASE/mixed/sub/e.th"
+  # every byte Windows-1252 defines (all but the 5 undefined), NUL and CR
+  # included, each followed by LF, and the expected UTF-8 (from CP1252_TABLE)
+  LC_ALL=C awk -v table="$CP1252_TABLE" -v want="$BASE/cp-sweep.expected" '
+    function u(c) {
+      if (c < 128) printf "%c", c > want
+      else if (c < 2048) printf "%c%c", 192 + int(c / 64), 128 + c % 64 > want
+      else printf "%c%c%c", 224 + int(c / 4096), 128 + int(c / 64) % 64, 128 + c % 64 > want
+      printf "\n" > want
+    }
+    BEGIN {
+      n = split(table, t, " ")
+      for (i = 1; i <= n; i++) { split(t[i], p, ":"); cp[p[1] + 0] = p[2] + 0 }
+      for (b = 0; b <= 255; b++) {
+        if (b < 128 || b > 159) { printf "%c\n", b; u(b) }
+        else if (b in cp) { printf "%c\n", b; u(cp[b]) }
+      }
+    }' >"$BASE/cp-sweep.prw"
 }
 
 # ---- case machinery ------------------------------------------------------------
@@ -337,7 +390,7 @@ case_usage() {
   step
   expect_rc 2
   expect_stdout
-  expect_stderr_has "usage: convert-encoding [--dry-run] [--translit] [-r] PATH..."
+  expect_stderr_has "usage: convert-encoding [--dry-run] [--translit | --to-utf8] [-r] PATH..."
   step --bogus 02-acentos-ptbr.prw
   expect_rc 2
   expect_stdout
@@ -356,7 +409,7 @@ case_usage() {
   expect_stdout "converted: 02-acentos-ptbr.prw"
   step --help
   expect_rc 0
-  expect_stdout "usage: convert-encoding [--dry-run] [--translit] [-r] PATH..."
+  expect_stdout "usage: convert-encoding [--dry-run] [--translit | --to-utf8] [-r] PATH..."
   end_case "usage: exit 2 before touching any file, --, --help"
 }
 
@@ -392,6 +445,199 @@ case_dash_paths() {
   expect_stdout "converted: -dir/y.prw"
   expect_that "-dir/y.prw: not Windows-1252" decodes_to "$CS/-dir/y.prw" "$BASE/-dir/y.prw"
   end_case "paths starting with -: option without --, converted after -- (file and -r dir)"
+}
+
+# ---- --to-utf8 (Windows-1252 -> UTF-8) ---------------------------------------------
+case_to_utf8() {
+  new_case to-utf8
+  step --to-utf8 01-ascii-puro.prw 02-acentos-ptbr.prw 04-emoji-fail.prw 05-already-cp1252.prw \
+    06-utf8-bom.prw 07-not-advpl.txt 09-tlpp-header.th bom-ascii.prw bom-only.prw boundary.prw \
+    cp-acentos.prw bom-cp1252.prw bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout \
+    "already-utf8: 01-ascii-puro.prw" \
+    "already-utf8: 02-acentos-ptbr.prw" \
+    "already-utf8: 04-emoji-fail.prw" \
+    "converted: 05-already-cp1252.prw" \
+    "already-utf8: 06-utf8-bom.prw" \
+    "skipped: 07-not-advpl.txt (not advpl)" \
+    "converted: 09-tlpp-header.th" \
+    "already-utf8: bom-ascii.prw" \
+    "already-utf8: bom-only.prw" \
+    "already-utf8: boundary.prw" \
+    "converted: cp-acentos.prw" \
+    "converted: bom-cp1252.prw" \
+    "converted: bad-overlong.prw" \
+    "converted: bad-surrogate.prw" \
+    "converted: bad-stray.prw" \
+    "converted: bad-truncated.prw"
+  # valid UTF-8 (ASCII, BOM kept, characters outside Windows-1252) untouched
+  untouched 01-ascii-puro.prw 02-acentos-ptbr.prw 04-emoji-fail.prw 06-utf8-bom.prw 07-not-advpl.txt \
+    bom-ascii.prw bom-only.prw boundary.prw
+  expect_that "cp-acentos: not the expected UTF-8 bytes (CRLF, no final newline)" \
+    same_file "$BASE/cp-acentos.expected" "$CS/cp-acentos.prw"
+  expect_that "bom-cp1252: BOM bytes not taken as Windows-1252" \
+    same_file "$BASE/bom-cp1252.expected" "$CS/bom-cp1252.prw"
+  local f
+  for f in 05-already-cp1252.prw 09-tlpp-header.th bad-overlong.prw bad-surrogate.prw bad-stray.prw \
+    bad-truncated.prw; do
+    expect_that "$f: not the UTF-8 of the Windows-1252 bytes" is_utf8_of "$BASE/$f" "$CS/$f"
+    expect_that "$f: BOM written" no_bom "$CS/$f"
+  done
+  # idempotent: a second run finds everything in UTF-8 already
+  step --to-utf8 05-already-cp1252.prw 09-tlpp-header.th cp-acentos.prw bom-cp1252.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout \
+    "already-utf8: 05-already-cp1252.prw" \
+    "already-utf8: 09-tlpp-header.th" \
+    "already-utf8: cp-acentos.prw" \
+    "already-utf8: bom-cp1252.prw"
+  end_case "--to-utf8: Windows-1252 -> UTF-8 (C1, CRLF, no BOM), already-utf8 untouched, skipped, idempotent"
+}
+
+case_to_utf8_fails() {
+  new_case to-utf8-fails
+  step --to-utf8 undef-81.prw undef-8d.prw cp-acentos.prw undef-8f.prw undef-90.prw undef-9d.prw bad-utf8.prw
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "failed: undef-81.prw (undefined byte)" \
+    "failed: undef-8d.prw (undefined byte)" \
+    "converted: cp-acentos.prw" \
+    "failed: undef-8f.prw (undefined byte)" \
+    "failed: undef-90.prw (undefined byte)" \
+    "failed: undef-9d.prw (undefined byte)" \
+    "failed: bad-utf8.prw (undefined byte)"
+  untouched undef-81.prw undef-8d.prw undef-8f.prw undef-90.prw undef-9d.prw bad-utf8.prw
+  expect_that "cp-acentos: not converted next to the failures" \
+    same_file "$BASE/cp-acentos.expected" "$CS/cp-acentos.prw"
+  end_case "--to-utf8: bytes 81 8D 8F 90 9D fail, files byte-identical, exit 1"
+}
+
+case_to_utf8_sweep() {
+  new_case to-utf8-sweep
+  expect_that "oracle: iconv disagrees with cp-sweep.expected" \
+    is_utf8_of "$BASE/cp-sweep.prw" "$BASE/cp-sweep.expected"
+  step --to-utf8 cp-sweep.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout "converted: cp-sweep.prw"
+  expect_that "cp-sweep: result differs from the CP1252 table" same_file "$BASE/cp-sweep.expected" "$CS/cp-sweep.prw"
+  end_case "--to-utf8 sweep: the 251 bytes Windows-1252 defines (NUL, CR, C1 included) become UTF-8"
+}
+
+case_round_trip() {
+  new_case round-trip
+  local files="cp-sweep.prw cp-acentos.prw 05-already-cp1252.prw 09-tlpp-header.th bom-cp1252.prw
+    cp-boundary.prw bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw mixed/a.PRW"
+  # shellcheck disable=SC2086  # $files is a list of plain names
+  step --to-utf8 $files 01-ascii-puro.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout \
+    "converted: cp-sweep.prw" \
+    "converted: cp-acentos.prw" \
+    "converted: 05-already-cp1252.prw" \
+    "converted: 09-tlpp-header.th" \
+    "converted: bom-cp1252.prw" \
+    "converted: cp-boundary.prw" \
+    "converted: bad-overlong.prw" \
+    "converted: bad-surrogate.prw" \
+    "converted: bad-stray.prw" \
+    "converted: bad-truncated.prw" \
+    "converted: mixed/a.PRW" \
+    "already-utf8: 01-ascii-puro.prw"
+  expect_that "cp-boundary: C3 A9 across offset 1024 not written" same_file "$BASE/boundary.prw" "$CS/cp-boundary.prw"
+  # shellcheck disable=SC2086
+  step $files 01-ascii-puro.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout \
+    "converted: cp-sweep.prw" \
+    "converted: cp-acentos.prw" \
+    "converted: 05-already-cp1252.prw" \
+    "converted: 09-tlpp-header.th" \
+    "converted: bom-cp1252.prw" \
+    "converted: cp-boundary.prw" \
+    "converted: bad-overlong.prw" \
+    "converted: bad-surrogate.prw" \
+    "converted: bad-stray.prw" \
+    "converted: bad-truncated.prw" \
+    "converted: mixed/a.PRW" \
+    "already-cp1252: 01-ascii-puro.prw"
+  # shellcheck disable=SC2086
+  untouched $files 01-ascii-puro.prw
+  end_case "round trip: --to-utf8 then the normal mode gives back every byte (sweep, CRLF, BOM bytes, offset 1024)"
+}
+
+case_to_utf8_dry_run() {
+  new_case to-utf8-dry-run
+  step --dry-run --to-utf8 cp-acentos.prw 02-acentos-ptbr.prw undef-81.prw 07-not-advpl.txt
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "converted: cp-acentos.prw" \
+    "already-utf8: 02-acentos-ptbr.prw" \
+    "failed: undef-81.prw (undefined byte)" \
+    "skipped: 07-not-advpl.txt (not advpl)"
+  untouched cp-acentos.prw 02-acentos-ptbr.prw undef-81.prw 07-not-advpl.txt
+  step -r mixed --to-utf8 --dry-run
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "converted: mixed/a.PRW" \
+    "already-utf8: mixed/b.tlpp" \
+    "already-utf8: mixed/c.ch" \
+    "failed: mixed/sub/d.prw (undefined byte)" \
+    "converted: mixed/sub/e.th"
+  untouched mixed/a.PRW mixed/b.tlpp mixed/c.ch mixed/notes.txt mixed/sub/d.prw mixed/sub/e.th
+  end_case "--to-utf8 --dry-run: same report and exit code, nothing written"
+}
+
+case_to_utf8_recursive() {
+  new_case to-utf8-recursive
+  step -r mixed/ --to-utf8
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "converted: mixed/a.PRW" \
+    "already-utf8: mixed/b.tlpp" \
+    "already-utf8: mixed/c.ch" \
+    "failed: mixed/sub/d.prw (undefined byte)" \
+    "converted: mixed/sub/e.th"
+  untouched mixed/b.tlpp mixed/c.ch mixed/notes.txt mixed/sub/d.prw
+  expect_that "a.PRW: not the expected UTF-8 with CRLF kept" same_file "$BASE/mixed-a.expected" "$CS/mixed/a.PRW"
+  expect_that "e.th: not the UTF-8 of the Windows-1252 bytes" is_utf8_of "$BASE/mixed/sub/e.th" "$CS/mixed/sub/e.th"
+  end_case "--to-utf8 -r: mixed directory, ADVPL files only, CRLF kept, undefined byte fails, run goes on"
+}
+
+case_to_utf8_usage() {
+  new_case to-utf8-usage
+  step --to-utf8 --translit cp-acentos.prw
+  expect_rc 2
+  expect_stdout
+  expect_stderr_has "convert-encoding: --to-utf8 cannot be combined with --translit"
+  expect_stderr_has "usage: convert-encoding [--dry-run] [--translit | --to-utf8] [-r] PATH..."
+  step --translit -r mixed --to-utf8
+  expect_rc 2
+  expect_stdout
+  expect_stderr_has "convert-encoding: --to-utf8 cannot be combined with --translit"
+  step --to-utf8 cp-acentos.prw missing.prw
+  expect_rc 2
+  expect_stdout
+  expect_stderr_has "cannot read PATH: missing.prw"
+  step --to-utf8 mixed
+  expect_rc 2
+  expect_stdout
+  expect_stderr_has "mixed is a directory (use -r)"
+  untouched cp-acentos.prw mixed/a.PRW
+  step --to-utf8 -- cp-acentos.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout "converted: cp-acentos.prw"
+  end_case "--to-utf8 usage: --translit together is exit 2, checks before touching any file, --"
 }
 
 # set_mode MODE PATH: chmod in the bash copy and in the PowerShell twin
@@ -430,7 +676,27 @@ case_unreadable() {
   set_mode 644 tree/sub/B.TLPP
   set_mode 644 "tree/x y.prw"
   untouched tree/sub/B.TLPP "tree/x y.prw"
-  end_case "-r: unreadable file = read error, read-only file = write error, run goes on, exit 1"
+  # the same formats with --to-utf8 (tree/a.prw is Windows-1252 now)
+  set_mode 000 tree/sub/B.TLPP
+  set_mode 444 tree/sub/deep/c.ch
+  step --to-utf8 tree/sub/B.TLPP
+  expect_rc 2
+  expect_stdout
+  expect_stderr_has "cannot read PATH: tree/sub/B.TLPP"
+  step --to-utf8 -r tree
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "already-utf8: tree/.hidden/z.prw" \
+    "converted: tree/a.prw" \
+    "failed: tree/sub/B.TLPP (read error)" \
+    "failed: tree/sub/deep/c.ch (write error)" \
+    "already-utf8: tree/x y.prw"
+  set_mode 644 tree/sub/B.TLPP
+  set_mode 644 tree/sub/deep/c.ch
+  untouched tree/sub/B.TLPP tree/sub/deep/c.ch "tree/x y.prw"
+  expect_that "a.prw: round trip changed the bytes" same_file "$BASE/tree/a.prw" "$CS/tree/a.prw"
+  end_case "-r: unreadable file = read error, read-only file = write error, run goes on, exit 1 (both directions)"
 }
 
 # ---- run -------------------------------------------------------------------------
@@ -456,6 +722,13 @@ case_recursive
 case_usage
 case_sweep
 case_dash_paths
+case_to_utf8
+case_to_utf8_fails
+case_to_utf8_sweep
+case_round_trip
+case_to_utf8_dry_run
+case_to_utf8_recursive
+case_to_utf8_usage
 case_unreadable
 
 echo ""
