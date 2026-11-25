@@ -190,7 +190,7 @@ User Function getCustomers()
 return oRest:setResponse(cData)
 ```
 
-A variante baseada em classe (`rest-mod03.tlpp`) tambem e suportada — usa `class ... from LongClassName` com decoradores `@Get/@Post` em metodos. Ambos os padroes compilam em RPOs de cliente, ambos exigem a declaracao de `namespace`. Nunca usa `Function` puro com anotacoes REST TLPP.
+A variante baseada em classe (`rest-mod03.tlpp`) tambem e suportada, com decoradores `@Get/@Post` em metodos. No codigo gerado a classe nao tem clausula de heranca: classe TLPP com `namespace` nao precisa de `LongNameClass`, e `from LongClassName` e a grafia incorreta apontada pela CA3002. Se o proprio `rest-mod03.tlpp` declara heranca fica "a confirmar no TDS". Ambos os padroes valem para RPO de cliente e exigem a declaracao de `namespace`. Nunca usa `Function` puro com anotacoes REST TLPP.
 
 ## Regras de Namespace TLPP (CRITICO)
 

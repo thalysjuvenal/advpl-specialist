@@ -4,8 +4,9 @@ Use Workarea when:
 
 - Looking up a single record by an existing SIX index key
 - Iterating records sequentially in a known order
-- Performing locking + update with `RecLock`/`MsUnlock` (triggers fire)
-- Need data dictionary validation/trigger semantics
+- Performing locking + a direct update with `RecLock`/`MsUnlock` (no `X3_VALID` and no SX7 triggers run)
+
+When the write needs dictionary validations or SX7 triggers, do not write the fields yourself: use `MsExecAuto` with the routine's documented example, or the MVC model API (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`).
 
 Avoid Workarea when:
 
@@ -85,7 +86,7 @@ Return aResult
 
 ## Pattern 1.3 — Locking + Update (RecLock / MsUnlock)
 
-`RecLock` fires SX7 triggers, dictionary validations, and is the standard Protheus way to update a single record.
+`RecLock` locks a single record so the code can write its fields directly. The write runs no `X3_VALID` validation and no SX7 trigger. Use it for fields the code owns (such as a custom `_X*` flag); when the dictionary rules must run, use `MsExecAuto` or the MVC model API instead.
 
 ```advpl
 #include "totvs.ch"
@@ -116,7 +117,7 @@ Return lOk
 
 - `RecLock("SA1", .F.)` — `.F.` for existing record, `.T.` to insert a new one.
 - Always pair every successful `RecLock` with `MsUnlock()` — even on error paths (use `BEGIN SEQUENCE / RECOVER`).
-- `RecLock` triggers `SX7` (gatilhos) and `SX3` validations — that is usually the desired behavior. If you need to bypass them (bulk operations), use `TCSqlExec`.
+- `RecLock` does **not** run `SX7` triggers (gatilhos) or `SX3` validations (`X3_VALID`): the assignment is written as is. When those rules are needed, use `MsExecAuto` with the routine's documented example, or the MVC model API (`SetValue` + `VldData` + `CommitData`). For bulk DML, `TCSqlExec` (which also skips them) is the alternative.
 
 ## Pattern 1.4 — Insert via RecLock
 

@@ -97,15 +97,16 @@ WHERE SA1.D_E_L_E_T_ = ' '
 | Large result sets | Good (memory control) | Good (mind alias cleanup) | — |
 | Record locking for update | **Required** (`RecLock`) | — | Bypasses locks |
 | Performance (key-based) | **Fastest** | Slight overhead | Fastest write |
-| Dictionary triggers (SX7) fire | **Yes** | No | **No** |
+| `X3_VALID` / SX7 triggers run | No (direct write) | No | No |
 | Index requirement | Must have suitable SIX | Any column | Any column |
 | Code readability for joins | Poor | **Best** | — |
 
 ### Rules of Thumb
 
-- **CRUD on a single record:** Workarea + `RecLock`/`MsUnlock` (triggers fire automatically).
+- **Direct write on a single record:** Workarea + `RecLock`/`MsUnlock`. It runs no `X3_VALID` validation and no SX7 trigger, so use it for fields the code owns (custom `_X*` fields, custom Z\* tables).
+- **Write that needs the dictionary rules** (validations, triggers, the standard routine's logic): `MsExecAuto` with the routine's documented example, or the MVC model API (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`).
 - **Reporting / aggregation / joins:** Embedded SQL via `BeginSQL/EndSQL` (preferred) or `FWPreparedStatement` + `TCGenQry`.
-- **Bulk DML (UPDATE/DELETE/INSERT) bypassing triggers:** `TCSqlExec` with `FWPreparedStatement` — only when triggers and validations are explicitly not desired.
+- **Bulk DML (UPDATE/DELETE/INSERT):** `TCSqlExec` with `FWPreparedStatement`. Like `RecLock`, it runs no validations or triggers.
 
 > **Default to BeginSQL/EndSQL** for SELECT queries. Use raw `FWPreparedStatement` + `TCGenQry` only when BeginSQL macros do not fit (e.g., dynamic table names, optional WHERE blocks).
 
@@ -113,10 +114,13 @@ WHERE SA1.D_E_L_E_T_ = ' '
 
 **Never concatenate user input directly into SQL strings.** Always use `FWPreparedStatement` with `?` placeholders for any value that comes from outside the function (form fields, REST payloads, `MV_*` parameters, table fields read at runtime).
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // DANGEROUS — vulnerable to SQL injection
 cQuery += "AND A1_COD = '" + cUserInput + "'"
+```
 
+```advpl
 // SAFE — parameterized
 oStmt := FWPreparedStatement():New()
 oStmt:SetQuery("SELECT A1_COD, A1_NOME FROM " + RetSqlName("SA1") + " " + ;

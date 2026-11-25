@@ -27,7 +27,7 @@ O nome fisico da tabela nunca deve ser hardcoded. Use sempre `RetSqlName("SA1")`
 Workarea e o padrao correto quando:
 
 - A busca e por chave primaria de um unico registro via indice SIX existente.
-- O processamento exige bloqueio de registro para escrita (`RecLock`/`MsUnlock`) com disparo de triggers SX7 e validacoes do dicionario.
+- O processamento exige bloqueio de registro para uma escrita direta (`RecLock`/`MsUnlock`). Essa escrita nao executa `X3_VALID` nem gatilhos SX7; quando essas regras forem necessarias, use `MsExecAuto` conforme o exemplo documentado da rotina, ou a API do modelo MVC.
 - A iteracao segue uma ordem de indice conhecida, como contas a receber por vencimento.
 
 Evite Workarea quando a query exige agregacao (SUM/COUNT/AVG), JOINs de tres ou mais tabelas, ou quando nao existe indice adequado para o caminho de acesso.
@@ -105,7 +105,7 @@ Em `BeginSQL`/`EndSQL`, o `%exp:` insere o valor no texto do SQL; ele **nao** e 
 
 Para LIKE, construa os wildcards `%` no lado AdvPL e vincule a string inteira — isso evita diferencas de operador de concatenacao entre bancos. Para listas IN dinamicas, construa os placeholders em loop e vincule um a um; valide `Len(aList) > 0` antes, pois `IN ()` vazio e erro de sintaxe em todos os dialetos.
 
-`TCSqlExec` bypassa triggers SX7 e validacoes do dicionario. Use-o apenas quando esses efeitos colaterais sao explicitamente indesejados (operacoes em lote). Para CRUD normal, prefira Workarea com `RecLock`.
+`TCSqlExec` grava direto no banco: nao executa validacoes do dicionario (`X3_VALID`) nem gatilhos SX7, assim como Workarea com `RecLock`. Use-o em operacoes em lote; para gravar um unico registro, prefira Workarea com `RecLock`. Quando as regras do dicionario precisarem rodar, use `MsExecAuto` ou a API do modelo MVC.
 
 ## Consciencia de Indices SIX
 
@@ -199,10 +199,10 @@ Prefira alternativas ANSI quando existirem — `COALESCE` funciona nos tres banc
 | Busca de registro unico por chave | **Melhor** | Aceitavel | — |
 | JOINs multi-tabela / agregacoes | Ruim | **Melhor** | — |
 | Bloqueio de registro para escrita | **Obrigatorio** (`RecLock`) | — | Bypassa locks |
-| Triggers SX7 e validacoes disparam | **Sim** | Nao | **Nao** |
-| DML em lote (sem triggers) | Nao | — | **Melhor** |
+| `X3_VALID` e gatilhos SX7 rodam | Nao (gravacao direta) | Nao | Nao |
+| DML em lote | Nao | — | **Melhor** |
 
-**Regra geral:** CRUD em registro unico usa Workarea com `RecLock`. Relatorios, agregacoes e JOINs usam `BeginSQL/EndSQL`. `TCSqlExec` com `FWPreparedStatement` apenas quando triggers e validacoes sao explicitamente indesejados.
+**Regra geral:** gravacao direta em registro unico usa Workarea com `RecLock`, para campos que o proprio codigo controla (campos `_X*`, tabelas Z\*). Gravacao que precisa das regras do dicionario usa `MsExecAuto` conforme o exemplo documentado da rotina, ou a API do modelo MVC. Relatorios, agregacoes e JOINs usam `BeginSQL/EndSQL`. `TCSqlExec` com `FWPreparedStatement` fica para DML em lote.
 
 ## Checklist
 

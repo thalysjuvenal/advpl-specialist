@@ -27,9 +27,13 @@ Customers compile their ADVPL/TLPP code into their **own RPO** (not the TOTVS co
 
 ### TLPP REST with annotations — the official TOTVS pattern
 
-Both the TDN documentation (`Migração WsRESTful para REST tlppCore`) and the official sample repository `totvs/tlpp-sample-rest` (file `rest-mod02.tlpp`) use `user function` with `@Get/@Post/@Put/@Patch/@Delete` annotations. This is the **authoritative reference** for TLPP REST endpoints — always follow it.
+Both the TDN documentation (`Migração WsRESTful para REST tlppCore`) and the official sample repository `totvs/tlpp-sample-rest` (file `rest-mod02.tlpp`) use `user function` with `@Get/@Post/@Put/@Patch/@Delete` annotations. This is the **authoritative reference** for the annotation style of TLPP REST endpoints.
+
+The block below is the **minimal TOTVS sample, without namespace**. It shows the annotation style only and is not generated as is: generated code always adds the `namespace` declaration, as in "RIGHT — function-based TLPP REST with namespace" under "Correct patterns — ALWAYS generate these".
 
 ```tlpp
+// Minimal TOTVS sample, without namespace: annotation style only.
+// Generated code uses the "RIGHT — function-based TLPP REST with namespace" pattern below.
 #include "tlpp-core.th"
 #include "tlpp-rest.th"
 
@@ -46,10 +50,10 @@ return oRest:setResponse(cData)
 
 The plugin adds one extra requirement on top of the sample: a mandatory `namespace` declaration (see "TLPP Namespace Declaration" below; the complete form is under "Correct patterns — ALWAYS generate these").
 
-A class-based approach is also officially supported (`rest-mod03.tlpp`):
+A class-based approach is also officially supported (`rest-mod03.tlpp`). In generated code the class has no inheritance clause: a TLPP class under a `namespace` does not need `LongNameClass`, and `from LongClassName` is the incorrect inheritance name flagged by CA3002. Whether the `rest-mod03.tlpp` sample itself declares an inheritance is "a confirmar no TDS"; do not copy one into generated code.
 
 ```tlpp
-class CustomersAPI from LongClassName
+class CustomersAPI
     @Get("/api/v1/customers")
     public method listAll()
 
@@ -232,7 +236,7 @@ return oRest:setResponse(cData)
 
 namespace custom.compras.purchasesapi
 
-class PurchasesAPI from LongClassName
+class PurchasesAPI
     @Get("/api/v1/purchases")
     public method listAll()
 endclass

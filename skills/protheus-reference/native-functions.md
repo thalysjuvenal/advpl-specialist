@@ -3790,6 +3790,7 @@ Loads an MVC model definition.
 ```advpl
 Local oModel  := FWLoadModel("MATA030")
 Local oMaster := NIL
+Local aError  := {}
 
 oModel:SetOperation(MODEL_OPERATION_INSERT)
 oModel:Activate()
@@ -3802,7 +3803,9 @@ oMaster:SetValue("A1_NOME", "Model Customer")
 If oModel:VldData()
     oModel:CommitData()
 Else
-    FWLogMsg("INFO", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Validation error: " + oModel:GetErrorMessage())
+    // GetErrorMessage() returns an array: [6] error message, [7] suggested solution
+    aError := oModel:GetErrorMessage()
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Validation error: " + cValToChar(aError[6]))
 EndIf
 
 oModel:DeActivate()

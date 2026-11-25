@@ -20,11 +20,13 @@ O Protheus usa um modelo de lock **hibrido**: locks de registro no nivel de Work
 
 | API | Granularidade | Bloqueia Outros? | Liberacao | Uso Tipico |
 |-----|--------------|-----------------|-----------|------------|
-| `RecLock(alias, lInsert)` | Registro unico | Sim, ate `MsUnlock` | `MsUnlock()` / `MsUnlockAll()` / fim do processo | CRUD padrao, dispara gatilhos SX7 |
+| `RecLock(alias, lInsert)` | Registro unico | Sim, ate `MsUnlock` | `MsUnlock()` / `MsUnlockAll()` / fim do processo | Gravacao direta de um registro; nao executa `X3_VALID` nem gatilhos SX7 |
 | `SoftLock(alias)` | Registro unico (otimista) | Nao — retorna `.F.` se ja bloqueado | Automatica ao mover cursor | Batch onde espera e indesejada |
 | `LockByName(cName, lShared, lFile)` | Lock global nomeado | Sim (outros chamadores esperam) | `UnLockByName()` | Coordenacao a nivel de aplicacao |
-| `TCSqlExec(cQuery)` (DML) | Lock de transacao DB | Sim, durante transacao DB | Commit/rollback DB | Operacoes bulk sem gatilhos |
+| `TCSqlExec(cQuery)` (DML) | Lock de transacao DB | Sim, durante transacao DB | Commit/rollback DB | DML em lote no banco; como o `RecLock`, sem validacoes do dicionario nem gatilhos |
 | `BeginTran` / `EndTran` | Escopo multi-registro | Sim, todos os registros tocados | `EndTran` (commit) / `DisarmTransaction` (rollback) | Consistencia transacional |
+
+Atribuir um campo depois do `RecLock` grava o valor como esta: nao roda a validacao `X3_VALID` nem os gatilhos SX7. Quando essas regras do dicionario forem necessarias, use `MsExecAuto` conforme o exemplo documentado da rotina, ou a API do modelo MVC (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`).
 
 ## Padroes de Prevencao
 

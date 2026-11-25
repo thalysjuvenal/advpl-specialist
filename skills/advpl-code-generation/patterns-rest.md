@@ -8,6 +8,8 @@ Patterns for implementing REST API endpoints in TOTVS Protheus using both WsRest
 
 The `WsRestFul` approach uses class declarations to define REST services. This is the traditional Protheus REST pattern.
 
+> **The write methods (POST/PUT/DELETE) are a template for custom tables (Z\*).** The service below keeps a custom customer register in the custom table `ZB1` and writes it with `RecLock`, which runs no `X3_VALID` validation, no SX7 trigger and none of the standard routine's logic (mandatory fields, fiscal and integration rules, entry points). Never write a standard table (SA1, SB1, SC5...) this way: run the standard routine through `MsExecAuto` following its documented example (`patterns-soap.md` includes a customer with `MsExecAuto` and `CRMA980`), or, for an MVC routine, use the model API (`patterns-mvc.md`, section 6).
+
 ### 1.1 Service Declaration
 
 ```advpl
@@ -15,7 +17,7 @@ The `WsRestFul` approach uses class declarations to define REST services. This i
 #include "restful.ch"
 
 /*/{Protheus.doc} CUSTOMERS
-API REST para cadastro de clientes
+API REST para um cadastro customizado de clientes (tabela ZB1)
 @type WsRestFul
 @author Autor
 @since 01/01/2026
@@ -44,7 +46,7 @@ WsMethod GET WsReceive nPage, nPageSize WsService CUSTOMERS
     Local oJsonArr := JsonObject():New()
     Local oJsonObj := Nil
     Local aArea    := GetArea()
-    Local cAlias   := "SA1"
+    Local cAlias   := "ZB1"
     Local nCount   := 0
     Local nSkip    := 0
     Local nPageLoc := 1
@@ -74,16 +76,16 @@ WsMethod GET WsReceive nPage, nPageSize WsService CUSTOMERS
     DbGoTop()
 
     While !Eof() .And. nCount < nSizeLoc
-        If xFilial(cAlias) == SA1->A1_FILIAL
+        If xFilial(cAlias) == ZB1->ZB1_FILIAL
             nSkip--
             If nSkip < 0
                 oJsonObj := JsonObject():New()
-                oJsonObj["codigo"]   := AllTrim(SA1->A1_COD)
-                oJsonObj["loja"]     := AllTrim(SA1->A1_LOJA)
-                oJsonObj["nome"]     := AllTrim(SA1->A1_NOME)
-                oJsonObj["cnpj"]     := AllTrim(SA1->A1_CGC)
-                oJsonObj["email"]    := AllTrim(SA1->A1_EMAIL)
-                oJsonObj["telefone"] := AllTrim(SA1->A1_TEL)
+                oJsonObj["codigo"]   := AllTrim(ZB1->ZB1_COD)
+                oJsonObj["loja"]     := AllTrim(ZB1->ZB1_LOJA)
+                oJsonObj["nome"]     := AllTrim(ZB1->ZB1_NOME)
+                oJsonObj["cnpj"]     := AllTrim(ZB1->ZB1_CGC)
+                oJsonObj["email"]    := AllTrim(ZB1->ZB1_EMAIL)
+                oJsonObj["telefone"] := AllTrim(ZB1->ZB1_TEL)
 
                 aAdd(aResult, oJsonObj)
                 nCount++
@@ -117,6 +119,8 @@ WsMethod POST WsService CUSTOMERS
     Local cErroJson := Nil
     Local cEmail    := ""
     Local cTelefone := ""
+    Local cCodigo   := ""
+    Local lGravou   := .F.
     Local aArea     := GetArea()
 
     // Autenticacao
@@ -154,27 +158,40 @@ WsMethod POST WsService CUSTOMERS
         cTelefone := oJson["telefone"]
     EndIf
 
-    // Inclusao
-    DbSelectArea("SA1")
+    // Inclusao na tabela customizada ZB1 (tabela padrao: MsExecAuto, veja a nota da secao 1)
+    DbSelectArea("ZB1")
+    cCodigo := GetSXENum("ZB1", "ZB1_COD")
 
     Begin Transaction
-        RecLock("SA1", .T.)
-            SA1->A1_FILIAL := xFilial("SA1")
-            SA1->A1_COD    := GetSXENum("SA1", "A1_COD")
-            SA1->A1_LOJA   := "01"
-            SA1->A1_NOME   := oJson["nome"]
-            SA1->A1_CGC    := oJson["cnpj"]
-            SA1->A1_EMAIL  := cEmail
-            SA1->A1_TEL    := cTelefone
-        MsUnlock()
-        ConfirmSX8()
+        If RecLock("ZB1", .T.)
+            ZB1->ZB1_FILIAL := xFilial("ZB1")
+            ZB1->ZB1_COD    := cCodigo
+            ZB1->ZB1_LOJA   := "01"
+            ZB1->ZB1_NOME   := oJson["nome"]
+            ZB1->ZB1_CGC    := oJson["cnpj"]
+            ZB1->ZB1_EMAIL  := cEmail
+            ZB1->ZB1_TEL    := cTelefone
+            MsUnlock()
+            ConfirmSX8()
+            lGravou := .T.
+        Else
+            RollBackSX8() // Falha: libera o numero reservado por GetSXENum
+        EndIf
     End Transaction
+
+    If !lGravou
+        SetRestFault(500, "Nao foi possivel incluir o cliente")
+        lRet := .F.
+        FreeObj(oJson)
+        RestArea(aArea)
+        Return lRet
+    EndIf
 
     // Response
     oResp := JsonObject():New()
-    oResp["codigo"]  := AllTrim(SA1->A1_COD)
-    oResp["loja"]    := AllTrim(SA1->A1_LOJA)
-    oResp["nome"]    := AllTrim(SA1->A1_NOME)
+    oResp["codigo"]  := AllTrim(ZB1->ZB1_COD)
+    oResp["loja"]    := AllTrim(ZB1->ZB1_LOJA)
+    oResp["nome"]    := AllTrim(ZB1->ZB1_NOME)
     oResp["message"] := "Cliente incluido com sucesso"
 
     ::SetContentType("application/json")
@@ -215,10 +232,10 @@ WsMethod PUT WsReceive cCodigo, cLoja WsService CUSTOMERS
         Return lRet
     EndIf
 
-    DbSelectArea("SA1")
+    DbSelectArea("ZB1")
     DbSetOrder(1)
 
-    If !DbSeek(xFilial("SA1") + PadR(::cCodigo, TamSX3("A1_COD")[1]) + PadR(::cLoja, TamSX3("A1_LOJA")[1]))
+    If !DbSeek(xFilial("ZB1") + PadR(::cCodigo, TamSX3("ZB1_COD")[1]) + PadR(::cLoja, TamSX3("ZB1_LOJA")[1]))
         SetRestFault(404, "Cliente nao encontrado: " + ::cCodigo + "/" + ::cLoja)
         lRet := .F.
         FreeObj(oJson)
@@ -227,25 +244,25 @@ WsMethod PUT WsReceive cCodigo, cLoja WsService CUSTOMERS
     EndIf
 
     Begin Transaction
-        RecLock("SA1", .F.)
+        RecLock("ZB1", .F.)
             If oJson["nome"] <> Nil
-                SA1->A1_NOME := oJson["nome"]
+                ZB1->ZB1_NOME := oJson["nome"]
             EndIf
             If oJson["cnpj"] <> Nil
-                SA1->A1_CGC := oJson["cnpj"]
+                ZB1->ZB1_CGC := oJson["cnpj"]
             EndIf
             If oJson["email"] <> Nil
-                SA1->A1_EMAIL := oJson["email"]
+                ZB1->ZB1_EMAIL := oJson["email"]
             EndIf
             If oJson["telefone"] <> Nil
-                SA1->A1_TEL := oJson["telefone"]
+                ZB1->ZB1_TEL := oJson["telefone"]
             EndIf
         MsUnlock()
     End Transaction
 
     oResp := JsonObject():New()
-    oResp["codigo"]  := AllTrim(SA1->A1_COD)
-    oResp["loja"]    := AllTrim(SA1->A1_LOJA)
+    oResp["codigo"]  := AllTrim(ZB1->ZB1_COD)
+    oResp["loja"]    := AllTrim(ZB1->ZB1_LOJA)
     oResp["message"] := "Cliente alterado com sucesso"
 
     ::SetContentType("application/json")
@@ -273,10 +290,10 @@ WsMethod DELETE WsReceive cCodigo, cLoja WsService CUSTOMERS
         Return lRet
     EndIf
 
-    DbSelectArea("SA1")
+    DbSelectArea("ZB1")
     DbSetOrder(1)
 
-    If !DbSeek(xFilial("SA1") + PadR(::cCodigo, TamSX3("A1_COD")[1]) + PadR(::cLoja, TamSX3("A1_LOJA")[1]))
+    If !DbSeek(xFilial("ZB1") + PadR(::cCodigo, TamSX3("ZB1_COD")[1]) + PadR(::cLoja, TamSX3("ZB1_LOJA")[1]))
         SetRestFault(404, "Cliente nao encontrado")
         lRet := .F.
         RestArea(aArea)
@@ -284,8 +301,8 @@ WsMethod DELETE WsReceive cCodigo, cLoja WsService CUSTOMERS
     EndIf
 
     Begin Transaction
-        RecLock("SA1", .F.)
-            SA1->(DbDelete()) // Exclusao logica: DbDelete() marca o D_E_L_E_T_
+        RecLock("ZB1", .F.)
+            ZB1->(DbDelete()) // Exclusao logica: DbDelete() marca o D_E_L_E_T_
         MsUnlock()
     End Transaction
 
@@ -359,6 +376,7 @@ Rules applied below (TDN, tlppCore REST):
 - **`oRest` methods (official names):** `getQueryRequest()` and `getPathParamsRequest()` return a `JsonObject` (read `jQuery['page']`; never modify it — it is a reference to the REST server object), `getBodyRequest()` returns the raw body string, `setStatusCode(nCode)` sets the HTTP status, `setResponse(cBody)` sets the body, `setFault(cBody)` sets the body **and** forces HTTP 500. There is no `setStatus`, `getQueryString` or `getBody`.
 - **Error body:** `{"code", "message", "detailedMessage"}` (TOTVS API guide; `code` is an identifier listed in the API documentation). 4xx: `setStatusCode(4xx)` + `setResponse(...)`; unexpected error: `setFault(...)` inside `Catch`.
 - **Error handling:** each endpoint wraps its work in `Try` / `Catch oError` / `Finally` / `EndTry`. (a confirmar no TDS: rollback de `Begin Transaction` quando a exceção escapa para o `Catch` — the TDN does not document whether the transaction is undone or needs `DisarmTransaction()` in this case.)
+- **Custom table only:** the POST/PUT/DELETE endpoints write the custom table `ZB2` with `RecLock`, which runs no `X3_VALID` validation, no SX7 trigger and none of the standard routine's logic. For a standard table such as SB1, run the standard routine through `MsExecAuto` following its documented example, or, for an MVC routine, use the model API (`patterns-mvc.md`, section 6). A number reserved with `GetSXENum` is released with `RollBackSX8()` when the write fails.
 
 ```tlpp
 #include "tlpp-core.th"
@@ -370,7 +388,7 @@ Rules applied below (TDN, tlppCore REST):
 namespace custom.est.productsapi
 
 /*/{Protheus.doc} ProductsAPI
-API REST de Produtos usando TLPP
+API REST de um cadastro customizado de produtos (tabela ZB2) usando TLPP
 Erros no padrao do Guia de API TOTVS: {code, message, detailedMessage}
 @type User Function
 @author Autor
@@ -406,20 +424,20 @@ User Function getProducts()
     nSkip := (nPage - 1) * nSize
 
     Try
-        DbSelectArea("SB1")
+        DbSelectArea("ZB2")
         DbSetOrder(1)
         DbGoTop()
 
         While !Eof() .And. nCount < nSize
-            If xFilial("SB1") == SB1->B1_FILIAL
+            If xFilial("ZB2") == ZB2->ZB2_FILIAL
                 nSkip--
                 If nSkip < 0
                     jItem := JsonObject():New()
-                    jItem["codigo"]    := AllTrim(SB1->B1_COD)
-                    jItem["descricao"] := AllTrim(SB1->B1_DESC)
-                    jItem["tipo"]      := AllTrim(SB1->B1_TIPO)
-                    jItem["unidade"]   := AllTrim(SB1->B1_UM)
-                    jItem["preco"]     := SB1->B1_PRV1
+                    jItem["codigo"]    := AllTrim(ZB2->ZB2_COD)
+                    jItem["descricao"] := AllTrim(ZB2->ZB2_DESC)
+                    jItem["tipo"]      := AllTrim(ZB2->ZB2_TIPO)
+                    jItem["unidade"]   := AllTrim(ZB2->ZB2_UM)
+                    jItem["preco"]     := ZB2->ZB2_PRV1
 
                     aAdd(aResult, jItem)
                     nCount++
@@ -459,24 +477,24 @@ User Function getProductById()
     EndIf
 
     Try
-        DbSelectArea("SB1")
+        DbSelectArea("ZB2")
         DbSetOrder(1)
 
-        If DbSeek(xFilial("SB1") + PadR(cCodigo, TamSX3("B1_COD")[1]))
+        If DbSeek(xFilial("ZB2") + PadR(cCodigo, TamSX3("ZB2_COD")[1]))
             jResp := JsonObject():New()
-            jResp["codigo"]    := AllTrim(SB1->B1_COD)
-            jResp["descricao"] := AllTrim(SB1->B1_DESC)
-            jResp["tipo"]      := AllTrim(SB1->B1_TIPO)
-            jResp["unidade"]   := AllTrim(SB1->B1_UM)
-            jResp["grupo"]     := AllTrim(SB1->B1_GRUPO)
-            jResp["preco"]     := SB1->B1_PRV1
-            jResp["custo"]     := SB1->B1_CUSTD
+            jResp["codigo"]    := AllTrim(ZB2->ZB2_COD)
+            jResp["descricao"] := AllTrim(ZB2->ZB2_DESC)
+            jResp["tipo"]      := AllTrim(ZB2->ZB2_TIPO)
+            jResp["unidade"]   := AllTrim(ZB2->ZB2_UM)
+            jResp["grupo"]     := AllTrim(ZB2->ZB2_GRUPO)
+            jResp["preco"]     := ZB2->ZB2_PRV1
+            jResp["custo"]     := ZB2->ZB2_CUSTD
 
             oRest:setStatusCode(200)
             oRest:setResponse(jResp:toJson())
         Else
             oRest:setStatusCode(404)
-            oRest:setResponse(errorBody("PRODUTO_NAO_ENCONTRADO", "Produto nao encontrado", "B1_COD: " + cCodigo))
+            oRest:setResponse(errorBody("PRODUTO_NAO_ENCONTRADO", "Produto nao encontrado", "ZB2_COD: " + cCodigo))
         EndIf
     Catch oError
         oRest:setFault(errorBody("ERRO_INTERNO", "Erro ao consultar produto", oError:description))
@@ -500,6 +518,8 @@ User Function createProduct()
     Local cTipo     := "PA"
     Local cUnidade  := "UN"
     Local nPreco    := 0
+    Local cCodigo   := ""
+    Local lPendSX8  := .F.
     Local aArea     := GetArea()
 
     // getBodyRequest() devolve o corpo bruto; FromJson retorna Nil no sucesso ou a descricao do erro
@@ -525,28 +545,44 @@ User Function createProduct()
                 nPreco := jBody["preco"]
             EndIf
 
-            DbSelectArea("SB1")
+            // Tabela customizada ZB2 (tabela padrao como SB1: MsExecAuto da rotina)
+            DbSelectArea("ZB2")
+            cCodigo  := GetSXENum("ZB2", "ZB2_COD")
+            lPendSX8 := .T.
             Begin Transaction
-                RecLock("SB1", .T.)
-                    SB1->B1_FILIAL := xFilial("SB1")
-                    SB1->B1_COD    := GetSXENum("SB1", "B1_COD")
-                    SB1->B1_DESC   := jBody["descricao"]
-                    SB1->B1_TIPO   := cTipo
-                    SB1->B1_UM     := cUnidade
-                    SB1->B1_PRV1   := nPreco
-                MsUnlock()
-                ConfirmSX8()
+                If RecLock("ZB2", .T.)
+                    ZB2->ZB2_FILIAL := xFilial("ZB2")
+                    ZB2->ZB2_COD    := cCodigo
+                    ZB2->ZB2_DESC   := jBody["descricao"]
+                    ZB2->ZB2_TIPO   := cTipo
+                    ZB2->ZB2_UM     := cUnidade
+                    ZB2->ZB2_PRV1   := nPreco
+                    MsUnlock()
+                    ConfirmSX8()
+                    lPendSX8 := .F.
+                EndIf
             End Transaction
 
-            jResp := JsonObject():New()
-            jResp["codigo"]    := AllTrim(SB1->B1_COD)
-            jResp["descricao"] := AllTrim(SB1->B1_DESC)
-            jResp["message"]   := "Produto criado com sucesso"
+            If lPendSX8
+                // RecLock falhou: libera o numero reservado por GetSXENum
+                RollBackSX8()
+                lPendSX8 := .F.
+                oRest:setFault(errorBody("ERRO_GRAVACAO", "Nao foi possivel criar o produto", "ZB2_COD: " + cCodigo))
+            Else
+                jResp := JsonObject():New()
+                jResp["codigo"]    := AllTrim(ZB2->ZB2_COD)
+                jResp["descricao"] := AllTrim(ZB2->ZB2_DESC)
+                jResp["message"]   := "Produto criado com sucesso"
 
-            oRest:setStatusCode(201)
-            oRest:setResponse(jResp:toJson())
+                oRest:setStatusCode(201)
+                oRest:setResponse(jResp:toJson())
+            EndIf
         EndIf
     Catch oError
+        If lPendSX8
+            // Excecao antes do ConfirmSX8: libera o numero reservado
+            RollBackSX8()
+        EndIf
         oRest:setFault(errorBody("ERRO_INTERNO", "Erro ao criar produto", oError:description))
     Finally
         FreeObj(jBody)
@@ -575,29 +611,29 @@ User Function updateProduct()
     cErroJson := jBody:FromJson(oRest:getBodyRequest())
 
     Try
-        DbSelectArea("SB1")
+        DbSelectArea("ZB2")
         DbSetOrder(1)
 
         If ValType(cErroJson) == "C"
             oRest:setStatusCode(400)
             oRest:setResponse(errorBody("JSON_INVALIDO", "Corpo da requisicao invalido", cErroJson))
-        ElseIf !DbSeek(xFilial("SB1") + PadR(cCodigo, TamSX3("B1_COD")[1]))
+        ElseIf !DbSeek(xFilial("ZB2") + PadR(cCodigo, TamSX3("ZB2_COD")[1]))
             oRest:setStatusCode(404)
-            oRest:setResponse(errorBody("PRODUTO_NAO_ENCONTRADO", "Produto nao encontrado", "B1_COD: " + cCodigo))
+            oRest:setResponse(errorBody("PRODUTO_NAO_ENCONTRADO", "Produto nao encontrado", "ZB2_COD: " + cCodigo))
         Else
             Begin Transaction
-                RecLock("SB1", .F.)
+                RecLock("ZB2", .F.)
                     If jBody["descricao"] <> Nil
-                        SB1->B1_DESC := jBody["descricao"]
+                        ZB2->ZB2_DESC := jBody["descricao"]
                     EndIf
                     If jBody["tipo"] <> Nil
-                        SB1->B1_TIPO := jBody["tipo"]
+                        ZB2->ZB2_TIPO := jBody["tipo"]
                     EndIf
                     If jBody["unidade"] <> Nil
-                        SB1->B1_UM := jBody["unidade"]
+                        ZB2->ZB2_UM := jBody["unidade"]
                     EndIf
                     If jBody["preco"] <> Nil
-                        SB1->B1_PRV1 := jBody["preco"]
+                        ZB2->ZB2_PRV1 := jBody["preco"]
                     EndIf
                 MsUnlock()
             End Transaction
@@ -628,13 +664,13 @@ User Function deleteProduct()
     EndIf
 
     Try
-        DbSelectArea("SB1")
+        DbSelectArea("ZB2")
         DbSetOrder(1)
 
-        If DbSeek(xFilial("SB1") + PadR(cCodigo, TamSX3("B1_COD")[1]))
+        If DbSeek(xFilial("ZB2") + PadR(cCodigo, TamSX3("ZB2_COD")[1]))
             Begin Transaction
-                RecLock("SB1", .F.)
-                    SB1->(DbDelete()) // Exclusao logica: DbDelete() marca o D_E_L_E_T_
+                RecLock("ZB2", .F.)
+                    ZB2->(DbDelete()) // Exclusao logica: DbDelete() marca o D_E_L_E_T_
                 MsUnlock()
             End Transaction
 
@@ -642,7 +678,7 @@ User Function deleteProduct()
             oRest:setResponse('{"message":"Produto excluido com sucesso"}')
         Else
             oRest:setStatusCode(404)
-            oRest:setResponse(errorBody("PRODUTO_NAO_ENCONTRADO", "Produto nao encontrado", "B1_COD: " + cCodigo))
+            oRest:setResponse(errorBody("PRODUTO_NAO_ENCONTRADO", "Produto nao encontrado", "ZB2_COD: " + cCodigo))
         EndIf
     Catch oError
         oRest:setFault(errorBody("ERRO_INTERNO", "Erro ao excluir produto", oError:description))
@@ -672,7 +708,7 @@ Return cJson
 
 As an alternative to the function-based pattern above, TLPP also supports a class-based REST approach where methods are annotated with HTTP verbs. This is officially documented in the TOTVS sample `rest-mod03.tlpp`. Both patterns are valid — choose based on team preference and code organization needs.
 
-The same `namespace` rule applies to the class-based pattern.
+The same `namespace` rule applies to the class-based pattern. The class is declared without an inheritance clause: a TLPP class under a `namespace` does not need `LongNameClass`, and `from LongClassName` is the incorrect inheritance name flagged by CA3002. Whether the `rest-mod03.tlpp` sample declares an inheritance is "a confirmar no TDS"; do not copy one into generated code.
 
 ```tlpp
 #include "tlpp-core.th"
@@ -681,7 +717,7 @@ The same `namespace` rule applies to the class-based pattern.
 // Namespace inferred from --module est + class name ProductsAPI
 namespace custom.est.productsapi
 
-class ProductsAPI from LongClassName
+class ProductsAPI
 
     private data cId
 

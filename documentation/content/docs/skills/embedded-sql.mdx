@@ -270,7 +270,7 @@ User Function QueryEx()
                SE2.E2_FORNECE, SE2.E2_LOJA,
                SE2.E2_EMISSAO, SE2.E2_VENCTO,
                SE2.E2_VALOR,
-               (SE2.E2_VALOR - SE2.E2_PAGO) AS SALDO,
+               SE2.E2_SALDO AS SALDO,
                SA2.A2_NOME
         FROM %table:SE2% SE2
         INNER JOIN %table:SA2% SA2
@@ -281,7 +281,7 @@ User Function QueryEx()
         WHERE SE2.%notDel%
         AND SE2.E2_FILIAL = %xfilial:SE2%
         AND SE2.E2_EMISSAO >= %exp:DtoS(dDataIni)%
-        AND (SE2.E2_VALOR - SE2.E2_PAGO) > 0
+        AND SE2.E2_SALDO > 0
         ORDER BY SE2.E2_VENCTO
 EndSQL
 

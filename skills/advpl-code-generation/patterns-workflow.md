@@ -496,6 +496,8 @@ TMailMng is the newer replacement for TMailManager, offering greater configurati
 
 This example implements a complete approval workflow: creating a purchase order, checking approval requirements, and sending email notifications.
 
+The custom flow records its approval requests in the custom table `ZA3` with `RecLock`. Do not write the standard approval table SCR with `RecLock`: a direct write runs no `X3_VALID` validation, no SX7 trigger and none of the standard approval control (groups, levels, limits). Read SCR (section 4.3) and let the standard routine create its records, for example a purchase order included through `MsExecAuto` with the approval control active (section 8).
+
 ```advpl
 #include "totvs.ch"
 
@@ -532,14 +534,14 @@ User Function zAprovPC(cNumPC)
         Return .F.
     EndIf
 
-    // Verifica se ja existe aprovacao pendente na SCR
+    // Verifica se ja existe aprovacao pendente na tabela customizada ZA3
     If fTemAprovPendente(cNumPC, "PC")
         FWLogMsg("WARN", /*cTransactionId*/, "zAprovPC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Pedido ja possui aprovacao pendente.")
         RestArea(aArea)
         Return .F.
     EndIf
 
-    // Registra solicitacao de aprovacao na SCR
+    // Registra solicitacao de aprovacao na ZA3 (a SCR padrao nao e gravada com RecLock)
     fRegistraAprovacao(cNumPC, "PC", cAprov, nTotal)
 
     // Envia notificacao por email ao aprovador
@@ -607,11 +609,12 @@ Return cAprov
 Static Function fTemAprovPendente(cNumDoc, cTipoDoc)
     Local lPendente := .F.
 
-    DbSelectArea("SCR")
+    // ZA3: tabela customizada do fluxo (indice 1 = ZA3_FILIAL + ZA3_NUM)
+    DbSelectArea("ZA3")
     DbSetOrder(1)
 
-    If DbSeek(xFilial("SCR") + cNumDoc)
-        If AllTrim(SCR->CR_TIPO) == cTipoDoc .And. AllTrim(SCR->CR_STATUS) < "03"
+    If DbSeek(xFilial("ZA3") + cNumDoc)
+        If AllTrim(ZA3->ZA3_TIPO) == cTipoDoc .And. AllTrim(ZA3->ZA3_STATUS) == "02"
             lPendente := .T.
         EndIf
     EndIf
@@ -619,22 +622,23 @@ Static Function fTemAprovPendente(cNumDoc, cTipoDoc)
 Return lPendente
 
 // =============================================================
-// Registra solicitacao de aprovacao
+// Registra solicitacao de aprovacao na tabela customizada ZA3
 // =============================================================
 Static Function fRegistraAprovacao(cNumDoc, cTipoDoc, cAprov, nTotal)
 
-    DbSelectArea("SCR")
+    DbSelectArea("ZA3")
 
-    RecLock("SCR", .T.)
-        SCR->CR_FILIAL  := xFilial("SCR")
-        SCR->CR_NUM     := cNumDoc
-        SCR->CR_TIPO    := cTipoDoc
-        SCR->CR_USER    := RetCodUsr() // Codigo do usuario logado
-        SCR->CR_APROV   := cAprov
-        SCR->CR_STATUS  := "02"        // 02 = pendente de aprovacao (01 = aguardando nivel anterior)
-        SCR->CR_EMISSAO := Date()
-        SCR->CR_TOTAL   := nTotal
-    MsUnlock()
+    If RecLock("ZA3", .T.)
+        ZA3->ZA3_FILIAL := xFilial("ZA3")
+        ZA3->ZA3_NUM    := cNumDoc
+        ZA3->ZA3_TIPO   := cTipoDoc
+        ZA3->ZA3_USER   := RetCodUsr() // Codigo do usuario logado
+        ZA3->ZA3_APROV  := cAprov
+        ZA3->ZA3_STATUS := "02"        // Codigo do proprio fluxo: 02 = pendente de aprovacao
+        ZA3->ZA3_EMISSA := Date()
+        ZA3->ZA3_TOTAL  := nTotal
+        MsUnlock()
+    EndIf
 
 Return Nil
 
@@ -808,7 +812,7 @@ Return lAprov
 - Use `GetArea()` / `RestArea()` to preserve table positioning.
 
 ### 10.2 Approval Flows
-- Use the standard SCR/SAK tables for approval control when possible.
+- Use the standard SCR/SAK tables for approval control when possible: read them, and let the standard routines create the SCR records (never `RecLock` on SCR). A custom flow keeps its own data in a custom Z\* table (section 7).
 - Always validate approver limits before allowing approval operations.
 - Log all approval actions for auditing purposes.
 

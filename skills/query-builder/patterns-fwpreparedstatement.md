@@ -131,7 +131,7 @@ Return aResult
 
 ## Pattern 2.3 — UPDATE / DELETE / INSERT (TCSqlExec)
 
-`TCSqlExec` bypasses Protheus dictionary triggers and validations. Use it only when those side effects are explicitly not desired (bulk operations, system-level fixes). Otherwise, prefer Workarea + `RecLock`/`MsUnlock`.
+`TCSqlExec` writes in the database directly: no dictionary validations (`X3_VALID`) and no SX7 triggers run, and neither do they with Workarea + `RecLock`/`MsUnlock`. Use `TCSqlExec` for bulk operations and system-level fixes; for a single-record write, prefer Workarea + `RecLock`/`MsUnlock`. When the dictionary rules must run, use `MsExecAuto` with the routine's documented example, or the MVC model API.
 
 ```advpl
 #include "totvs.ch"
@@ -263,4 +263,4 @@ Next
 | Forgetting `:GetFixQuery()` | Passing the raw template to `TCGenQry` — placeholders not substituted | Always call `:GetFixQuery()` |
 | Not closing the alias | Alias leak | `(cAlias)->(DBCloseArea())` in all paths |
 | Not destroying the statement | Object kept alive after use | `oStmt:Destroy()` when done (TDN) |
-| `TCSqlExec` for CRUD that should fire triggers | Bypasses SX7 + dictionary validation | Use Workarea + `RecLock` instead |
+| `TCSqlExec` or `RecLock` for a write that needs the dictionary rules | Neither runs SX7 triggers nor `X3_VALID` | `MsExecAuto` with the routine's documented example, or the MVC model API (`SetValue` + `VldData` + `CommitData`) |

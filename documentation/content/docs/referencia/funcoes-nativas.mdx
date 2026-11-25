@@ -3106,12 +3106,12 @@ Sets the return field for a query opened with TCGenQry or embedded SQL.
 
 **Example:**
 ```c
-Local cQuery := "SELECT A1_COD, A1_NOME, A1_SALDO FROM " + RetSqlName("SA1")
+Local cQuery := "SELECT A1_COD, A1_NOME, A1_SALDUP FROM " + RetSqlName("SA1")
 Local cAlias := GetNextAlias()
 
 cQuery += " WHERE D_E_L_E_T_ = ' '"
 DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
-TCSetField(cAlias, "A1_SALDO", "N", 14, 2)
+TCSetField(cAlias, "A1_SALDUP", "N", 16, 2)
 ```
 
 ---
@@ -3794,6 +3794,7 @@ Loads an MVC model definition.
 ```c
 Local oModel  := FWLoadModel("MATA030")
 Local oMaster := NIL
+Local aError  := {}
 
 oModel:SetOperation(MODEL_OPERATION_INSERT)
 oModel:Activate()
@@ -3806,7 +3807,9 @@ oMaster:SetValue("A1_NOME", "Model Customer")
 If oModel:VldData()
     oModel:CommitData()
 Else
-    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Validation error: " + oModel:GetErrorMessage())
+    // GetErrorMessage() returns an array: [6] error message, [7] suggested solution
+    aError := oModel:GetErrorMessage()
+    FWLogMsg("ERROR", /*cTransactionId*/, "EXEMPLO", "REFERENCIA", /*cStep*/, /*cMsgId*/, "Validation error: " + cValToChar(aError[6]))
 EndIf
 
 oModel:DeActivate()
@@ -4014,7 +4017,7 @@ Creates a totalizer/aggregation function attached to a TRCell. Inherits from TRC
 
 **Example:**
 ```c
-// Sum the A1_SALDO field at the end of the report
+// Sum the A1_SALDUP field at the end of the report
 TRFunction():New(oCell, NIL, "SUM",, , "@E 999,999,999.99")
 
 // Count records with a break

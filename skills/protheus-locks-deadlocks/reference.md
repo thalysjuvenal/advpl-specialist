@@ -27,10 +27,10 @@ Protheus uses a hybrid locking model: record-level Workarea locks (`RecLock`/`Ms
 
 | API | Granularity | Blocks Other Users? | Released By | Typical Use |
 |---|---|---|---|---|
-| `RecLock(alias, lInsert)` | Single record | **Yes** (until `MsUnlock`) | `MsUnlock()` / `MsUnlockAll()` / process exit | Standard CRUD, fires SX7 triggers + dictionary validations |
+| `RecLock(alias, lInsert)` | Single record | **Yes** (until `MsUnlock`) | `MsUnlock()` / `MsUnlockAll()` / process exit | Direct single-record write; runs no `X3_VALID` and no SX7 triggers |
 | `SoftLock(alias)` | Single record (optimistic) | **No** — returns `.F.` if already locked | Automatically when next record is read | Read-modify-write patterns where waiting is unwanted |
 | `LockByName(cName, lShared, lFile)` | Named global lock (no record) | **Yes** (other callers wait) | `UnLockByName()` | Application-level coordination (only one job at a time) |
-| `TCSqlExec(cQuery)` (DML) | Database transaction lock | **Yes** during DB transaction | DB commit/rollback | Bulk operations bypassing dictionary triggers |
+| `TCSqlExec(cQuery)` (DML) | Database transaction lock | **Yes** during DB transaction | DB commit/rollback | Bulk DML in the database; like `RecLock`, no dictionary validations or triggers |
 | `BeginTran` / `EndTran` | Multi-record transaction scope | **Yes** for all records touched | `EndTran` (commit) / `DisarmTransaction` (rollback) | Transactional consistency across multiple `RecLock`s |
 
 ## Core APIs
@@ -46,7 +46,7 @@ EndIf
 
 - Returns `.T.` on success, `.F.` if another user holds the lock.
 - **Blocks the caller** until `MV_TIMEOUT` (default ~10s) expires; then returns `.F.`.
-- Triggers SX7 (gatilhos), `X3_VALID`, and dictionary integrity checks.
+- Writes directly: assigning a field after `RecLock` runs **no** `X3_VALID` validation and **no** SX7 trigger (gatilho). When those dictionary rules are needed, use `MsExecAuto` with the routine's documented example, or the MVC model API (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`).
 - **Must be paired with `MsUnlock()`** on every code path — including error paths.
 
 ### `MsUnlock()` / `MsUnlockAll()`
