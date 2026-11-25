@@ -238,13 +238,33 @@ case_legado_utf8() {
   check "legado-utf8-bom: sem saida (#Include Protheus.ch legado nao acusado)" [ -z "$OUT$ERR" ]
   check "legado-utf8-bom: BOM removido do arquivo" lacks_bytes "$(printf '\357\273\277')" "$g"
   check "legado-utf8-bom: snapshot e copia removidos" snap_empty
-  # .th with BOM (not converted), editor dropped the BOM: line 1 still matches
+  # .th with BOM, editor dropped the BOM: the snapshot copy goes through the
+  # converter too (BOM stripped), so line 1 still matches
   printf '\357\273\277#Include "Protheus.ch"\n#define CMSG "x"\n' >"$h"
   pre "$h"
   printf '#Include "Protheus.ch"\n#define CMSG "y"\n' >"$h"
   post "$h"
   check "legado-bom-removido (.th): exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
   check "legado-bom-removido (.th): snapshot removido" snap_empty
+}
+
+case_translit() {
+  # emoji in a comment: transliterated to "?" (never blocks), the rest of the
+  # file converted, and a non-blocking note names the file and the count
+  local d="$TMP_DIR/$MODE/translit" f ctx
+  mkdir -p "$d"; f="$d/FATA012.prw"
+  pre "$f" Write
+  printf '#include "totvs.ch"\n\n// lan\303\247amento \360\237\232\200\nUser Function FATA012()\nReturn Nil\n' >"$f"
+  post "$f" Write
+  check "translit: exit 0" [ "$RC" = 0 ]
+  check "translit: sem stderr" [ -z "$ERR" ]
+  check "translit: JSON valido" valid_hook_json "$OUT"
+  ctx="$(json_context "$OUT")"
+  check "translit: contexto traz a linha translit: com a contagem" contains "$ctx" "translit: $f (1)"
+  check "translit: contexto pede revisao dos '?'" contains "$ctx" "viraram '?'"
+  check "translit: emoji virou ? e acento em CP1252" has_bytes "$(printf 'lan\347amento ?')" "$f"
+  check "translit: sem bytes UTF-8" lacks_bytes "$UTF8_ACENTO" "$f"
+  check "translit: snapshot removido" snap_empty
 }
 
 case_nao_advpl() {
@@ -377,6 +397,7 @@ run_cases() {
   case_edit_crlf
   case_caminho_espaco_acento
   case_fffd
+  case_translit
   case_legado_utf8
   case_nao_advpl
   case_arquivo_grande

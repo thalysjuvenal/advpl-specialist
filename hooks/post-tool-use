@@ -7,10 +7,14 @@
 #      non-blocking note says so), so the corruption is not transliterated
 #      away; ADV014 reports it in step 4 when it is on an introduced line
 #      (U+FFFD already in the snapshot is legacy).
-#   2. Encoding: UTF-8 -> Windows-1252 through convert_encoding (the converter
-#      decides which extensions it handles). When the file was converted, a
-#      copy of the snapshot with the same extension goes through the same
-#      converter, so a legacy file still in UTF-8 compares like for like.
+#   2. Encoding: UTF-8 -> Windows-1252 through convert_encoding, i.e.
+#      skills/advpl-code-generation/scripts/convert-encoding.sh --translit (the
+#      converter decides which extensions it handles). A character without a
+#      Windows-1252 representation becomes "?" instead of blocking the edit,
+#      and the "translit: FILE (N)" report line becomes a non-blocking note.
+#      When the file was converted, a copy of the snapshot with the same
+#      extension goes through the same converter, so a legacy file still in
+#      UTF-8 compares like for like.
 #   3. Introduced lines: numbers of the lines of the file whose text occurs
 #      nowhere in the (normalized) snapshot; both sides compared without CR and
 #      without a leading UTF-8 BOM. No snapshot = new file: the whole file is
@@ -18,8 +22,9 @@
 #   4. advpl-lint.sh --lines-file, only for .prw .prx .tlpp .th (any case), with
 #      ${CLAUDE_PROJECT_DIR:-$PWD}/.advpl-specialist-ignore when readable.
 #   5. Errors: findings and a hint on stderr, exit 2 (Claude sees them and fixes
-#      the lines). Warnings only (or a skipped/failed conversion): JSON
-#      additionalContext on stdout, exit 0. Nothing to report: exit 0, no output.
+#      the lines). Warnings only (or a skipped/failed/transliterated
+#      conversion): JSON additionalContext on stdout, exit 0. Nothing to
+#      report: exit 0, no output.
 #   6. The snapshot is always removed (EXIT trap).
 # Lint engine missing or failing: message on stderr, exit 1 (non-blocking).
 
@@ -33,22 +38,32 @@ esac
 # shellcheck source=pre-tool-use
 . "$HOOK_DIR/pre-tool-use"
 
-# Single call site of the UTF-8 -> Windows-1252 converter (file and snapshot).
-convert_encoding() {
-  "${BASH:-bash}" "$HOOK_DIR/lib/convert-encoding.sh" process_file "$1"
-}
-
-# Prints the path of advpl-lint.sh: plugin root first, then next to this hook.
-lint_engine() {
-  local root rel=skills/advpl-code-review/scripts/advpl-lint.sh
+# plugin_script REL: prints the path of a plugin script, looked up under the
+# plugin root first, then next to this hook.
+plugin_script() {
+  local root
   for root in "${CLAUDE_PLUGIN_ROOT:-}" "$HOOK_DIR/.."; do
-    if [ -n "$root" ] && [ -f "$root/$rel" ]; then
-      printf '%s' "$root/$rel"
+    if [ -n "$root" ] && [ -f "$root/$1" ]; then
+      printf '%s' "$root/$1"
       return 0
     fi
   done
   return 1
 }
+
+# Single call site of the UTF-8 -> Windows-1252 converter (file and snapshot).
+# --translit: an emoji in a comment must not block the edit; the caller turns
+# the "translit: FILE (N)" report line into a visible note.
+convert_encoding() {
+  local conv
+  if ! conv=$(plugin_script skills/advpl-code-generation/scripts/convert-encoding.sh); then
+    echo "convert-encoding.sh nao encontrado"
+    return 1
+  fi
+  "${BASH:-bash}" "$conv" --translit -- "$1"
+}
+
+lint_engine() { plugin_script skills/advpl-code-review/scripts/advpl-lint.sh; }
 
 # introduced_lines SNAPSHOT FILE: 1-based numbers of the FILE lines whose text
 # is absent from SNAPSHOT; on both sides a trailing CR and, on line 1, a UTF-8
@@ -106,6 +121,10 @@ if grep -q "$(printf '\357\277\275')" "$file"; then
   notes="advpl-specialist: conversao para Windows-1252 nao executada em $file: o arquivo contem U+FFFD (bytes EF BF BD); restaure os caracteres originais"
 elif conv=$(convert_encoding "$file" 2>&1); then
   converted=1
+  case $conv in
+    *"translit: "*)
+      notes="advpl-specialist: caracteres sem representacao em Windows-1252 viraram '?' na conversao ($conv); revise esses trechos" ;;
+  esac
 else
   notes="advpl-specialist: falha na conversao para Windows-1252 de $file${conv:+: $conv}"
 fi
