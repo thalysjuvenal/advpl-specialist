@@ -1,0 +1,296 @@
+---
+title: Smart View Development
+description: "Desenvolvimento Smart View - objetos de negocio (Integrated Provider) com getSchema/getData, parametros com busca avancada e combo, fonte de menu callTReports e publicacao do recurso .trp"
+---
+
+# Smart View Development
+
+Smart View e a ferramenta de analise de dados do TOTVS Protheus: o usuario recebe uma grade onde arrasta colunas, agrupa, filtra, soma e exporta sem pedir nada ao desenvolvedor. O que o desenvolvedor entrega e o **objeto de negocio** (*Integrated Provider*) — uma classe TLPP que descreve as colunas disponiveis e devolve os dados. O layout que o usuario ve e montado depois, no designer web da propria ferramenta, e distribuido como um **recurso** (arquivo `.trp`).
+
+> O comando `/advpl-specialist:smartview` gera e migra objetos de negocio Smart View seguindo os padroes desta skill automaticamente.
+
+> **Nao confundir com Smart X.** Smart X e outro produto: telas de cadastro PO-UI geradas a partir de metadados do dicionario (Objeto, Modelo, Interface e Launcher). Smart View e analise de dados sobre TReports. Os nomes se parecem, os frameworks nao tem relacao. Para Smart X veja [Smart X Development](/docs/skills/smartx-development).
+
+## Divisao de Responsabilidades
+
+| Camada | Quem faz | Muda com que frequencia |
+|---|---|---|
+| Objeto de negocio (`.tlpp`) | Desenvolvedor | Raramente — so quando muda a origem dos dados |
+| Recurso/layout (`.trp`) | Designer web do Smart View, exportado e compilado | A cada pedido de mudanca visual |
+| Grade (agrupar, somar, filtrar, exportar) | Usuario final, sozinho | O tempo todo |
+
+Escrever a classe e a parte facil; o custo do projeto esta no ciclo de publicacao do recurso.
+
+## Pre-requisitos de Ambiente
+
+Conferir **antes** de estimar prazo. Qualquer um destes derruba a entrega inteira.
+
+| # | Pre-requisito | Como conferir |
+|---|---|---|
+| 1 | Banco com `compatibility_level >= 130` (SQL Server 2016) | `SELECT name, compatibility_level FROM sys.databases WHERE name = DB_NAME()` |
+| 2 | Servico Smart View instalado e apontando para o REST do Protheus | O portal do Smart View abre e lista os objetos padrao |
+| 3 | Objeto compilado no RPO que o **appserver REST** usa | O objeto aparece na lista apos reiniciar o servico |
+| 4 | `FwLibVersion() >= "20231121"` para busca avancada em tabela | `FwLibVersion()` no console |
+| 5 | TDS com a extensao `.TRP` liberada | Ver "Publicacao do Recurso (.trp)" |
+
+Subir o nivel de compatibilidade do banco muda o comportamento do otimizador do SQL Server e pode alterar o plano de execucao de rotinas que nada tem a ver com Smart View: e janela agendada, com validacao depois. O servico precisa ser **reiniciado** para reler as annotations.
+
+## Contrato Minimo
+
+A classe herda de `totvs.framework.treports.integratedprovider.IntegratedProvider`, leva a annotation `@totvsFrameworkTReportsIntegratedProvider` e implementa tres metodos.
+
+| Metodo | Responsabilidade |
+|---|---|
+| `new()` | Chama `_Super:new()` e configura a identidade: `appendArea`, `setDisplayName`, `setDescription`, `setIsLookUp` e, opcionalmente, `setPergunte` |
+| `getSchema()` | Declara colunas (`addProperty`) e parametros (`oSchema:addParameter`), e amarra URLs de lookup/combo (`setCustomURL`). Retorna `self:oSchema` |
+| `getData(nPage, oFilter)` | Le os parametros, executa a consulta e alimenta `self:oData:appendData()` linha a linha. Retorna `self:oData` |
+
+Atributos da annotation, extraidos do include `totvs.framework.treports.integratedprovider.th`:
+
+| Atributo | Tipo | Default | Observacao |
+|---|---|---|---|
+| `active` | logico | — | `.F.` esconde o objeto da ferramenta |
+| `team` | caractere | vazio | Time responsavel; em customizacao, use `"CUSTOM"` |
+| `tables` | caractere | vazio | Tabelas padrao lidas, separadas por virgula |
+| `name` | caractere | vazio | Nome do objeto |
+| `country` | caractere | vazio | `"ALL"` ou sigla do pais (`"BRA"`) |
+| `initialRelease` | caractere | `12.1.2310` | Release minima; declare a sua se for anterior |
+| `customTables` | caractere | vazio | Tabelas customizadas lidas |
+
+## Identidade do Objeto — Tres Nomes Diferentes
+
+| Identificador | Exemplo | Onde importa |
+|---|---|---|
+| **Nome do fonte** = id do objeto | `custom.sv.fat.customerlist` | `callTReports`, prefixo do `.trp`, De/Para |
+| **Namespace** | `custom.smartview.fat.treportsintegratedprovider` | So dentro do TLPP |
+| **Nome da classe** | `CustomerListSmartViewBusinessObject` | So dentro do TLPP |
+
+- O id e o **nome do arquivo**, no padrao `<area>.sv.<modulo>.<nome>`. Renomear o fonte depois quebra `.trp`, De/Para e menu de uma vez — batize certo antes de compilar.
+- O namespace **precisa terminar em `.treportsintegratedprovider`**: e exigencia do framework e a unica excecao legitima a regra `custom.<agrupador>.<servico>` do `AGENTS.md`.
+- Nunca use namespace `totvs.protheus.*` em objeto customizado, sob pena de ser sobrescrito por pacote de atualizacao.
+
+## Exemplo Completo
+
+Objeto minimo, usando apenas API da classe base. Lista clientes por faixa de codigo, com busca avancada nos dois parametros. Arquivo `custom.sv.fat.customerlist.tlpp`:
+
+```c
+#include "totvs.ch"
+#include "msobject.ch"
+#include "totvs.framework.treports.integratedprovider.th"
+#include "tlpp-core.th"
+
+namespace custom.smartview.fat.treportsintegratedprovider
+
+@totvsFrameworkTReportsIntegratedProvider(active=.T., team="CUSTOM", tables="SA1", name="Clientes por Faixa", country="ALL", initialRelease="12.1.2210", customTables="SA1")
+
+Class CustomerListSmartViewBusinessObject From totvs.framework.treports.integratedprovider.IntegratedProvider
+    public method new()       as object
+    public method getSchema() as object
+    public method getData()   as object
+EndClass
+
+Method new() Class CustomerListSmartViewBusinessObject
+
+    _Super:new()
+
+    self:appendArea("Customizados")
+    self:setDisplayName("Clientes por Faixa")
+    self:setDescription("Clientes (SA1) por faixa de codigo")
+
+    //Habilita o botao "Fazer busca avancada" nos parametros com URL de lookup
+    self:setIsLookUp(.T.)
+
+Return self
+
+Method getSchema() as object Class CustomerListSmartViewBusinessObject
+
+    self:addProperty("A1_COD"   , "Codigo do Cliente"    , "string", "Codigo"      , "A1_COD"   )
+    self:addProperty("A1_LOJA"  , "Loja"                 , "string", "Loja"        , "A1_LOJA"  )
+    self:addProperty("A1_NOME"  , "Razao Social"         , "string", "Razao Social", "A1_NOME"  )
+    self:addProperty("A1_EST"   , "Estado"               , "string", "UF"          , "A1_EST"   )
+    self:addProperty("A1_LC"    , "Limite de Credito"    , "number", "Lim. Credito", "A1_LC"    )
+    self:addProperty("A1_ULTCOM", "Data da Ultima Compra", "date"  , "Ult. Compra" , "A1_ULTCOM")
+
+    self:oSchema:addParameter("MV_PAR01", "Cliente de ?" , "string", .F.)
+    self:oSchema:addParameter("MV_PAR02", "Cliente ate ?", "string", .F.)
+
+    //Busca avancada (tipo 2 = LOOKUP). O genericLookupService e do framework:
+    //nao ha endpoint a publicar. Tem de vir DEPOIS do addParameter correspondente.
+    self:setCustomURL("MV_PAR01", "api/framework/v1/genericLookupService/smartview/SA1", 2)
+    self:setCustomURL("MV_PAR02", "api/framework/v1/genericLookupService/smartview/SA1", 2)
+
+Return self:oSchema
+
+Method getData(nPage as numeric, oFilter as object) as object Class CustomerListSmartViewBusinessObject
+
+    Local oParams := oFilter:getParameters() as json
+    Local cAlias  := GetNextAlias() as character
+    Local nTamCod := TamSX3("A1_COD")[1] as numeric
+    Local cFilSA1 := xFilial("SA1") as character
+    Local cCliDe  := "" as character
+    Local cCliAte := "" as character
+
+    cCliDe  := PadR(AllTrim(cValToChar(oParams["MV_PAR01", 1])), nTamCod)
+    cCliAte := AllTrim(cValToChar(oParams["MV_PAR02", 1]))
+
+    //O valor vem do JSON SEM padding: o teto da faixa tem de sair do dicionario,
+    //nunca de Len() sobre o conteudo informado.
+    If Empty(cCliAte)
+        cCliAte := Replicate("Z", nTamCod)
+    Else
+        cCliAte := PadR(cCliAte, nTamCod)
+    EndIf
+
+    self:setPageSize(500)
+
+    BeginSQL Alias cAlias
+
+        SELECT A1.A1_COD, A1.A1_LOJA, A1.A1_NOME, A1.A1_EST, A1.A1_LC, A1.A1_ULTCOM
+          FROM %table:SA1% A1
+         WHERE A1.%notDel%
+           AND A1.A1_FILIAL = %exp:cFilSA1%
+           AND A1.A1_COD BETWEEN %exp:cCliDe% AND %exp:cCliAte%
+         ORDER BY A1.A1_COD, A1.A1_LOJA
+
+EndSQL
+
+    While !(cAlias)->(Eof())
+
+        self:oData:appendData({;
+            "A1_COD"    : (cAlias)->A1_COD ,;
+            "A1_LOJA"   : (cAlias)->A1_LOJA ,;
+            "A1_NOME"   : AllTrim((cAlias)->A1_NOME) ,;
+            "A1_EST"    : (cAlias)->A1_EST ,;
+            "A1_LC"     : (cAlias)->A1_LC ,;
+            "A1_ULTCOM" : totvs.framework.treports.date.stringToTimeStamp((cAlias)->A1_ULTCOM) ;
+        })
+
+        (cAlias)->(dbSkip())
+
+    EndDo
+
+    (cAlias)->(dbCloseArea())
+
+Return self:oData
+```
+
+O exemplo completo da skill (`reference.md`) traz tambem os cabecalhos Protheus.doc de cada metodo.
+
+## O Fonte de Menu (callTReports)
+
+O objeto so e alcancavel pelo menu do Protheus atraves de `callTReports`. O fonte e um `.prw` comum, sem namespace:
+
+```c
+#include "totvs.ch"
+
+User Function USVFAT01()
+
+    Local lSuccess := .F. as logical
+
+    lSuccess := totvs.framework.treports.callTReports("custom.sv.fat.customerlist",,,,,.F.)
+
+Return lSuccess
+```
+
+Um unico `.prw` sem namespace pode concentrar todos os lancadores de um conjunto de objetos relacionados e tambem a funcao de opcoes dos combos. O 2o parametro do `callTReports` e o tipo do recurso (`reports`, `data-grid` ou `pivot-table`); fixa-lo em `"data-grid"` evita que o usuario veja o seletor de tipo de recurso.
+
+## Colunas e Parametros
+
+**Colunas (`addProperty`).** O tipo define o que a grade habilita: `string` agrupa e filtra por texto, `number` soma e calcula media, `date` filtra por periodo e agrupa por mes/ano/trimestre. A chave do `addProperty` tem de ser **identica** a do `appendData` — divergencia nao gera erro, a coluna simplesmente vem vazia.
+
+**Datas.** Data nunca sai como `DTOC()` nem como string formatada: o tipo e `date` e o valor passa por `totvs.framework.treports.date.stringToTimeStamp()`, que espera caractere `AAAAMMDD`. Em `BeginSQL`, nao declare a coluna com `column ... as Date`.
+
+**Parametros.** `self:oSchema:addParameter(cNome, cLabel, cTipo, lFlag, , , , , , cHelp)` declara um parametro; o 4o argumento **nao e validacao** — parametro "obrigatorio" pode chegar vazio no `getData`. `self:setPergunte("GRUPO")` no `new()` carrega o grupo do SX1, mas o grupo precisa existir no ambiente (em migracao, quem o cria e o `ValidPerg` do fonte original) e **nao renderiza combo**.
+
+| `nTipo` do `setCustomURL` | Constante | O que faz | Precisa de endpoint proprio? |
+|---|---|---|---|
+| 1 | `KEYVALUE` | Combo de valores | **Sim** |
+| 2 | `LOOKUP` | Busca avancada em tabela | Nao — `genericLookupService` do framework |
+| 3 | `LOOKUPQUERY` | Busca avancada por consulta | Nao |
+| 4 | `LOOKUPSX5` | Busca avancada em tabela generica | Nao |
+
+Combo em objeto customizado exige endpoint REST proprio: a rota de options do modulo padrao nao resolve namespace `custom.*` e devolve dados vazios sem erro. A funcao de opcoes so pode morar numa `User Function` em `.prw` **sem namespace** — `Function` pura nao compila em fonte customizado, `Static Function` nao e visivel de fora e `User Function` dentro de `.tlpp` com namespace nao e registrada globalmente. O contrato de resposta esperado, com `key` sendo o indice base 1:
+
+```json
+{ "data": [ { "key": "1", "label": "Emissao" } ] }
+```
+
+URL invalida no `setCustomURL` nao degrada para combo vazio: a tela de parametros responde 500. Valide o endpoint no Postman antes de amarra-lo ao objeto.
+
+## Regras do getData
+
+O `getData` roda em **thread REST**, sem usuario na frente e sem console a vista:
+
+- Nenhuma chamada de interface (`MsgInfo`, `Alert`, `MsgYesNo`, `MSDIALOG`, `FWMsgRun`, `ParamBox`); o que for aviso vira `FWLogMsg()`.
+- Nenhum acesso a disco do cliente (`MakeDir`, `__CopyFile`, `MsExcel()` por OLE) e nenhum `ConOut()`.
+- `EndSQL` deve comecar na coluna 1; o `BeginSQL` pode ficar indentado.
+- Nada de `%xfilial%`: o macro resolve a filial da **sessao**, e aqui a filial vem de parametro. Pre-calcule `xFilial(alias, cFil)` num `Local` e passe por `%exp%`.
+- Faixas "ate": o valor vem do JSON sem padding, entao o tamanho vem do dicionario (`TamSX3`), nunca de `Len()` sobre o conteudo.
+
+| Situacao | Ferramenta |
+|---|---|
+| Consulta **estatica** — o `WHERE` e sempre o mesmo, so os valores mudam | `BeginSQL/EndSQL` com macros |
+| `WHERE` **montado em tempo de execucao** — clausulas entram e saem conforme o parametro | `FWExecStatement` com bind |
+
+## Publicacao do Recurso (.trp)
+
+Sem o `.trp`, o `callTReports` falha, mesmo com o objeto compilado e visivel na ferramenta. O ciclo:
+
+1. **Exportar** no Smart View: Mais acoes, Exportar Recurso Smart View (em versoes 3.x o download chega com extensao `.sv`).
+2. **Renomear** para o padrao — so renomear, nao recompactar.
+3. **Liberar `.TRP` no TDS** (`totvsLanguageServer.folder.extensionsAllowed`): o array substitui o default, entao preserve as extensoes padrao junto com a nova.
+4. **Compilar** o `.trp` no mesmo RPO do objeto de negocio.
+5. **Reiniciar** o AppServer.
+6. **Rodar a rotina de menu**: a primeira execucao importa o recurso e grava o De/Para (Amarracao Protheus x Smart View, campo `TR__IDREL`).
+
+```
+<area>.sv.<agrupador>.<modulo>.<subtitulo>.<tipo>[.<pais>].trp
+custom.sv.fat.customerlist.default.dg.trp
+```
+
+O prefixo e exatamente o id do objeto; o tipo e `rep` (relatorio), `dg` (visao de dados) ou `pv` (tabela dinamica). Quando ha combo, o Smart View mantem cache da URL de opcoes e o ciclo de teste ganha um passo: compilar, reiniciar o AppServer, **reiniciar o servico do Smart View** e so entao abrir a tela.
+
+| Mensagem | Causa |
+|---|---|
+| `[SKIPPED] File extension ... is not in the allowed extensions list` | Extensao `.TRP` nao liberada no TDS |
+| `O arquivo .TRP necessario para a importacao nao foi localizado no repositorio` | Nao ha `.trp` no RPO com aquele prefixo: nao compilado, nome fora do padrao ou AppServer nao reiniciado |
+| `Nao possui arquivos no .trp ou o mesmo esta corrompido` | Recurso encontrado, mas o container e ilegivel: arquivo solto renomeado, recompactado ou corrompido |
+
+Todo recurso novo tem ciclo de deploy, e todo redesenho tambem — leve isso para a estimativa.
+
+## Migracao de Relatorios
+
+| Origem | Destino natural |
+|---|---|
+| `FWMSExcel` | Visao de dados (`data-grid`) — caso mais direto e mais pedido |
+| `TReport` | Visao de dados, se o valor esta nos dados; se o layout importa, avalie recurso do tipo `reports` |
+| `FWMSPrinter` / `TMSPrinter` | Recurso do tipo relatorio (`rep`) |
+
+A migracao e **aditiva**: o relatorio original continua existindo e so sai de cena depois da homologacao. Os dois bugs que a migracao introduz em silencio sao as faixas "ate" vazias e as datas publicadas como texto. Toda migracao e entregue com o **relatorio de lacunas** (tabela Item, Situacao, Motivo e Acao, no formato do `gap-report.md` da skill `advpl-to-tlpp-migration`), registrando o que nao migra — telas e mensagens de UI, saidas em disco do cliente, execucao em varias empresas.
+
+## Troubleshooting
+
+| Sintoma | Causa mais provavel |
+|---|---|
+| Objeto nao aparece na lista | Nao compilado no RPO do appserver REST, ou servico nao reiniciado |
+| Tela de parametros responde 500 | URL invalida no `setCustomURL` |
+| Combo vazio | Endpoint nao alcancado, ou cache do Smart View |
+| `cannot find function U_XXX in AppMap` | `User Function` dentro de `.tlpp` com namespace |
+| Grade abre vazia | Faixa de parametro, filial, ou `INNER JOIN` sem dado auxiliar |
+| Coluna sempre vazia | Chave do `appendData` diferente da do `addProperty` |
+| Data nao filtra nem agrupa por mes | Publicada como texto |
+| Busca avancada nao aparece | `setIsLookUp(.F.)` ou lib antiga |
+
+## Arquivos de Suporte
+
+Esta skill inclui os seguintes arquivos de referencia:
+
+| Arquivo | Conteudo |
+|---|---|
+| `reference.md` | Smart View vs Smart X, pre-requisitos de ambiente, contrato minimo, annotation, rotas REST, identidade do objeto, exemplo completo |
+| `patterns-schema.md` | Colunas com `addProperty`: tipos, datas, colunas calculadas, coluna discriminadora, tamanho de pagina |
+| `patterns-parameters.md` | Parametros: `addParameter`, `setPergunte`, busca avancada (lookup), combo e o endpoint de opcoes proprio |
+| `patterns-getdata.md` | Consulta e carga: `BeginSQL` vs `FWExecStatement`, multi-filial, moeda, regras de workarea |
+| `patterns-migration-reports.md` | Conversao de TReport, FWMSPrinter, TMSPrinter ou FWMSExcel em objeto de negocio Smart View |
+| `deploy-trp.md` | Publicacao: pre-requisitos, nomeacao do `.trp`, extensao no TDS, ciclo de compilacao e restart, De/Para |
+| `troubleshooting.md` | Diagnostico: objeto ausente da lista, recurso nao encontrado, tela de parametros 500, combo vazio, zero linhas |
