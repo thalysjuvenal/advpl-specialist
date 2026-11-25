@@ -253,7 +253,10 @@ Return
 **Solution:**
 ```tlpp
 // Class definition
-Namespace mycompany.services
+#include "tlpp-core.th"
+
+// Convention: custom.<agrupador>.<servico>
+Namespace custom.fat.myservice
 
 Class MyService
     Public Method New() As Object
@@ -262,7 +265,7 @@ EndClass
 
 // Consumer file
 #include "totvs.ch"
-Using Namespace mycompany.services
+Using Namespace custom.fat.myservice
 
 User Function TestSvc()
     Local oSvc := MyService():New()

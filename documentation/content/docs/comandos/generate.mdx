@@ -140,7 +140,7 @@ Gera novo codigo ADVPL ou TLPP seguindo as convencoes e boas praticas do Protheu
 
 ## Verificacoes antes de planejar
 
-- **Release declarada (`.protheus-version`)**: se o arquivo existir na raiz do projeto, o plugin compara a release com o minimo da funcionalidade pedida (linha correspondente em `skills/protheus-reference/releases.md`, por exemplo TLPP com MVC ou com `namespace`, 12.1.2410). Se a release for menor, avisa e propoe a alternativa (ex.: `.prw` ADVPL). Um arquivo malformado e ignorado com um aviso; sem o arquivo, o plugin segue normalmente e sugere criar `.protheus-version`.
+- **Release declarada (`.protheus-version`)**: se o arquivo existir na raiz do projeto, o plugin compara a release com o minimo da funcionalidade pedida (linha correspondente em `skills/protheus-reference/releases.md`, por exemplo TLPP com MVC ou com `namespace`, 12.1.2410). Se a release for menor, avisa, dizendo que a fonte desse minimo no TDN ainda esta "a confirmar", e propoe a alternativa (ex.: `.prw` ADVPL). Um arquivo malformado e ignorado com um aviso; sem o arquivo, o plugin segue normalmente e sugere criar `.protheus-version`.
 - **Tamanho do identificador**: `User Function` em `.prw` ate 8 caracteres, `Static Function` ate 10, TLPP com `namespace` ate 255. Se o nome excede o limite, o plano nao e aberto: voce escolhe entre encurtar o nome ou migrar para TLPP com `namespace`.
 - **Regras criticas**: o gerador le `skills/advpl-code-generation/critical-rules.md` (palavra-chave de funcao, `namespace` em TLPP, tamanho de identificador) antes de gerar.
 

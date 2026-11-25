@@ -31,7 +31,7 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 **MANDATORY: Always enter planning mode before migrating code. Never skip planning.**
 
 ### Analysis Phase
-1. **Check the declared release** - If a `.protheus-version` file exists in the project root, read it (one release string, e.g. `12.1.2310`). Look up the minimum release of the target TLPP features in `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/releases.md` (target `.tlpp`: rows "TLPP com MVC" and "TLPP com `namespace`", both 12.1.2410) and compare the third component as an integer. If the declared release is below the minimum (e.g. TLPP with `namespace` or TLPP+MVC needs `12.1.2410`), warn the user and propose the alternative (e.g. keep the code in `.prw` ADVPL and apply only the safe cleanups). Continue only with the user's choice. If the content, after trimming whitespace, is not `12.1.N` with N all digits (empty, multi-line, `12.1`, non-numeric), ignore the file, tell the user, and proceed as if it were absent. If the file does not exist, proceed as usual and add one line suggesting the user create `.protheus-version` with the Protheus release.
+1. **Check the declared release** - If a `.protheus-version` file exists in the project root, read it (one release string, e.g. `12.1.2310`). Look up the minimum release of the target TLPP features in `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/releases.md` (target `.tlpp`: rows "TLPP com MVC" and "TLPP com `namespace`", both 12.1.2410) and compare the third component as an integer. If the declared release is below the minimum (e.g. TLPP with `namespace` or TLPP+MVC needs `12.1.2410`), warn the user, saying that the TDN source of this 12.1.2410 minimum is still "a confirmar" (see the row's source column), and propose the alternative (e.g. keep the code in `.prw` ADVPL and apply only the safe cleanups). Continue only with the user's choice. If the content, after trimming whitespace, is not `12.1.N` with N all digits (empty, multi-line, `12.1`, non-numeric), ignore the file, tell the user, and proceed as if it were absent. If the file does not exist, proceed as usual and add one line suggesting the user create `.protheus-version` with the Protheus release.
 2. **Read source file** - Read the .prw file completely
 3. **Analyze structure** - Identify functions, dependencies, shared variables
 4. **Search for callers** - Grep codebase for `u_FunctionName` references
@@ -81,7 +81,7 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 /advpl-specialist:migrate src/FATA001.prw --dry-run
 
 # Specify output path and namespace
-/advpl-specialist:migrate src/FATA001.prw --output src/tlpp/PedidoService.tlpp --namespace mycompany.faturamento
+/advpl-specialist:migrate src/FATA001.prw --output src/tlpp/PedidoService.tlpp --namespace custom.faturamento.pedidoservice
 
 # Migrate without backward compatibility wrapper
 /advpl-specialist:migrate src/FATA001.prw --wrapper false

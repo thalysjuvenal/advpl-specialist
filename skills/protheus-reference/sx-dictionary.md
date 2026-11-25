@@ -273,13 +273,13 @@ Local aStruct := FWSX3Util():GetFieldStruct("A1_COD")
 Local aFields := FWSX3Util():GetAllFields("SA1", .T.) // .T. includes virtual fields
 
 // Get structure of all fields for an alias
-Local aStruct := FWSX3Util():GetListFieldsStruct("SA1", .T., .F.)
+Local aListStru := FWSX3Util():GetListFieldsStruct("SA1", .T., .F.)
 
-// Check if a field exists
+// Check if a field exists (SeekX3File: a confirmar no TDS, not confirmed in the TDN)
 Local lExists := FWSX3Util():SeekX3File("A1_COD")
 
 // Using GetSX3Cache to get field properties efficiently (also valid)
-Local cType := GetSX3Cache("A1_COD", "X3_TIPO")     // Returns "C"
+Local cX3Type := GetSX3Cache("A1_COD", "X3_TIPO")     // Returns "C"
 Local nSize := GetSX3Cache("A1_COD", "X3_TAMANHO")   // Returns field size
 Local cPict := GetSX3Cache("A1_COD", "X3_PICTURE")   // Returns picture mask
 ```

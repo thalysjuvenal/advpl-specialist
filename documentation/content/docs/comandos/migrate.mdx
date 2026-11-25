@@ -33,7 +33,7 @@ Converte codigo ADVPL procedural para TLPP com padroes orientados a objetos.
 3. **Buscar chamadores** - Pesquisar na base de codigo por referencias `u_NomeFuncao`
 
 ### Fase de Planejamento (OBRIGATORIA)
-- **Release declarada**: se existir `.protheus-version` na raiz do projeto, o plugin compara a release com o minimo de TLPP com MVC e TLPP com `namespace` (12.1.2410, em `skills/protheus-reference/releases.md`). Se for menor, avisa e propoe a alternativa (ex.: manter `.prw` e aplicar so as limpezas seguras). Arquivo malformado e ignorado com aviso; sem o arquivo, o plugin segue e sugere cria-lo.
+- **Release declarada**: se existir `.protheus-version` na raiz do projeto, o plugin compara a release com o minimo de TLPP com MVC e TLPP com `namespace` (12.1.2410, em `skills/protheus-reference/releases.md`). Se for menor, avisa, dizendo que a fonte desse minimo no TDN ainda esta "a confirmar", e propoe a alternativa (ex.: manter `.prw` e aplicar so as limpezas seguras). Arquivo malformado e ignorado com aviso; sem o arquivo, o plugin segue e sugere cria-lo.
 4. **Carregar referencia** - Carregar referencia `advpl-to-tlpp-migration` para regras e checklist
 5. **Entrar em modo de planejamento** - Usar `EnterPlanMode` para criar um plano estruturado de migracao
 6. **Projetar estrutura de classes** - Mapear funcoes para classes e metodos
@@ -67,7 +67,7 @@ Converte codigo ADVPL procedural para TLPP com padroes orientados a objetos.
 /advpl-specialist:migrate src/FATA001.prw --dry-run
 
 # Especificar caminho de saida e namespace
-/advpl-specialist:migrate src/FATA001.prw --output src/tlpp/PedidoService.tlpp --namespace mycompany.faturamento
+/advpl-specialist:migrate src/FATA001.prw --output src/tlpp/PedidoService.tlpp --namespace custom.faturamento.pedidoservice
 
 # Migrar sem wrapper de compatibilidade retroativa
 /advpl-specialist:migrate src/FATA001.prw --wrapper false
