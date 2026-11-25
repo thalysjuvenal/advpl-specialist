@@ -29,6 +29,7 @@ if [ "$FOUND" -eq 1 ]; then
     echo "  /advpl-specialist:sxgen"
     echo "  /advpl-specialist:smartx"
     echo "  /advpl-specialist:smartview"
+    echo "  /advpl-specialist:validate"
 
     # Dica estatica (sem consultar o sistema)
     echo ""

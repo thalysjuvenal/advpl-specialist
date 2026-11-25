@@ -443,7 +443,8 @@ check_session_start() {
   out="$(cd "$d" && HOME="$home" PATH="$fake:$PATH" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
   check "session-start: FOO.PRW detectado" grep -q "ADVPL/TLPP project detected" <<<"$out"
   n="$(grep -c '/advpl-specialist:' <<<"$out")"
-  check "session-start: lista 15 comandos (achou $n)" [ "$n" = 15 ]
+  check "session-start: lista 16 comandos (achou $n)" [ "$n" = 16 ]
+  check "session-start: lista /advpl-specialist:validate" grep -q '/advpl-specialist:validate$' <<<"$out"
   check "session-start: nunca chama claude" [ ! -e "$TMP_DIR/claude-called" ]
   check "session-start: nao apaga cache de plugins" \
     [ -d "$home/.claude/plugins/cache/advpl-specialist-marketplace/advpl-specialist/0.0.1" ]
