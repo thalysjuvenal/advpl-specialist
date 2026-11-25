@@ -35,6 +35,16 @@
             "async": false
           }
         ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-read\"",
+            "async": false
+          }
+        ]
       }
     ]
   }

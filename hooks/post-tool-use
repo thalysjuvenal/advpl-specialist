@@ -27,6 +27,9 @@
 #      report: exit 0, no output.
 #   6. The snapshot is always removed (EXIT trap).
 # Lint engine missing or failing: message on stderr, exit 1 (non-blocking).
+# post-tool-use-read sources this file for its helpers (payload reader,
+# plugin_script, json_escape, finish); the steps above run only when the file
+# is executed.
 
 set -u
 export LC_ALL=C
@@ -105,6 +108,9 @@ finish() {
   fi
   exit 0
 }
+
+# Sourced by post-tool-use-read for the helpers above: stop here.
+[ "${BASH_SOURCE[0]}" = "$0" ] || return 0
 
 input=$(cat)
 file=$(advpl_hook_file_path "$input")

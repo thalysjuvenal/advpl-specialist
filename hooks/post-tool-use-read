@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# advpl-specialist - PostToolUse hook (Read)
+#
+# Claude Code's Edit, MultiEdit and Write refuse a file that is not valid
+# UTF-8 ("File is not valid UTF-8"), and that refusal comes before any hook
+# runs, so no PreToolUse or PostToolUseFailure hook can show the way out. But
+# Claude reads a file before editing it: after a Read of a Windows-1252 ADVPL
+# source this hook gives Claude the editing flow as JSON additionalContext,
+# with both commands already resolved:
+#   bash ".../convert-encoding.sh" --to-utf8 "FILE"   then Read again and Edit;
+#       post-tool-use converts the file back to Windows-1252 and lints only
+#       the introduced lines
+#   bash ".../convert-encoding.sh" "FILE"             gave up: back to CP1252
+#
+# The hint is given only when tool_input.file_path of the stdin JSON (offset
+# and limit do not matter):
+#   - has a lint extension (.prw .prx .tlpp .th, any case);
+#   - is outside the plugin (${CLAUDE_PLUGIN_ROOT} or the plugin directory of
+#     this hook, symbolic links resolved): its fixtures get no hint;
+#   - would be converted by convert-encoding.sh --dry-run --to-utf8, i.e. the
+#     report is exactly "converted: FILE": not valid UTF-8 and no byte that
+#     Windows-1252 leaves undefined. A Windows-1252 file whose bytes happen to
+#     be valid UTF-8 is "already-utf8": Edit accepts it, no hint is needed.
+# The file is never written (--dry-run) and snapshots are never touched.
+#
+# Never blocks or fails the Read: always exit 0, and an internal error
+# (stderr included) ends in silence. The helpers (payload reader with the jq
+# fallback and CR removal, plugin_script, json_escape, finish) come from
+# post-tool-use, which stops right after its definitions when sourced.
+
+set -u
+
+case "${BASH_SOURCE[0]}" in
+  */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;;
+  *) HOOK_DIR=. ;;
+esac
+# Not followed by shellcheck: it does not see the early return of a sourced
+# post-tool-use and would take its main part, which always exits, for the end
+# of this script (everything below "unreachable").
+# shellcheck source=/dev/null
+. "$HOOK_DIR/post-tool-use" 2>/dev/null || exit 0
+
+# physical_dir DIR: DIR with symbolic links resolved; fails if not a directory.
+physical_dir() { (cd -- "$1" 2>/dev/null && pwd -P); }
+
+# shell_word S: S as one double-quoted shell word (\ " $ ` escaped).
+shell_word() { printf '"%s"' "$(printf '%s' "$1" | sed 's/[\\"$`]/\\&/g')"; }
+
+# in_plugin FILE: succeeds when FILE is inside the plugin.
+in_plugin() {
+  local dir root
+  case $1 in
+    */*) dir=${1%/*} ;;
+    *) dir=. ;;
+  esac
+  dir=$(physical_dir "${dir:-/}") || return 1
+  for root in "${CLAUDE_PLUGIN_ROOT:-}" "$HOOK_DIR/.."; do
+    [ -n "$root" ] || continue
+    root=$(physical_dir "$root") || continue
+    case "$dir/" in "${root%/}/"*) return 0 ;; esac
+  done
+  return 1
+}
+
+advpl_read_hint() {
+  local input file conv dir out c f
+  input=$(cat)
+  file=$(advpl_hook_file_path "$input")
+  [ -n "$file" ] || return 0
+  [ -f "$file" ] || return 0
+  advpl_is_lint_file "$file" || return 0
+  if in_plugin "$file"; then return 0; fi
+  conv=$(plugin_script skills/advpl-code-generation/scripts/convert-encoding.sh) || return 0
+  out=$("${BASH:-bash}" "$conv" --dry-run --to-utf8 -- "$file") || return 0
+  [ "$out" = "converted: $file" ] || return 0
+  dir=$(physical_dir "${conv%/*}") || return 0
+  c=$(shell_word "$dir/${conv##*/}")
+  f=$(shell_word "$file")
+  # shellcheck disable=SC2034 # read by finish (post-tool-use)
+  notes="advpl-specialist: $file esta em Windows-1252, e o Edit/Write do Claude Code recusa arquivo que nao e UTF-8 valido. Para editar, converta-o para UTF-8:
+bash $c --to-utf8 $f
+Depois leia o arquivo de novo, porque o conteudo mudou, e faca o Edit: o hook do plugin reconverte para Windows-1252 e faz o lint so das linhas introduzidas. Se desistir da edicao, rode o mesmo script sem --to-utf8 para voltar a Windows-1252:
+bash $c $f
+Nao edite com sed nem outro comando de shell: isso pula o lint."
+  finish
+}
+
+(advpl_read_hint) 2>/dev/null
+exit 0

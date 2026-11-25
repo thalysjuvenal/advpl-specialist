@@ -31,9 +31,10 @@ if [ "$FOUND" -eq 1 ]; then
     echo "  /advpl-specialist:smartview"
     echo "  /advpl-specialist:validate"
 
-    # Dica estatica (sem consultar o sistema)
+    # Dicas estaticas (sem consultar o sistema)
     echo ""
     echo "Tip: install the 'superpowers' plugin for planning, debugging and review: /plugin install superpowers@claude-plugins-official"
+    echo "Tip: Claude Code's Edit/Write refuse Windows-1252 sources (not valid UTF-8). To edit one, run bash \"${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/scripts/convert-encoding.sh\" --to-utf8 FILE, Read it again and Edit: the plugin hook converts it back to Windows-1252 and lints only the introduced lines. To give up, run the same script without --to-utf8. Never edit with sed or another shell command: that skips the lint."
 
     # --- Protheus release detection ---
     if [ -f "${CLAUDE_PLUGIN_ROOT}/hooks/lib/detect-protheus-version.sh" ]; then
