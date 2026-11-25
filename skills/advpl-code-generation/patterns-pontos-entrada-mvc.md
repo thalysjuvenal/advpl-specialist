@@ -116,8 +116,8 @@ oModel:SetErrorMessage(oModel:GetId(), , oModel:GetId(), , "PERMISSAO", ;
 ## 4. Template do PE MVC (hub de eventos)
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDEF.CH"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
 /*/{Protheus.doc} NOMEDOMODELO
 Ponto de entrada MVC da rotina <ROTINA>. Hub unico: PARAMIXB[2] (cIdPonto)
@@ -183,8 +183,8 @@ Return xRet
 Caso de uso: apenas usuários listados no parâmetro customizado `M3_USRFOR` (códigos separados por `/`) podem incluir fornecedor. Testado em 12.1.2510.
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDEF.CH"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
 /*/{Protheus.doc} CUSTOMERVENDOR
 PE MVC do cadastro de Fornecedores (MATA020). Valida permissao de
@@ -226,7 +226,7 @@ Pontos de atenção deste exemplo:
 1. **TDN**: busque `Pontos de entrada MVC <rotina>`; se existir a página, a rotina é MVC e ela informa o ID do modelo.
 2. **Sintoma clássico**: PEs legados de confirmação/validação param de disparar após upgrade de release, mas os de exclusão ou os que recebem dados via PARAMIXB continuam.
 3. **Pela interface**: telas MVC usam FWFormView (painéis com layout dockado, browse via FWMBrowse/FWLoadBrw).
-4. **Em dúvida**: compile um PE de teste com `ConOut()` para cada mecanismo e observe o console.
+4. **Em dúvida**: compile um PE de teste com `FWLogMsg()` para cada mecanismo e observe o console.
 
 ---
 

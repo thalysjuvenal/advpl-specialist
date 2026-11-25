@@ -13,7 +13,7 @@ The only reliable way to enforce this in ADVPL/TLPP is to wrap the lock in `BEGI
 ## Pattern 1 — Single Record Update with Recovery
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function FlagCust(cCustCode, cLoja, cFlag)
     Local lOk      := .F.
@@ -38,7 +38,7 @@ User Function FlagCust(cCustCode, cLoja, cFlag)
         SA1->A1_XFLAG := cFlag
         lOk := .T.
     RECOVER USING oError
-        ConOut("[FlagCust] Error: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "FLAGCUST", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Error: " + oError:Description, /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
     END SEQUENCE
 
     // Unlock runs in BOTH success and error paths
@@ -63,7 +63,7 @@ Return lOk
 ## Pattern 2 — Multi-Record Transaction
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function ApproveOrder(cOrderNum)
     Local lOk      := .F.
@@ -101,7 +101,7 @@ User Function ApproveOrder(cOrderNum)
 
         lOk := .T.
     RECOVER USING oError
-        ConOut("[ApproveOrder] Error: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "APPROVEORDER", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Error: " + oError:Description, /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
     END SEQUENCE
 
     If lLockedSC5
@@ -137,7 +137,7 @@ Return lOk
 For batch jobs that should skip locked records instead of waiting:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function BatchProcess()
     Local nProcessed := 0
@@ -162,8 +162,9 @@ User Function BatchProcess()
         SE1->(DbSkip())
     EndDo
 
-    ConOut("[BatchProcess] Processed: " + cValToChar(nProcessed) + ;
-           " | Skipped: " + cValToChar(nSkipped))
+    FWLogMsg("INFO", /*cTransactionId*/, "BATCHPROCESS", /*cCategory*/, /*cStep*/, /*cMsgId*/, ;
+        "Processed: " + cValToChar(nProcessed) + " | Skipped: " + cValToChar(nSkipped), ;
+        /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
 
     RestArea(aArea)
 Return nProcessed
@@ -182,15 +183,16 @@ Return nProcessed
 To ensure only one instance of a job runs at a time (regardless of record):
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function NightlyJob()
     Local cLockName := "NIGHTLY_JOB_" + cFilAnt
     Local lOk       := .F.
+    Local oError
 
     // .F. = exclusive lock | .T. = file scope (across all environments)
     If !LockByName(cLockName, .F., .F.)
-        ConOut("[NightlyJob] Already running — exiting")
+        FWLogMsg("WARN", /*cTransactionId*/, "NIGHTLYJOB", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Already running - exiting", /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
         Return .F.
     EndIf
 
@@ -198,7 +200,7 @@ User Function NightlyJob()
         // ... main job logic ...
         lOk := .T.
     RECOVER USING oError
-        ConOut("[NightlyJob] Error: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "NIGHTLYJOB", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Error: " + oError:Description, /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
     END SEQUENCE
 
     UnLockByName(cLockName, .F., .F.)
@@ -218,7 +220,7 @@ Return lOk
 When inserting using `GetSxeNum()`, the sequence reservation is itself a lock that must be released:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function CreateOrder(cCliente, cLoja)
     Local cNum    := ""
@@ -250,7 +252,7 @@ User Function CreateOrder(cCliente, cLoja)
             lOk := .T.
         EndIf
     RECOVER USING oError
-        ConOut("[CreateOrder] Error: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "CREATEORDER", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Error: " + oError:Description, /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
     END SEQUENCE
 
     If lLocked

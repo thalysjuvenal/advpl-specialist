@@ -17,7 +17,7 @@ Key classes:
 
 Required includes:
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 ```
 
 ---
@@ -34,7 +34,7 @@ oReport := TReport():New(cName, cTitle, cPergunte, bAction, cDescription, lLands
 |-----------|------|-------------|
 | `cName` | Character | Report internal name |
 | `cTitle` | Character | Report title displayed in header |
-| `cPergunte` | Character | Pergunte group code (SX1) for filtering. Use `Nil` if using ParamBox |
+| `cPergunte` | Character | Pergunte group code (SX1) for filtering. Use `Nil` if the parameters are not collected by the report |
 | `bAction` | Block | Code block executed for printing: `{|oReport| PrintFunction(oReport)}` |
 | `cDescription` | Character | Report description |
 | `lLandscape` | Logical | `.T.` for landscape, `.F.` for portrait (optional) |
@@ -189,7 +189,7 @@ TRFunction():New(oCell, cId, cFunction, oBreak, cTitle, cPicture, cFormula, lEnd
 
 ---
 
-## 7. Filtering - Pergunte and ParamBox
+## 7. Filtering - Pergunte and ParamBox (restricted)
 
 ### 7.1 Using Pergunte (SX1)
 
@@ -201,7 +201,7 @@ oReport := TReport():New("REL001", "Relatorio de Produtos", "REL001", {|oReport|
 
 ### 7.2 Using ParamBox
 
-For custom parameters without SX1 registration, use `ParamBox` before creating the report:
+For custom parameters without SX1 registration, `ParamBox` collects them before creating the report. Note: `ParamBox` is on the TOTVS list of restricted functions (internal, unsupported, may change without notice - see `skills/protheus-reference/restricted-functions.md`); prefer `Pergunte` with an SX1 group (7.1) in new code:
 
 ```advpl
 User Function MyReport()
@@ -250,7 +250,7 @@ Return aRotina
 This example creates a report listing products grouped by type, with count totalizer per group.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} zRelProd
 Relatorio de Produtos por Grupo com TReport
@@ -260,26 +260,12 @@ Relatorio de Produtos por Grupo com TReport
 @version 1.0
 /*/
 User Function zRelProd()
-    Local aArea    := GetArea()
-    Local aPergs   := {}
-    Local oReport  := Nil
-    Local cProdDe  := Space(TamSX3("B1_COD")[1])
-    Local cProdAte := StrTran(cProdDe, " ", "Z")
-    Local cTipoDe  := Space(TamSX3("B1_TIPO")[1])
-    Local cTipoAte := StrTran(cTipoDe, " ", "Z")
+    Local oReport := Nil
 
-    // Parametros de filtro
-    aAdd(aPergs, {1, "Produto De",  cProdDe,  "", ".T.", "SB1", ".T.", 80, .F.})
-    aAdd(aPergs, {1, "Produto Ate", cProdAte, "", ".T.", "SB1", ".T.", 80, .T.})
-    aAdd(aPergs, {1, "Tipo De",     cTipoDe,  "", ".T.", "02",  ".T.", 40, .F.})
-    aAdd(aPergs, {1, "Tipo Ate",    cTipoAte, "", ".T.", "02",  ".T.", 40, .T.})
-
-    If ParamBox(aPergs, "Informe os parametros", , , , , , , , , .F., .F.)
-        oReport := fReportDef()
-        oReport:PrintDialog()
-    EndIf
-
-    RestArea(aArea)
+    // O grupo de perguntas ZRELPROD (SX1) deve existir com os parametros:
+    // MV_PAR01/02 = Produto De/Ate, MV_PAR03/04 = Tipo De/Ate
+    oReport := fReportDef()
+    oReport:PrintDialog()
 
 Return Nil
 
@@ -292,7 +278,7 @@ Static Function fReportDef()
     Local oBreak   := Nil
 
     // Cria o relatorio
-    oReport := TReport():New("zRelProd", "Relatorio de Produtos por Grupo", Nil, ;
+    oReport := TReport():New("zRelProd", "Relatorio de Produtos por Grupo", "ZRELPROD", ;
         {|oReport| fRepPrint(oReport)})
     oReport:SetTotalInLine(.F.)
     oReport:SetPortrait()
@@ -330,19 +316,28 @@ Static Function fRepPrint(oReport)
     Local cQuery   := ""
     Local cAlias   := GetNextAlias()
     Local oSection := oReport:Section(1)
+    Local oStmt    := FWPreparedStatement():New()
 
-    // Monta query com filtros do ParamBox
+    // Monta query com filtros do Pergunte (parametros via FWPreparedStatement)
     cQuery := "SELECT B1_COD, B1_DESC, B1_TIPO, B1_UM, B1_PRV1 "
     cQuery += "FROM " + RetSqlName("SB1") + " SB1 "
     cQuery += "WHERE SB1.D_E_L_E_T_ = ' ' "
-    cQuery += "AND B1_FILIAL = '" + xFilial("SB1") + "' "
-    cQuery += "AND B1_COD  >= '" + MV_PAR01 + "' "
-    cQuery += "AND B1_COD  <= '" + MV_PAR02 + "' "
-    cQuery += "AND B1_TIPO >= '" + MV_PAR03 + "' "
-    cQuery += "AND B1_TIPO <= '" + MV_PAR04 + "' "
+    cQuery += "AND B1_FILIAL = ? "
+    cQuery += "AND B1_COD  >= ? "
+    cQuery += "AND B1_COD  <= ? "
+    cQuery += "AND B1_TIPO >= ? "
+    cQuery += "AND B1_TIPO <= ? "
     cQuery += "ORDER BY B1_TIPO, B1_COD "
 
-    TCQuery cQuery New Alias (cAlias)
+    oStmt:SetQuery(cQuery)
+    oStmt:SetString(1, xFilial("SB1"))
+    oStmt:SetString(2, MV_PAR01)
+    oStmt:SetString(3, MV_PAR02)
+    oStmt:SetString(4, MV_PAR03)
+    oStmt:SetString(5, MV_PAR04)
+
+    DBUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+    oStmt:Destroy()
 
     // Configura a secao para usar o alias da query
     oSection:BeginQuery()

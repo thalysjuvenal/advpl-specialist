@@ -212,7 +212,7 @@ Return
 
 ```advpl
 // RIGHT — customer .prw file
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function MyCustomerCode()
     // compiles in customer RPO, callable as u_MyCustomerCode()
@@ -291,8 +291,9 @@ All rules must hold simultaneously. If any is violated, fix before emitting:
 ### Canonical file header for generated TLPP
 
 ```tlpp
-#Include "tlpp-core.th"
-#Include "tlpp-rest.th"  // only if REST endpoint
+#include "tlpp-core.th"
+#include "tlpp-rest.th"  // only if REST endpoint
+#include "totvs.ch"      // when framework features are used (PARAMIXB, DEFAULT, MsExecAuto, BeginSQL, MVC...)
 
 // Namespace inferred from --module <agrupador> + service/class name
 namespace custom.<agrupador>.<servico>
@@ -314,6 +315,7 @@ User Function getCustomers()
 return oRest:setResponse(cData)
 ```
 
+<!-- advpl-lint: anti-exemplo -->
 ```tlpp
 // WRONG — using namespace tlpp.* (already provided by .th includes)
 #include "tlpp-core.th"
@@ -444,7 +446,7 @@ Return .T.
 
 ```advpl
 // RIGHT — User Function respecting the 8-char limit (.prw)
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function FATA100()
     // compiles: 7 chars, invoked as u_FATA100()
@@ -453,7 +455,7 @@ Return .T.
 
 ```advpl
 // RIGHT — Static Function respecting the 10-char limit (.prw)
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 Static Function ValidaItem()
     // compiles: 10 chars, direct call within the same file
@@ -712,7 +714,7 @@ Before delivering any generated code, verify:
 - [ ] ALL Local declarations at the TOP of the function (never inside If/While/For)
 - [ ] Hungarian notation on all variable names
 - [ ] Protheus.doc header with @type, @author, @since, @param, @return
-- [ ] #Include "TOTVS.CH" present (for .prw files)
+- [ ] #include "totvs.ch" present (for .prw files)
 - [ ] Error handling with Begin Sequence / Recover / End Sequence
 - [ ] GetArea() / RestArea() around database operations
 - [ ] xFilial() used for alias filtering

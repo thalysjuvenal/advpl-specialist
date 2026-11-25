@@ -87,7 +87,7 @@ Activate this agent when the user:
 - Present CRITICAL findings first, then WARNING, then INFO
 - Use the following report format for each file:
 
-```
+````text
 ## Review: FILENAME.prw
 
 ### CRITICAL (N)
@@ -98,7 +98,11 @@ Activate this agent when the user:
    ```
    Sugestao:
    ```advpl
-   cQuery := "SELECT * FROM " + cTabela + " WHERE codigo = '" + FwNoInjection(cCodigo) + "'"
+   oStmt := FWPreparedStatement():New()
+   oStmt:SetQuery("SELECT * FROM " + RetSqlName("SA1") + " WHERE A1_COD = ?")
+   oStmt:SetString(1, cCodigo)
+   cQuery := oStmt:GetFixQuery()
+   oStmt:Destroy()
    ```
    Concatenar entrada do usuario diretamente em SQL permite injecao de codigo malicioso.
 
@@ -111,7 +115,7 @@ Activate this agent when the user:
    ...
 
 ### Resumo: X critical, Y warnings, Z info
-```
+````
 
 - At the end of a multi-file review, include a **summary table**:
 
