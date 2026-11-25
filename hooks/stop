@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# advpl-specialist - Stop and SessionEnd hook
+#
+# Converts the session's pending sources back to Windows-1252 at the end of
+# the turn. post-tool-use (each Write|Edit|MultiEdit of a source the converter
+# handles) and post-tool-use-read (a Read of a Windows-1252 source, where
+# Claude is told to run --to-utf8) put them on
+# ${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}/advpl-specialist-pending/<session_id>
+# (advpl_pending_list in post-tool-use). Converting once at the end of the
+# turn, not after each edit, keeps the source in UTF-8 while Claude edits it:
+# Claude Code's Edit refuses a file that is not valid UTF-8.
+#
+# By hook_event_name of the stdin JSON:
+#   Stop        background_tasks not empty: a background agent or shell may
+#               still edit those files, so nothing is done and the list stays
+#               for a later Stop. Empty or absent: the files are converted.
+#   SessionEnd  the files are converted.
+#   any other   nothing is done (SubagentStop is not registered: the main
+#               agent's Stop converts what its subagents edited).
+# Conversion: the list is taken over (renamed) first, so a line appended
+# meanwhile waits for the next Stop. Every listed path, duplicates dropped,
+# that is still a readable regular file goes through one convert-encoding.sh
+# --translit run; the converter leaves alone the extensions it does not
+# handle ("skipped") and the files already in Windows-1252. A file with U+FFFD
+# bytes (EF BF BD) is not converted, as post-tool-use announced: "?" would
+# hide the corruption from ADV014. Then the taken list is removed.
+# Notes: one line per U+FFFD file and per "translit:" or "failed:" line of the
+# converter's report. On Stop they reach the user as {"systemMessage": "..."}
+# on stdout: the hooks reference lists systemMessage among the fields every
+# event accepts, and Stop does not discard it. SessionEnd discards JSON
+# output, so there the notes go to stderr. Never "decision" nor
+# additionalContext: on Stop both make Claude continue the turn.
+#
+# Never blocks: always exit 0. A single converter run keeps SessionEnd within
+# its 1.5 s default budget for the usual handful of files.
+
+set -u
+
+case "${BASH_SOURCE[0]}" in
+  */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;;
+  *) HOOK_DIR=. ;;
+esac
+# Not followed by shellcheck, for the reason given in post-tool-use-read.
+# shellcheck source=/dev/null
+. "$HOOK_DIR/post-tool-use" 2>/dev/null || exit 0
+
+# background_busy JSON: succeeds when background_tasks is a non-empty array.
+background_busy() {
+  local n=""
+  if [ "${ADVPL_HOOK_NO_JQ:-0}" != 1 ] && command -v jq >/dev/null 2>&1; then
+    n=$(printf '%s' "$1" | jq -r '(.background_tasks // []) | length' 2>/dev/null) || n=""
+    n=${n%$'\r'}   # jq.exe on Windows: CRLF
+  fi
+  case $n in
+    0) return 1 ;;
+    [1-9]*) return 0 ;;
+  esac
+  # Without jq: the first "background_tasks" key (an escaped occurrence inside
+  # a string is followed by \" and never matches), with the input joined into
+  # one line because the array may span several; busy when the first
+  # non-blank character after its "[" is not "]".
+  printf '%s\n' "$1" | awk '
+    { s = s $0 " " }
+    END {
+      if (!match(s, /"background_tasks"[ \t\r]*:[ \t\r]*\[[ \t\r]*/)) exit 1
+      exit (substr(s, RSTART + RLENGTH, 1) == "]")
+    }'
+}
+
+# add_note TEXT: appends one line to $notes (advpl_stop's local).
+add_note() {
+  notes="${notes:+$notes
+}$1"
+}
+
+advpl_stop() {
+  local input list event work paths p files report rc line notes=""
+  input=$(cat)
+  list=$(advpl_pending_list "$input")
+  [ -f "$list" ] || return 0
+  event=$(advpl_hook_string .hook_event_name hook_event_name "$input")
+  case $event in
+    Stop) if background_busy "$input"; then return 0; fi ;;
+    SessionEnd) ;;
+    *) return 0 ;;
+  esac
+  work="$list.$$"
+  mv -f -- "$list" "$work" 2>/dev/null || return 0
+  paths=$(awk '!seen[$0]++' <"$work")
+  rm -f -- "$work"
+
+  files=()
+  while IFS= read -r p; do
+    [ -n "$p" ] && [ -f "$p" ] && [ -r "$p" ] || continue
+    if grep -q -e "$ADVPL_FFFD" -- "$p" 2>/dev/null; then
+      add_note "advpl-specialist: reconversao para Windows-1252 nao executada em $p: o arquivo contem U+FFFD (bytes EF BF BD); restaure os caracteres originais e rode convert-encoding.sh nele"
+      continue
+    fi
+    files[${#files[@]}]=$p
+  done <<<"$paths"
+
+  if [ "${#files[@]}" -gt 0 ]; then
+    report=$(convert_encoding --translit -- "${files[@]}" 2>/dev/null)
+    rc=$?
+    if [ "$rc" = 2 ]; then
+      # usage error: a path vanished or became unreadable after the checks
+      # above, and the converter then touches nothing; one file at a time
+      report=""
+      for p in "${files[@]}"; do
+        report="$report
+$(convert_encoding --translit -- "$p" 2>/dev/null)"
+      done
+    fi
+    while IFS= read -r line; do
+      case $line in
+        "translit: "*)
+          add_note "advpl-specialist: $line: caracteres sem representacao em Windows-1252 viraram '?' na reconversao do fim do turno; revise esses trechos" ;;
+        "failed: "*)
+          add_note "advpl-specialist: $line: a reconversao para Windows-1252 do fim do turno falhou; rode convert-encoding.sh nesse arquivo" ;;
+      esac
+    done <<<"$report"
+  fi
+
+  [ -n "$notes" ] || return 0
+  if [ "$event" = Stop ]; then
+    printf '{"systemMessage":"%s"}\n' "$(printf '%s\n' "$notes" | json_escape)"
+  else
+    printf '%s\n' "$notes" >&2
+  fi
+}
+
+(advpl_stop)
+exit 0

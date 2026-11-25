@@ -3,33 +3,40 @@
 # advpl-specialist - PostToolUse hook (Write|Edit|MultiEdit)
 #
 # After Claude writes or edits a file (tool_input.file_path of the stdin JSON):
-#   1. U+FFFD bytes (EF BF BD) in the file: the encoding step is skipped (a
-#      non-blocking note says so), so the corruption is not transliterated
-#      away; ADV014 reports it in step 4 when it is on an introduced line
-#      (U+FFFD already in the snapshot is legacy).
-#   2. Encoding: UTF-8 -> Windows-1252 through convert_encoding, i.e.
-#      skills/advpl-code-generation/scripts/convert-encoding.sh --translit (the
-#      converter decides which extensions it handles). A character without a
-#      Windows-1252 representation becomes "?" instead of blocking the edit,
-#      and the "translit: FILE (N)" report line becomes a non-blocking note.
-#      When the file was converted, a copy of the snapshot with the same
-#      extension goes through the same converter, so a legacy file still in
-#      UTF-8 compares like for like.
+#   1. Pending list: a source the converter handles (the strict
+#      convert-encoding.sh --dry-run report is not "skipped") goes on the
+#      session's pending list (advpl_pending_add); hooks/stop converts the
+#      listed files back to Windows-1252 at the end of the turn. The file is
+#      not converted here: Claude Code's Edit refuses a file that is not valid
+#      UTF-8, so a source converted after each Edit could not take the next one.
+#   2. Notes on that source (non-blocking):
+#      - U+FFFD bytes (EF BF BD): the end-of-turn conversion skips the file
+#        too, so the corruption is not transliterated away; ADV014 reports it
+#        in step 4 when it is on an introduced line (U+FFFD already in the
+#        snapshot is legacy).
+#      - otherwise, characters without a Windows-1252 representation (the dry
+#        run reports "failed: FILE (incompatible char)"): they become "?" at
+#        the end of the turn, so Claude is asked to replace them now.
 #   3. Introduced lines: numbers of the lines of the file whose text occurs
-#      nowhere in the (normalized) snapshot; both sides compared without CR and
-#      without a leading UTF-8 BOM. No snapshot = new file: the whole file is
-#      linted, file-scope rules included. No introduced line = nothing to lint.
-#   4. advpl-lint.sh --lines-file, only for .prw .prx .tlpp .th (any case), with
-#      ${CLAUDE_PROJECT_DIR:-$PWD}/.advpl-specialist-ignore when readable.
+#      nowhere in the snapshot. Both are compared as Windows-1252: copies named
+#      with the file's extension go through convert-encoding.sh --translit, so
+#      a line whose only change is its encoding (a source converted with
+#      --to-utf8, a legacy file still in UTF-8) is not introduced; the
+#      conversion keeps every line break, so the numbers are those of the
+#      file. A trailing CR and a leading UTF-8 BOM are ignored on both sides.
+#      No snapshot = new file: the whole file is linted, file-scope rules
+#      included. No introduced line = nothing to lint.
+#   4. advpl-lint.sh --lines-file on the file itself, only for .prw .prx .tlpp
+#      .th (any case), with ${CLAUDE_PROJECT_DIR:-$PWD}/.advpl-specialist-ignore
+#      when readable.
 #   5. Errors: findings and a hint on stderr, exit 2 (Claude sees them and fixes
-#      the lines). Warnings only (or a skipped/failed/transliterated
-#      conversion): JSON additionalContext on stdout, exit 0. Nothing to
-#      report: exit 0, no output.
-#   6. The snapshot is always removed (EXIT trap).
+#      the lines). Warnings only (or a note from step 2): JSON additionalContext
+#      on stdout, exit 0. Nothing to report: exit 0, no output.
+#   6. The snapshot and its copies are always removed (EXIT trap).
 # Lint engine missing or failing: message on stderr, exit 1 (non-blocking).
-# post-tool-use-read sources this file for its helpers (payload reader,
-# plugin_script, json_escape, finish); the steps above run only when the file
-# is executed.
+# post-tool-use-read and stop source this file for its helpers (payload
+# reader, plugin_script, convert_encoding, pending list, json_escape, finish);
+# the steps above run only when the file is executed.
 
 set -u
 export LC_ALL=C
@@ -40,6 +47,8 @@ case "${BASH_SOURCE[0]}" in
 esac
 # shellcheck source=pre-tool-use
 . "$HOOK_DIR/pre-tool-use"
+
+ADVPL_FFFD=$(printf '\357\277\275')   # U+FFFD in UTF-8
 
 # plugin_script REL: prints the path of a plugin script, looked up under the
 # plugin root first, then next to this hook.
@@ -54,19 +63,39 @@ plugin_script() {
   return 1
 }
 
-# Single call site of the UTF-8 -> Windows-1252 converter (file and snapshot).
-# --translit: an emoji in a comment must not block the edit; the caller turns
-# the "translit: FILE (N)" report line into a visible note.
+# convert_encoding ARG...: skills/advpl-code-generation/scripts/
+# convert-encoding.sh ARG... (stdout: its report, one line per file; its exit
+# status); 127 without output when the script is missing.
 convert_encoding() {
   local conv
-  if ! conv=$(plugin_script skills/advpl-code-generation/scripts/convert-encoding.sh); then
-    echo "convert-encoding.sh nao encontrado"
-    return 1
-  fi
-  "${BASH:-bash}" "$conv" --translit -- "$1"
+  conv=$(plugin_script skills/advpl-code-generation/scripts/convert-encoding.sh) || return 127
+  "${BASH:-bash}" "$conv" "$@"
 }
 
 lint_engine() { plugin_script skills/advpl-code-review/scripts/advpl-lint.sh; }
+
+# advpl_pending_list JSON: the session's pending list, the sources hooks/stop
+# converts back to Windows-1252 at the end of the turn:
+# ${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}/advpl-specialist-pending/<session_id>,
+# every byte of the id outside [A-Za-z0-9_-] turned into "_" (the name stays a
+# file of that directory), "nosession" when the payload has no session_id.
+advpl_pending_list() {
+  local id
+  id=$(advpl_hook_string .session_id session_id "$1" | tr -c 'A-Za-z0-9_-' '_')
+  printf '%s/advpl-specialist-pending/%s' "${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}" "${id:-nosession}"
+}
+
+# advpl_pending_add JSON FILE: puts FILE on the session's list unless it is
+# already there, one path per line. Hooks of parallel tool calls may append at
+# the same time: each appends one line with a single printf >> (hooks/stop
+# drops duplicates anyway). A path with a line break cannot be listed.
+advpl_pending_add() {
+  local list
+  case $2 in *$'\n'*) return 1 ;; esac
+  list=$(advpl_pending_list "$1")
+  if [ -f "$list" ] && grep -qxF -e "$2" -- "$list" 2>/dev/null; then return 0; fi
+  (umask 077 && mkdir -p "${list%/*}" && printf '%s\n' "$2" >>"$list") 2>/dev/null
+}
 
 # introduced_lines SNAPSHOT FILE: 1-based numbers of the FILE lines whose text
 # is absent from SNAPSHOT; on both sides a trailing CR and, on line 1, a UTF-8
@@ -109,43 +138,43 @@ finish() {
   exit 0
 }
 
-# Sourced by post-tool-use-read for the helpers above: stop here.
+# Sourced by post-tool-use-read or stop for the helpers above: stop here.
 [ "${BASH_SOURCE[0]}" = "$0" ] || return 0
 
 input=$(cat)
 file=$(advpl_hook_file_path "$input")
 [ -n "$file" ] || exit 0
 snap=$(advpl_snapshot_file "$file")
-baseline=$snap   # what the file is compared with (step 3)
-trap 'rm -f "$snap" "$snap.lines" "$baseline"' EXIT
+ext=${file##*/}; ext=${ext##*.}
+base="$snap.base.$ext"   # snapshot and file as Windows-1252 (step 3)
+cur="$snap.cur.$ext"
+trap 'rm -f "$snap" "$snap.lines" "$base" "$cur"' EXIT
 [ -f "$file" ] || exit 0
 
 notes=""
-converted=0
-if grep -q "$(printf '\357\277\275')" "$file"; then
-  # step 1: keep U+FFFD visible to ADV014
-  notes="advpl-specialist: conversao para Windows-1252 nao executada em $file: o arquivo contem U+FFFD (bytes EF BF BD); restaure os caracteres originais"
-elif conv=$(convert_encoding "$file" 2>&1); then
-  converted=1
-  case $conv in
-    *"translit: "*)
-      notes="advpl-specialist: caracteres sem representacao em Windows-1252 viraram '?' na conversao ($conv); revise esses trechos" ;;
-  esac
-else
-  notes="advpl-specialist: falha na conversao para Windows-1252 de $file${conv:+: $conv}"
-fi
+report=$(convert_encoding --dry-run -- "$file" 2>/dev/null)
+case $report in
+  "" | "skipped: "*) ;;   # not a source the converter handles
+  *)
+    advpl_pending_add "$input" "$file"
+    if grep -q -e "$ADVPL_FFFD" -- "$file"; then
+      notes="advpl-specialist: conversao para Windows-1252 nao executada em $file: o arquivo contem U+FFFD (bytes EF BF BD); restaure os caracteres originais (com U+FFFD, a reconversao do fim do turno tambem pula o arquivo)"
+    elif [ "$report" = "failed: $file (incompatible char)" ]; then
+      notes="advpl-specialist: $file tem caracteres sem representacao em Windows-1252; no fim do turno, quando o plugin reconverte o arquivo para Windows-1252, eles viram '?'. Troque-os agora por caracteres que existem no Windows-1252"
+    fi
+    ;;
+esac
 
 advpl_is_lint_file "$file" || finish
 
 lint_args=()
 if [ -f "$snap" ]; then
-  # normalize the snapshot exactly like the file: same converter, same
-  # decision, and a copy named with the file's extension for its filter
-  if [ "$converted" = 1 ] && cp "$snap" "$snap.${file##*.}" 2>/dev/null; then
-    baseline="$snap.${file##*.}"
-    convert_encoding "$baseline" >/dev/null 2>&1
+  if cp "$snap" "$base" 2>/dev/null && cp "$file" "$cur" 2>/dev/null; then
+    convert_encoding --translit -- "$base" "$cur" >/dev/null 2>&1
+    introduced_lines "$base" "$cur" >"$snap.lines"
+  else
+    introduced_lines "$snap" "$file" >"$snap.lines"
   fi
-  introduced_lines "$baseline" "$file" >"$snap.lines"
   [ -s "$snap.lines" ] || finish
   lint_args=(--lines-file "$snap.lines")
 fi

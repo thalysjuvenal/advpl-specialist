@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Runner for hooks/pre-tool-use + hooks/post-tool-use + hooks/post-tool-use-read:
-# simulates the stdin JSON Claude Code sends to PreToolUse/PostToolUse for
-# Write|Edit|MultiEdit and to PostToolUse for Read, in a temporary directory,
-# and checks exit codes, stderr/stdout and file bytes. Also checks
-# hooks/hooks.json and hooks/session-start.
+# Runner for hooks/pre-tool-use + hooks/post-tool-use + hooks/post-tool-use-read
+# + hooks/stop: simulates the stdin JSON Claude Code sends to
+# PreToolUse/PostToolUse for Write|Edit|MultiEdit, to PostToolUse for Read and
+# to Stop/SessionEnd, in a temporary directory, and checks exit codes,
+# stderr/stdout, file bytes and the session's pending list (files converted
+# back to Windows-1252 at the end of the turn). Also checks hooks/hooks.json
+# and hooks/session-start.
 #
 # Usage: bash tests/hooks/run-tests.sh
 #   HOOK_BASH  interpreter for the hooks (default /bin/bash: bash 3.2 on macOS)
@@ -19,6 +21,7 @@ HOOK_BASH="${HOOK_BASH:-/bin/bash}"
 PRE="$ROOT/hooks/pre-tool-use"
 POST="$ROOT/hooks/post-tool-use"
 READ="$ROOT/hooks/post-tool-use-read"
+STOP="$ROOT/hooks/stop"
 # the converter as the Read hint names it (symbolic links resolved)
 CONV="$(cd "$ROOT/skills/advpl-code-generation/scripts" && pwd -P)/convert-encoding.sh"
 TMP_DIR="$(mktemp -d)"
@@ -28,6 +31,8 @@ export CLAUDE_PLUGIN_ROOT="$ROOT"
 export CLAUDE_PLUGIN_DATA="$TMP_DIR/plugin-data"
 export CLAUDE_PROJECT_DIR="$TMP_DIR"
 SNAP_DIR="$CLAUDE_PLUGIN_DATA/advpl-specialist-snapshots"
+PEND_DIR="$CLAUDE_PLUGIN_DATA/advpl-specialist-pending"
+SID=t   # session_id of the payloads (new_session gives a case its own list)
 cd "$TMP_DIR" || exit 2   # no .advpl-specialist-ignore from the caller's cwd
 
 FFFD="$(printf '\357\277\275')"
@@ -48,8 +53,8 @@ json_quote() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
 # other tool_input strings, placed before the real key.
 hook_json() {
   local p; p="$(json_quote "$3")"
-  printf '{"session_id":"t","cwd":"%s","hook_event_name":"%s","tool_name":"%s","tool_input":{"old_string":"say \\"file_path\\": \\"/decoy.prw\\"","new_string":"a\\\\\\"file_path\\\\\\":x","file_path":"%s"},"tool_response":{"filePath":"%s"}}' \
-    "$(json_quote "$TMP_DIR")" "$1" "$2" "$p" "$p"
+  printf '{"session_id":"%s","cwd":"%s","hook_event_name":"%s","tool_name":"%s","tool_input":{"old_string":"say \\"file_path\\": \\"/decoy.prw\\"","new_string":"a\\\\\\"file_path\\\\\\":x","file_path":"%s"},"tool_response":{"filePath":"%s"}}' \
+    "$(json_quote "$SID")" "$(json_quote "$TMP_DIR")" "$1" "$2" "$p" "$p"
 }
 
 # pre PATH [TOOL] / post PATH [TOOL]: run the hook; post sets RC, OUT, ERR
@@ -71,6 +76,49 @@ lacks_bytes() { ! LC_ALL=C grep -q "$1" "$2"; }
 contains() { case "$1" in *"$2"*) return 0 ;; esac; return 1; }
 lacks() { ! contains "$1" "$2"; }
 finding_count() { printf '%s\n' "$1" | grep -Ec ': (error|warning) ADV[0-9]'; }
+not() { ! "$@"; }
+
+# Pending list of the session $SID: the files hooks/stop converts back to
+# Windows-1252 at the end of the turn.
+new_session() { SID="$MODE-$1"; rm -f "$PEND_DIR/$SID"; }
+pending_has() { [ -f "$PEND_DIR/$SID" ] && grep -qxF -- "$1" "$PEND_DIR/$SID"; }
+pending_count() {
+  if [ -f "$PEND_DIR/$SID" ]; then wc -l <"$PEND_DIR/$SID" | tr -d ' '; else echo 0; fi
+}
+pending_gone() { [ ! -e "$PEND_DIR/$SID" ]; }
+# pending_set PATH...: the session's list, written by hand
+pending_set() { mkdir -p "$PEND_DIR" && printf '%s\n' "$@" >"$PEND_DIR/$SID"; }
+
+# stop_json EVENT [BG]: payload of EVENT (Stop, SessionEnd or another one) for
+# session $SID. BG: "busy" (one task in flight), "absent" (no
+# background_tasks key) or empty (no task). last_assistant_message carries an
+# escaped decoy "background_tasks" with the opposite value, before the real key.
+stop_json() {
+  local bg='"background_tasks":[],' decoy='[{\"id\":\"x\"}]'
+  case ${2:-} in
+    busy)
+      bg='"background_tasks":[{"id":"b1","type":"shell","status":"running","description":"tail logs","command":"tail -f log"}],'
+      decoy='[]' ;;
+    absent) bg='' ;;
+  esac
+  if [ "$1" = SessionEnd ]; then
+    printf '{"session_id":"%s","transcript_path":"/t.jsonl","cwd":"%s","hook_event_name":"SessionEnd","reason":"other"}' \
+      "$(json_quote "$SID")" "$(json_quote "$TMP_DIR")"
+  else
+    printf '{"session_id":"%s","transcript_path":"/t.jsonl","cwd":"%s","hook_event_name":"%s","stop_hook_active":false,"last_assistant_message":"say \\"background_tasks\\": %s",%s"session_crons":[]}' \
+      "$(json_quote "$SID")" "$(json_quote "$TMP_DIR")" "$1" "$decoy" "$bg"
+  fi
+}
+
+# stop_hook EVENT [BG]: run hooks/stop; sets RC, OUT, ERR and SYS (decoded
+# systemMessage)
+stop_hook() {
+  stop_json "$@" | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>"$TMP_DIR/stop.err"
+  RC=$?
+  OUT="$(cat "$TMP_DIR/stop.out")"
+  ERR="$(cat "$TMP_DIR/stop.err")"
+  SYS="$(json_string .systemMessage systemMessage "$OUT")"
+}
 
 # set_line FILE N TEXT: replace line N (bytes kept, LF ending on that line)
 set_line() {
@@ -107,6 +155,7 @@ legacy_cp1252() {
 case_write_novo() {
   local d="$TMP_DIR/$MODE/write-novo" f
   mkdir -p "$d"; f="$d/FATA002.prw"
+  new_session write-novo
   pre "$f" Write
   printf '#include "totvs.ch"\n\nUser Function FATA002()\n\tLocal cMsg := "importa\303\247\303\243o"\n\tConOut(cMsg)\nReturn Nil\n' >"$f"
   post "$f" Write
@@ -114,9 +163,14 @@ case_write_novo() {
   check "write-novo: stderr cita ADV003 na linha 5" contains "$ERR" "FATA002.prw:5: error ADV003"
   check "write-novo: stderr traz a dica do ignore" contains "$ERR" ".advpl-specialist-ignore"
   check "write-novo: stdout vazio" [ -z "$OUT" ]
-  check "write-novo: UTF-8 convertido para CP1252" has_bytes "$(printf '\347\343')" "$f"
-  check "write-novo: sem bytes UTF-8 remanescentes" lacks_bytes "$UTF8_ACENTO" "$f"
+  check "write-novo: continua UTF-8 depois do post (sem conversao por Edit)" has_bytes "$UTF8_ACENTO" "$f"
+  check "write-novo: entra na lista de pendentes da sessao" pending_has "$f"
   check "write-novo: snapshot removido" snap_empty
+  stop_hook Stop
+  check "write-novo: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "write-novo: Stop converte para CP1252" has_bytes "$(printf 'importa\347\343o')" "$f"
+  check "write-novo: sem bytes UTF-8 remanescentes" lacks_bytes "$UTF8_ACENTO" "$f"
+  check "write-novo: lista removida depois do Stop" pending_gone
 }
 
 case_edit_legado_cp1252() {
@@ -136,10 +190,12 @@ case_edit_legado_cp1252() {
 }
 
 case_edit_legado_reencode() {
-  # the editor rewrote the whole CP1252 file as UTF-8: conversion runs first,
-  # so the legacy lines match the snapshot again
+  # the editor rewrote the whole CP1252 file as UTF-8: snapshot and file are
+  # compared as Windows-1252, so the legacy lines (accents, IIf l.10, ConOut
+  # l.11) are not introduced
   local d="$TMP_DIR/$MODE/edit-reencode" f
   mkdir -p "$d"; f="$d/FATA001.prw"
+  new_session edit-reencode
   legacy_cp1252 "$f"
   pre "$f"
   set_line "$f" 12 "$(printf '\tnX := 1')"
@@ -147,7 +203,9 @@ case_edit_legado_reencode() {
   post "$f"
   check "edit-legado-utf8: exit 0" [ "$RC" = 0 ]
   check "edit-legado-utf8: sem saida" [ -z "$OUT$ERR" ]
-  check "edit-legado-utf8: reconvertido para CP1252" has_bytes "$CP_ACENTO" "$f"
+  check "edit-legado-utf8: continua UTF-8 ate o fim do turno" has_bytes "$UTF8_ACENTO" "$f"
+  stop_hook Stop
+  check "edit-legado-utf8: Stop reconverte para CP1252" has_bytes "$CP_ACENTO" "$f"
   check "edit-legado-utf8: sem bytes UTF-8" lacks_bytes "$UTF8_ACENTO" "$f"
 }
 
@@ -185,6 +243,7 @@ case_caminho_espaco_acento() {
   local d f
   d="$TMP_DIR/$MODE/meu projeto/jo$(printf '\303\243')o"
   mkdir -p "$d"; f="$d/FATA001.PRW"
+  new_session caminho-espaco-acento
   printf '#include "totvs.ch"\n\nUser Function FATA001()\n\tLocal nX := 0\n\tConOut("legado")\nReturn nX\n' >"$f"
   pre "$f"
   check "caminho-espaco-acento: snapshot criado" [ -f "$SNAP_DIR/$(snap_key "$f")" ]
@@ -194,11 +253,13 @@ case_caminho_espaco_acento() {
   check "caminho-espaco-acento: cita o caminho completo" contains "$ERR" "$f:5: error ADV003"
   check "caminho-espaco-acento: exatamente 1 achado" [ "$(finding_count "$ERR")" = 1 ]
   check "caminho-espaco-acento: snapshot removido" snap_empty
+  check "caminho-espaco-acento: caminho exato na lista" pending_has "$f"
 }
 
 case_fffd() {
-  local d="$TMP_DIR/$MODE/fffd" f g
+  local d="$TMP_DIR/$MODE/fffd" f g ctx
   mkdir -p "$d"; f="$d/FATA004.prw"; g="$d/FATA005.prw"
+  new_session fffd
   pre "$f" Write
   printf '#include "totvs.ch"\n\nUser Function FATA004()\n\tLocal cMsg := "importa%s%so"\nReturn cMsg\n' "$FFFD" "$FFFD" >"$f"
   post "$f" Write
@@ -206,6 +267,7 @@ case_fffd() {
   check "fffd: stderr cita ADV014 na linha 4" contains "$ERR" "FATA004.prw:4: error ADV014"
   check "fffd: conversao pulada (bytes EF BF BD mantidos)" has_bytes "$FFFD" "$f"
   check "fffd: stderr avisa que a conversao foi pulada" contains "$ERR" "conversao para Windows-1252 nao executada"
+  check "fffd: sem o aviso de '?' (o U+FFFD nao e transliterado)" lacks "$ERR" "viram '?'"
   check "fffd: snapshot removido" snap_empty
   # U+FFFD already in the file before the edit is legacy debt: not reported,
   # only the non-blocking note that the conversion was skipped
@@ -213,12 +275,26 @@ case_fffd() {
   pre "$g"
   set_line "$g" 5 "$(printf '\tLocal nX := 1')"
   post "$g"
+  ctx="$(json_context "$OUT")"
   check "fffd-legado: exit 0" [ "$RC" = 0 ]
   check "fffd-legado: sem stderr" [ -z "$ERR" ]
   check "fffd-legado: JSON valido" valid_hook_json "$OUT"
-  check "fffd-legado: contexto avisa conversao pulada" contains "$(json_context "$OUT")" "conversao para Windows-1252 nao executada"
-  check "fffd-legado: nenhum achado do lint" [ "$(finding_count "$(json_context "$OUT")")" = 0 ]
+  check "fffd-legado: contexto avisa conversao pulada" contains "$ctx" "conversao para Windows-1252 nao executada"
+  check "fffd-legado: sem o aviso de '?'" lacks "$ctx" "viram '?'"
+  check "fffd-legado: nenhum achado do lint" [ "$(finding_count "$ctx")" = 0 ]
   check "fffd-legado: U+FFFD legado nao e transliterado" has_bytes "$FFFD" "$g"
+  # end of the turn: both files listed, neither converted (U+FFFD stays
+  # visible to ADV014), the user is told why
+  check "fffd: os dois arquivos na lista" [ "$(pending_count)" = 2 ]
+  stop_hook Stop
+  check "fffd-stop: exit 0 sem stderr" [ "$RC$ERR" = 0 ]
+  check "fffd-stop: JSON valido (so systemMessage)" valid_stop_json "$OUT"
+  check "fffd-stop: systemMessage cita o arquivo novo" contains "$SYS" "nao executada em $f"
+  check "fffd-stop: systemMessage cita o arquivo legado" contains "$SYS" "nao executada em $g"
+  check "fffd-stop: systemMessage cita U+FFFD" contains "$SYS" "U+FFFD"
+  check "fffd-stop: U+FFFD mantido no arquivo novo" has_bytes "$FFFD" "$f"
+  check "fffd-stop: U+FFFD mantido no legado" has_bytes "$FFFD" "$g"
+  check "fffd-stop: lista removida" pending_gone
 }
 
 case_legado_utf8() {
@@ -226,38 +302,46 @@ case_legado_utf8() {
   # normalized like the file, so untouched accented/BOM lines are not "introduced"
   local d="$TMP_DIR/$MODE/legado-utf8" f g h
   mkdir -p "$d"; f="$d/FATA010.prw"; g="$d/FATA011.PRW"; h="$d/defs.th"
+  new_session legado-utf8
   printf '#include "totvs.ch"\n\nUser Function FATA010()\n\tLocal nX := 0\n\tConOut("In\303\255cio da importa\303\247\303\243o")\nReturn nX\n' >"$f"
   pre "$f"
   set_line "$f" 4 "$(printf '\tLocal nX := 1')"
   post "$f"
   check "legado-utf8: exit 0" [ "$RC" = 0 ]
   check "legado-utf8: sem saida (ConOut legado acentuado nao acusado)" [ -z "$OUT$ERR" ]
-  check "legado-utf8: arquivo convertido para CP1252" has_bytes "$CP_ACENTO" "$f"
-  check "legado-utf8: snapshot e copia removidos" snap_empty
-  # UTF-8 with BOM, editor kept the BOM: the conversion strips it from the file
+  check "legado-utf8: Edit em UTF-8 com acentos fica UTF-8 depois do post" has_bytes "$UTF8_ACENTO" "$f"
+  check "legado-utf8: e entra na lista" pending_has "$f"
+  check "legado-utf8: snapshot e copias removidos" snap_empty
+  # UTF-8 with BOM, editor kept the BOM: the end of the turn strips it
   printf '\357\273\277#Include "Protheus.ch"\n\nUser Function FATA011()\n\tLocal cMsg := "a\303\247\303\243o"\n\tLocal nX := 0\nReturn cMsg\n' >"$g"
   pre "$g"
   set_line "$g" 5 "$(printf '\tLocal nX := 1')"
   post "$g"
   check "legado-utf8-bom: exit 0" [ "$RC" = 0 ]
   check "legado-utf8-bom: sem saida (#Include Protheus.ch legado nao acusado)" [ -z "$OUT$ERR" ]
-  check "legado-utf8-bom: BOM removido do arquivo" lacks_bytes "$(printf '\357\273\277')" "$g"
-  check "legado-utf8-bom: snapshot e copia removidos" snap_empty
-  # .th with BOM, editor dropped the BOM: the snapshot copy goes through the
-  # converter too (BOM stripped), so line 1 still matches
+  check "legado-utf8-bom: snapshot e copias removidos" snap_empty
+  # .th with BOM, editor dropped the BOM: both sides go through the converter
+  # (BOM stripped), so line 1 still matches
   printf '\357\273\277#Include "Protheus.ch"\n#define CMSG "x"\n' >"$h"
   pre "$h"
   printf '#Include "Protheus.ch"\n#define CMSG "y"\n' >"$h"
   post "$h"
   check "legado-bom-removido (.th): exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
   check "legado-bom-removido (.th): snapshot removido" snap_empty
+  stop_hook Stop
+  check "legado-utf8: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "legado-utf8: Stop converte para CP1252" has_bytes "$CP_ACENTO" "$f"
+  check "legado-utf8-bom: Stop remove o BOM" lacks_bytes "$(printf '\357\273\277')" "$g"
+  check "legado-utf8-bom: Stop converte para CP1252" has_bytes "$CP_ACENTO" "$g"
 }
 
 case_translit() {
-  # emoji in a comment: transliterated to "?" (never blocks), the rest of the
-  # file converted, and a non-blocking note names the file and the count
+  # emoji in a comment: an immediate non-blocking warning (it becomes "?" at
+  # the end of the turn, replace it now); the Stop transliterates it and
+  # tells the user with the converter's translit: line
   local d="$TMP_DIR/$MODE/translit" f ctx
   mkdir -p "$d"; f="$d/FATA012.prw"
+  new_session translit
   pre "$f" Write
   printf '#include "totvs.ch"\n\n// lan\303\247amento \360\237\232\200\nUser Function FATA012()\nReturn Nil\n' >"$f"
   post "$f" Write
@@ -265,29 +349,46 @@ case_translit() {
   check "translit: sem stderr" [ -z "$ERR" ]
   check "translit: JSON valido" valid_hook_json "$OUT"
   ctx="$(json_context "$OUT")"
-  check "translit: contexto traz a linha translit: com a contagem" contains "$ctx" "translit: $f (1)"
-  check "translit: contexto pede revisao dos '?'" contains "$ctx" "viraram '?'"
-  check "translit: emoji virou ? e acento em CP1252" has_bytes "$(printf 'lan\347amento ?')" "$f"
-  check "translit: sem bytes UTF-8" lacks_bytes "$UTF8_ACENTO" "$f"
+  check "translit: aviso imediato cita o arquivo" contains "$ctx" "$f tem caracteres sem representacao em Windows-1252"
+  check "translit: aviso diz que viram '?' no fim do turno" contains "$ctx" "no fim do turno"
+  check "translit: aviso pede a troca agora" contains "$ctx" "Troque-os agora"
+  check "translit: arquivo intocado ate o fim do turno (emoji em UTF-8)" has_bytes "$(printf '\360\237\232\200')" "$f"
   check "translit: snapshot removido" snap_empty
+  stop_hook Stop
+  check "translit-stop: exit 0 sem stderr" [ "$RC$ERR" = 0 ]
+  check "translit-stop: JSON valido (so systemMessage)" valid_stop_json "$OUT"
+  check "translit-stop: systemMessage traz a linha translit: com a contagem" contains "$SYS" "translit: $f (1)"
+  check "translit-stop: systemMessage pede revisao dos '?'" contains "$SYS" "viraram '?'"
+  check "translit-stop: emoji virou ? e acento em CP1252" has_bytes "$(printf 'lan\347amento ?')" "$f"
+  check "translit-stop: sem bytes UTF-8" lacks_bytes "$UTF8_ACENTO" "$f"
+  check "translit-stop: lista removida" pending_gone
 }
 
 case_nao_advpl() {
-  local d="$TMP_DIR/$MODE/nao-advpl" f c
+  local d="$TMP_DIR/$MODE/nao-advpl" f c sum
   mkdir -p "$d"; f="$d/notas.txt"; c="$d/defs.ch"
+  new_session nao-advpl
   printf 'ConOut("x")\n' >"$f"
   pre "$f"
   check "nao-advpl: pre nao cria snapshot" snap_empty
-  printf 'ConOut("y")\n' >>"$f"
+  printf 'ConOut("a\303\247\303\243o")\n' >>"$f"
   post "$f"
   check "nao-advpl: exit 0" [ "$RC" = 0 ]
   check "nao-advpl: sem saida" [ -z "$OUT$ERR" ]
-  # .ch: still converted to CP1252 by the encoding step, never linted
+  check "nao-advpl: fora da lista" not pending_has "$f"
+  # .ch: listed and converted to CP1252 at the end of the turn, never linted
   pre "$c" Write
   printf '#define CMSG "importa\303\247\303\243o"\nConOut(CMSG)\n' >"$c"
   post "$c" Write
   check "ch: exit 0 e sem saida" [ "$RC$OUT$ERR" = 0 ]
-  check "ch: convertido para CP1252" has_bytes "$CP_ACENTO" "$c"
+  check "ch: na lista" pending_has "$c"
+  # a .txt listed by hand is skipped by the end of the turn
+  printf '%s\n' "$f" >>"$PEND_DIR/$SID"
+  sum="$(cksum <"$f")"
+  stop_hook Stop
+  check "ch: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "ch: Stop converte para CP1252" has_bytes "$CP_ACENTO" "$c"
+  check "nao-advpl: Stop nao toca o .txt listado" [ "$(cksum <"$f")" = "$sum" ]
 }
 
 big_ops() {
@@ -329,12 +430,25 @@ valid_hook_json() { # strict shape check of the PostToolUse JSON on stdout
   fi
 }
 
-json_context() { # additionalContext, decoded (jq, or awk without jq: \uXXXX kept)
+valid_stop_json() { # strict shape check of the Stop JSON: systemMessage only
   if command -v jq >/dev/null 2>&1; then
-    printf '%s' "$1" | jq -r '.hookSpecificOutput.additionalContext'
+    printf '%s' "$1" | jq -e '(keys == ["systemMessage"]) and (.systemMessage | type == "string")' >/dev/null
   else
-    printf '%s\n' "$1" | LC_ALL=C awk '
-      match($0, /"additionalContext":"/) {
+    printf '%s\n' "$1" | LC_ALL=C grep -Eq '^\{"systemMessage":"([^"\\]|\\["\\/bfnrt]|\\u[0-9a-f]{4})*"\}$' &&
+      [ "$(printf '%s\n' "$1" | wc -l | tr -d ' ')" = 1 ]
+  fi
+}
+
+json_context() { json_string .hookSpecificOutput.additionalContext additionalContext "$1"; }
+
+# json_string FILTER KEY JSON: the string at the jq FILTER, decoded (without
+# jq: the first "KEY" key, \uXXXX kept)
+json_string() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$3" | jq -r "$1 // empty" 2>/dev/null
+  else
+    printf '%s\n' "$3" | KEY="$2" LC_ALL=C awk '
+      match($0, "\"" ENVIRON["KEY"] "\":\"") {
         s = substr($0, RSTART + RLENGTH); n = length(s); out = ""
         for (i = 1; i <= n; i++) {
           c = substr(s, i, 1)
@@ -355,6 +469,7 @@ case_somente_avisos() {
   # name with a double quote and a backslash: the JSON must escape both
   local d="$TMP_DIR/$MODE/avisos" f ctx
   mkdir -p "$d"; f="$d/aspas\"e\\barra.prw"
+  new_session somente-avisos
   printf '#include "totvs.ch"\n\nUser Function FATA007()\n\tLocal nX := 0\n\tLocal lOk := .T.\nReturn nX\n' >"$f"
   pre "$f"
   insert_after "$f" 5 "$(printf '\tnX := IIf(lOk, 1, 2)')"
@@ -366,6 +481,7 @@ case_somente_avisos() {
   check "somente-avisos: contexto cita ADV009 na linha 6" contains "$ctx" ":6: warning ADV009"
   check "somente-avisos: aspas e barra escapadas" contains "$OUT" 'aspas\"e\\barra.prw'
   check "somente-avisos: snapshot removido" snap_empty
+  check "somente-avisos: caminho com aspas e barra na lista" pending_has "$f"
 }
 
 case_tlpp() {
@@ -416,8 +532,8 @@ case_sem_mudanca() {
 # in tool_response carries an escaped "file_path" decoy.
 read_json() {
   local p; p="$(json_quote "$1")"
-  printf '{"session_id":"t","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"offset":1,"limit":50,"file_path":"%s"},"tool_response":{"type":"text","file":{"filePath":"%s","content":"say \\"file_path\\": \\"/decoy.prw\\"\\n","numLines":1,"startLine":1,"totalLines":13}}}' \
-    "$(json_quote "$TMP_DIR")" "$p" "$p"
+  printf '{"session_id":"%s","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{"offset":1,"limit":50,"file_path":"%s"},"tool_response":{"type":"text","file":{"filePath":"%s","content":"say \\"file_path\\": \\"/decoy.prw\\"\\n","numLines":1,"startLine":1,"totalLines":13}}}' \
+    "$(json_quote "$SID")" "$(json_quote "$TMP_DIR")" "$p" "$p"
 }
 
 # read_hook PATH: run post-tool-use-read; sets RC, OUT, ERR and CTX (decoded
@@ -451,11 +567,13 @@ run_hint() {
 
 # is_cp1252 FILE: not valid UTF-8, every byte defined in Windows-1252
 is_cp1252() { [ "$("$HOOK_BASH" "$CONV" --dry-run --to-utf8 -- "$1")" = "converted: $1" ]; }
-# same_except_line A B N: same line count and same bytes outside line N
+# same_except_line A B "N...": same line count and same bytes outside the
+# lines N (space-separated)
 same_except_line() {
+  local skip='BEGIN { k = split(n, a, " "); for (i = 1; i <= k; i++) s[a[i]] = 1 } !(NR in s)'
   [ "$(wc -l <"$1")" = "$(wc -l <"$2")" ] &&
-    LC_ALL=C awk -v n="$3" 'NR != n' "$1" >"$TMP_DIR/a.cmp" &&
-    LC_ALL=C awk -v n="$3" 'NR != n' "$2" >"$TMP_DIR/b.cmp" &&
+    LC_ALL=C awk -v n="$3" "$skip" "$1" >"$TMP_DIR/a.cmp" &&
+    LC_ALL=C awk -v n="$3" "$skip" "$2" >"$TMP_DIR/b.cmp" &&
     cmp -s "$TMP_DIR/a.cmp" "$TMP_DIR/b.cmp"
 }
 line_is() { [ "$(LC_ALL=C sed -n "$2p" "$1")" = "$3" ]; }
@@ -463,6 +581,7 @@ line_is() { [ "$(LC_ALL=C sed -n "$2p" "$1")" = "$3" ]; }
 case_read_dica() {
   local d="$TMP_DIR/$MODE/read-dica" f
   mkdir -p "$d"; f="$d/FATA001.prw"
+  new_session read-dica
   legacy_cp1252 "$f"; cp "$f" "$d/original"
   # an Edit of the same file in flight (parallel tool calls): the Read must
   # not touch its snapshot
@@ -475,17 +594,24 @@ case_read_dica() {
   check "read-dica: comando de volta (sem --to-utf8)" has_line "$CTX" "bash \"$CONV\" \"$f\""
   check "read-dica: explica a recusa do Edit/Write" contains "$CTX" "Edit/Write do Claude Code recusa"
   check "read-dica: pede nova leitura antes do Edit" contains "$CTX" "leia o arquivo de novo"
-  check "read-dica: hook reconverte e faz o lint das linhas introduzidas" \
-    contains "$CTX" "reconverte para Windows-1252 e faz o lint so das linhas introduzidas"
+  check "read-dica: edite a vontade" contains "$CTX" "edite a vontade"
+  check "read-dica: lint de cada edicao e reconversao no fim do turno" \
+    contains "$CTX" "faz o lint de cada edicao (so das linhas introduzidas) e reconverte o arquivo para Windows-1252 no fim do turno"
+  check "read-dica: sem Bash (subagente), devolve o caminho a quem chamou" \
+    contains "$CTX" "Sem a ferramenta Bash (subagente), nao converta: devolva o caminho do arquivo a quem chamou"
+  check "read-dica: desistir = conversor sem --to-utf8" contains "$CTX" "rode o mesmo script sem --to-utf8"
   check "read-dica: nao editar com sed" contains "$CTX" "Nao edite com sed"
   check "read-dica: arquivo intocado (dry-run)" cmp -s "$f" "$d/original"
   check "read-dica: snapshot do Edit em curso preservado" [ -f "$SNAP_DIR/$(snap_key "$f")" ]
+  check "read-dica: arquivo entra na lista de pendentes" pending_has "$f"
   rm -f "$SNAP_DIR/$(snap_key "$f")"
   legacy_cp1252 "$d/Servico.TLPP"; legacy_cp1252 "$d/defs.th"
   read_hook "$d/Servico.TLPP"
   check "read-dica: .TLPP" has_line "$CTX" "$(to_utf8_line "$d/Servico.TLPP")"
   read_hook "$d/defs.th"
   check "read-dica: .th" has_line "$CTX" "$(to_utf8_line "$d/defs.th")"
+  read_hook "$f"
+  check "read-dica: tres arquivos na lista, sem repeticao" [ "$(pending_count)" = 3 ]
 }
 
 case_read_caminho() {
@@ -509,6 +635,7 @@ case_read_caminho() {
 case_read_sem_dica() {
   local d="$TMP_DIR/$MODE/read-sem-dica" r
   mkdir -p "$d"
+  new_session read-sem-dica
   printf '#include "totvs.ch"\n\nUser Function FATA010()\n\tConOut("In\303\255cio da importa\303\247\303\243o")\nReturn Nil\n' >"$d/utf8.prw"
   printf '#include "totvs.ch"\n\nUser Function FATA011()\nReturn Nil\n' >"$d/ascii.prw"
   legacy_cp1252 "$d/notas.txt"
@@ -522,11 +649,13 @@ case_read_sem_dica() {
   printf '{"hook_event_name":"PostToolUse","tool_name":"Read","tool_input":{}}' |
     ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$READ" >"$TMP_DIR/read.out" 2>&1
   check "read-sem-dica: payload sem file_path" [ "$?$(cat "$TMP_DIR/read.out")" = 0 ]
+  check "read-sem-dica: sem dica, nada na lista" pending_gone
 }
 
 case_read_plugin() {
   # files of the plugin itself (fixtures) never get the hint
   local d="$TMP_DIR/$MODE/read-plugin" fx="$ROOT/examples/encoding-tests/fixtures/05-already-cp1252.prw" sum
+  new_session read-plugin
   check "read-plugin: a fixture do plugin e CP1252" is_cp1252 "$fx"
   sum="$(cksum <"$fx")"
   read_hook "$fx"
@@ -538,6 +667,7 @@ case_read_plugin() {
   check "read-plugin: arquivo sob CLAUDE_PLUGIN_ROOT sem dica" no_hint
   CLAUDE_PLUGIN_ROOT="$d/plugin" read_hook "$d/plugin-x/FATA001.prw"
   check "read-plugin: irmao com o mesmo prefixo recebe a dica" has_line "$CTX" "$(to_utf8_line "$d/plugin-x/FATA001.prw")"
+  check "read-plugin: so o irmao entra na lista" [ "$(cat "$PEND_DIR/$SID" 2>/dev/null)" = "$d/plugin-x/FATA001.prw" ]
 }
 
 case_read_erro_interno() {
@@ -545,47 +675,179 @@ case_read_erro_interno() {
   local d="$TMP_DIR/$MODE/read-erro" s
   s="$d/root/skills/advpl-code-generation/scripts"
   mkdir -p "$s"
+  new_session read-erro-interno
   printf '#!/bin/sh\necho "boom" >&2\nexit 3\n' >"$s/convert-encoding.sh"
   legacy_cp1252 "$d/FATA001.prw"
   CLAUDE_PLUGIN_ROOT="$d/root" read_hook "$d/FATA001.prw"
   check "read-erro-interno: silencio e exit 0" no_hint
+  check "read-erro-interno: nada na lista" pending_gone
 }
 
 case_read_ida_volta() {
   # the whole flow with the real hook scripts: Read hint, --to-utf8 from the
-  # hint, pre-tool-use, one-line Edit, post-tool-use
-  local d="$TMP_DIR/$MODE/read-ida-volta" f o
+  # hint, two Edits (pre-tool-use + post-tool-use each) while the file stays
+  # UTF-8, then Stop
+  local d="$TMP_DIR/$MODE/read-ida-volta" f o ctx
   mkdir -p "$d"; f="$d/FATA001.prw"; o="$d/original"
+  new_session ida-volta
   legacy_cp1252 "$f"; cp "$f" "$o"
   read_hook "$f"
   check "ida-volta: o Read da a dica" has_line "$CTX" "$(to_utf8_line "$f")"
+  check "ida-volta: o Read poe o arquivo na lista" pending_has "$f"
   check "ida-volta: o comando da dica roda" run_hint to-utf8
   check "ida-volta: converted: $f" [ "$CMD_OUT" = "converted: $f" ]
   check "ida-volta: arquivo em UTF-8" has_bytes "$UTF8_ACENTO" "$f"
   read_hook "$f"
   check "ida-volta: novo Read (ja UTF-8) sem dica" no_hint
+  # first Edit: an accented line, nothing to report (IIf l.10, ConOut l.11 legacy)
   pre "$f"
   set_line "$f" 12 "$(printf '\tnY := nX + 2 // revis\303\243o')"
   post "$f"
-  check "ida-volta: post exit 0 sem saida (IIf e ConOut legados quietos)" [ "$RC$OUT$ERR" = 0 ]
-  check "ida-volta: arquivo final em Windows-1252" is_cp1252 "$f"
-  check "ida-volta: linha 12 em Windows-1252" line_is "$f" 12 "$(printf '\tnY := nX + 2 // revis\343o')"
-  check "ida-volta: bytes fora da linha 12 identicos ao original" same_except_line "$f" "$o" 12
+  check "ida-volta: 1o Edit exit 0 sem saida (IIf e ConOut legados quietos)" [ "$RC$OUT$ERR" = 0 ]
+  check "ida-volta: arquivo continua UTF-8 para o 2o Edit" has_bytes "$UTF8_ACENTO" "$f"
   check "ida-volta: snapshot removido" snap_empty
-  # second edit of the same file: an introduced ConOut blocks (exit 2)
-  read_hook "$f"
-  check "ida-volta: o Read seguinte da a dica de novo" has_line "$CTX" "$(to_utf8_line "$f")"
-  check "ida-volta: segundo --to-utf8 da dica" run_hint to-utf8
-  check "ida-volta: arquivo de novo em UTF-8 antes do Edit" has_bytes "$UTF8_ACENTO" "$f"
+  # second Edit of the same file, without a new Read nor --to-utf8: a new IIf
   pre "$f"
-  set_line "$f" 12 "$(printf '\tConOut("fim da importa\303\247\303\243o")')"
+  set_line "$f" 9 "$(printf '\tLocal nY := IIf(nX > 0, 1, 0) // padr\303\243o')"
   post "$f"
-  check "ida-volta: ConOut introduzido = exit 2" [ "$RC" = 2 ]
-  check "ida-volta: acusa a linha 12" contains "$ERR" "FATA001.prw:12: error ADV003"
-  check "ida-volta: exatamente 1 achado (IIf l.10 e ConOut l.11 fora)" [ "$(finding_count "$ERR")" = 1 ]
-  check "ida-volta: reconvertido mesmo com erro de lint" is_cp1252 "$f"
-  check "ida-volta: bytes fora da linha 12 ainda identicos" same_except_line "$f" "$o" 12
-  check "ida-volta: snapshot removido apos o erro" snap_empty
+  ctx="$(json_context "$OUT")"
+  check "ida-volta: 2o Edit exit 0 sem stderr" [ "$RC$ERR" = 0 ]
+  check "ida-volta: 2o Edit JSON valido" valid_hook_json "$OUT"
+  check "ida-volta: 2o Edit acusa o IIf novo (linha 9)" contains "$ctx" "FATA001.prw:9: warning ADV009"
+  check "ida-volta: 2o Edit exatamente 1 achado (IIf legado l.10 nunca)" [ "$(finding_count "$ctx")" = 1 ]
+  check "ida-volta: uma entrada na lista (Read + 2 Edits)" [ "$(pending_count)" = 1 ]
+  stop_hook Stop
+  check "ida-volta: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "ida-volta: arquivo final em Windows-1252" is_cp1252 "$f"
+  check "ida-volta: linha 9 em Windows-1252" line_is "$f" 9 "$(printf '\tLocal nY := IIf(nX > 0, 1, 0) // padr\343o')"
+  check "ida-volta: linha 12 em Windows-1252" line_is "$f" 12 "$(printf '\tnY := nX + 2 // revis\343o')"
+  check "ida-volta: bytes fora das linhas 9 e 12 identicos ao original" same_except_line "$f" "$o" "9 12"
+  check "ida-volta: lista removida" pending_gone
+}
+
+case_read_sem_conversao() {
+  # Read of a Windows-1252 source, no --to-utf8, then Stop: bytes untouched
+  local d="$TMP_DIR/$MODE/read-stop" f
+  mkdir -p "$d"; f="$d/FATA001.prw"
+  new_session read-stop
+  legacy_cp1252 "$f"; cp "$f" "$d/original"
+  read_hook "$f"
+  check "read-stop: dica e lista" pending_has "$f"
+  stop_hook Stop
+  check "read-stop: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "read-stop: arquivo CP1252 com bytes identicos" cmp -s "$f" "$d/original"
+  check "read-stop: lista removida" pending_gone
+}
+
+case_tres_edits() {
+  # three Edits of a UTF-8 source (converted with --to-utf8): each one lints
+  # only the lines it introduced, the list keeps one entry, the file stays
+  # UTF-8 (Edit accepts it) until the end of the turn
+  local d="$TMP_DIR/$MODE/tres-edits" f ctx
+  mkdir -p "$d"; f="$d/FATA001.prw"
+  new_session tres-edits
+  legacy_cp1252 "$f"; cp "$f" "$d/original"
+  "$HOOK_BASH" "$CONV" --to-utf8 -- "$f" >/dev/null
+  pre "$f"
+  insert_after "$f" 9 "$(printf '\tConOut("um")')"
+  post "$f"
+  check "tres-edits: 1o Edit exit 2" [ "$RC" = 2 ]
+  check "tres-edits: 1o Edit acusa a linha 10" contains "$ERR" "FATA001.prw:10: error ADV003"
+  check "tres-edits: 1o Edit exatamente 1 achado" [ "$(finding_count "$ERR")" = 1 ]
+  check "tres-edits: UTF-8 depois do 1o Edit" has_bytes "$UTF8_ACENTO" "$f"
+  pre "$f"
+  set_line "$f" 10 "$(printf '\tnX := IIf(nY > 0, 3, 4) // edi\303\247\303\243o')"
+  post "$f"
+  ctx="$(json_context "$OUT")"
+  check "tres-edits: 2o Edit exit 0" [ "$RC" = 0 ]
+  check "tres-edits: 2o Edit acusa o IIf da linha 10" contains "$ctx" "FATA001.prw:10: warning ADV009"
+  check "tres-edits: 2o Edit exatamente 1 achado (IIf legado l.11 fora)" [ "$(finding_count "$ctx")" = 1 ]
+  pre "$f"
+  insert_after "$f" 13 "$(printf '\tConOut("tr\303\252s")')"
+  post "$f"
+  check "tres-edits: 3o Edit exit 2" [ "$RC" = 2 ]
+  check "tres-edits: 3o Edit acusa a linha 14" contains "$ERR" "FATA001.prw:14: error ADV003"
+  check "tres-edits: 3o Edit exatamente 1 achado (IIf do 2o Edit fora)" [ "$(finding_count "$ERR")" = 1 ]
+  check "tres-edits: UTF-8 depois do 3o Edit" has_bytes "$UTF8_ACENTO" "$f"
+  check "tres-edits: uma entrada na lista" [ "$(pending_count)" = 1 ]
+  check "tres-edits: a entrada e o arquivo" pending_has "$f"
+  check "tres-edits: snapshot removido" snap_empty
+  stop_hook Stop
+  check "tres-edits: Stop exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "tres-edits: Windows-1252 depois do Stop" is_cp1252 "$f"
+  check "tres-edits: linhas 1-9 identicas ao original" \
+    [ "$(LC_ALL=C sed -n '1,9p' "$f" | cksum)" = "$(LC_ALL=C sed -n '1,9p' "$d/original" | cksum)" ]
+}
+
+case_stop() {
+  # Stop and SessionEnd with lists written by hand: bytes checked against the
+  # expected Windows-1252 files
+  local d="$TMP_DIR/$MODE/stop" a b e gone sid
+  mkdir -p "$d"; a="$d/FATA020.prw"; b="$d/defs.ch"; e="$d/FATA022.tlpp"; gone="$d/FATA021.prw"
+  new_session stop
+  utf8_pair() {
+    printf '#include "totvs.ch"\n// importa\303\247\303\243o\nReturn\n' >"$a"
+    printf '#define CMSG "a\303\247\303\243o"\n' >"$b"
+  }
+  printf '#include "totvs.ch"\n// importa\347\343o\nReturn\n' >"$d/a.esperado"
+  printf '#define CMSG "a\347\343o"\n' >"$d/b.esperado"
+  utf8_pair
+  pending_set "$a" "$gone" "$b" "$a"
+  stop_hook Stop busy
+  check "stop-ocupado: exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "stop-ocupado: nada convertido" has_bytes "$UTF8_ACENTO" "$a"
+  check "stop-ocupado: .ch tambem nao" has_bytes "$UTF8_ACENTO" "$b"
+  check "stop-ocupado: lista mantida" [ "$(pending_count)" = 4 ]
+  stop_hook SubagentStop
+  check "subagentstop: nada convertido, lista mantida" [ "$RC$OUT$ERR$(pending_count)" = 04 ]
+  stop_hook Stop
+  check "stop-vazio: exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "stop-vazio: .prw convertido (bytes conferidos)" cmp -s "$a" "$d/a.esperado"
+  check "stop-vazio: .ch convertido (bytes conferidos)" cmp -s "$b" "$d/b.esperado"
+  check "stop-vazio: pendente apagado foi pulado (nada criado)" [ ! -e "$gone" ]
+  check "stop-vazio: lista removida" pending_gone
+  stop_hook Stop
+  check "stop-sem-lista: exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  # background_tasks absent: same as empty
+  utf8_pair; pending_set "$a"
+  stop_hook Stop absent
+  check "stop-sem-background_tasks: convertido" cmp -s "$a" "$d/a.esperado"
+  check "stop-sem-background_tasks: lista removida" pending_gone
+  # SessionEnd: converts; the translit note goes to stderr only
+  utf8_pair; printf '// foguete \360\237\232\200\n' >"$e"
+  pending_set "$a" "$e"
+  stop_hook SessionEnd
+  check "sessionend: exit 0 sem stdout" [ "$RC$OUT" = 0 ]
+  check "sessionend: convertido" cmp -s "$a" "$d/a.esperado"
+  check "sessionend: emoji virou ?" [ "$(cat "$e")" = "// foguete ?" ]
+  check "sessionend: translit: no stderr" contains "$ERR" "translit: $e (1)"
+  check "sessionend: lista removida" pending_gone
+  # another session's list is not touched
+  utf8_pair; pending_set "$a"; sid="$SID"
+  SID="$sid-outra"
+  stop_hook Stop
+  SID="$sid"
+  check "stop-outra-sessao: lista e arquivo intocados" [ "$(pending_count)" = 1 ]
+  check "stop-outra-sessao: arquivo ainda UTF-8" has_bytes "$UTF8_ACENTO" "$a"
+  rm -f "$PEND_DIR/$SID"
+}
+
+case_sessao() {
+  # session_id becomes a file name: anything outside [A-Za-z0-9_-] turns into
+  # "_", so "../s p" stays inside the pending directory
+  local d="$TMP_DIR/$MODE/sessao" f saved="$SID"
+  mkdir -p "$d"; f="$d/FATA030.prw"
+  SID='../s p'
+  rm -f "$PEND_DIR/___s_p"
+  pre "$f" Write
+  printf '#include "totvs.ch"\n// importa\303\247\303\243o\nReturn\n' >"$f"
+  post "$f" Write
+  check "sessao: id saneado (___s_p)" grep -qxF -- "$f" "$PEND_DIR/___s_p"
+  check "sessao: nada fora do diretorio de pendentes" [ ! -e "$CLAUDE_PLUGIN_DATA/s p" ]
+  stop_hook Stop
+  check "sessao: Stop com o mesmo id converte" has_bytes "$CP_ACENTO" "$f"
+  check "sessao: lista saneada removida" [ ! -e "$PEND_DIR/___s_p" ]
+  SID="$saved"
 }
 
 run_cases() {
@@ -611,13 +873,17 @@ run_cases() {
   case_read_plugin
   case_read_erro_interno
   case_read_ida_volta
+  case_read_sem_conversao
+  case_tres_edits
+  case_stop
+  case_sessao
 }
 
 check_hooks_json() {
   local j="$ROOT/hooks/hooks.json" c
   echo "[hooks.json]"
   check "hooks.json: post-tool-use-encoding removido" [ ! -e "$ROOT/hooks/post-tool-use-encoding" ]
-  for c in session-start pre-tool-use post-tool-use post-tool-use-read; do
+  for c in session-start pre-tool-use post-tool-use post-tool-use-read stop; do
     check "hooks.json: comando bash \"\${CLAUDE_PLUGIN_ROOT}/hooks/$c\"" \
       grep -qF "\"command\": \"bash \\\"\${CLAUDE_PLUGIN_ROOT}/hooks/$c\\\"\"" "$j"
     check "hooks.json: hooks/$c existe" [ -f "$ROOT/hooks/$c" ]
@@ -636,6 +902,14 @@ check_hooks_json() {
         == [["command", "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-read\"", false]]' "$j"
     check "hooks.json: Read fora do PreToolUse" \
       jq -e '[.hooks.PreToolUse[] | select(.matcher | test("Read"))] == []' "$j"
+    # shellcheck disable=SC2016 # ${CLAUDE_PLUGIN_ROOT} is literal text in hooks.json
+    check "hooks.json: Stop e SessionEnd -> so hooks/stop (sincrono)" \
+      jq -e '["command", "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/stop\"", false] as $s
+        | [.hooks.Stop, .hooks.SessionEnd | [.[].hooks[] | [.type, .command, .async]]] == [[$s], [$s]]' "$j"
+    check "hooks.json: SubagentStop fora (nao converte no fim de subagente)" \
+      jq -e '.hooks.SubagentStop == null' "$j"
+    check "hooks.json: eventos" \
+      jq -e '(.hooks | keys) == ["PostToolUse", "PreToolUse", "SessionEnd", "SessionStart", "Stop"]' "$j"
   fi
 }
 
@@ -659,6 +933,10 @@ check_session_start() {
   check "session-start: lista /advpl-specialist:validate" grep -q '/advpl-specialist:validate$' <<<"$out"
   check "session-start: dica do fluxo --to-utf8 com o conversor" \
     grep -qF -- "bash \"$ROOT/skills/advpl-code-generation/scripts/convert-encoding.sh\" --to-utf8 FILE" <<<"$out"
+  check "session-start: dica fala do lint de cada edicao e da volta no fim do turno" \
+    grep -qF -- "lints each edit (introduced lines only) and converts the file back to Windows-1252 at the end of the turn" <<<"$out"
+  check "session-start: dica do subagente sem Bash" \
+    grep -qF -- "A subagent without Bash must not convert: return the file path to the caller, who converts it" <<<"$out"
   check "session-start: nunca chama claude" [ ! -e "$TMP_DIR/claude-called" ]
   check "session-start: nao apaga cache de plugins" \
     [ -d "$home/.claude/plugins/cache/advpl-specialist-marketplace/advpl-specialist/0.0.1" ]
@@ -672,6 +950,18 @@ check_session_start() {
 crlf_json() {
   printf '{\r\n  "hook_event_name": "%s",\r\n  "tool_name": "%s",\r\n  "tool_input": {\r\n    "file_path": "%s"\r\n  }\r\n}\r\n' \
     "$1" "${3:-Edit}" "$(json_quote "$2")"
+}
+
+# crlf_stop_json busy|empty: Stop payload without session_id, one key per
+# line, CRLF line endings, background_tasks spread over several lines
+crlf_stop_json() {
+  local nl=$'\r\n' bg
+  if [ "$1" = busy ]; then
+    bg="[$nl    {$nl      \"id\": \"b1\",$nl      \"type\": \"subagent\"$nl    }$nl  ]"
+  else
+    bg="[$nl  ]"
+  fi
+  printf '{\r\n  "hook_event_name": "Stop",\r\n  "stop_hook_active": false,\r\n  "background_tasks": %s,\r\n  "session_crons": []\r\n}\r\n' "$bg"
 }
 
 # jq.exe on Windows writes CRLF (text-mode stdout). A jq wrapper first in PATH
@@ -703,7 +993,8 @@ check_crlf() {
     fi
     d="$TMP_DIR/crlf/$p"; f="$d/FATA008.prw"
     mkdir -p "$d"
-    printf '#include "totvs.ch"\n\nUser Function FATA008()\n\tLocal nX := 0\nReturn nX\n' >"$f"
+    rm -f "$PEND_DIR/nosession"
+    printf '#include "totvs.ch"\n// importa\303\247\303\243o\nUser Function FATA008()\n\tLocal nX := 0\nReturn nX\n' >"$f"
     crlf_json PreToolUse "$f" | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$PRE" >"$TMP_DIR/pre.out" 2>&1
     PRE_RC=$?
     check "crlf-$p: pre exit 0" [ "$PRE_RC" = 0 ]
@@ -725,6 +1016,20 @@ check_crlf() {
     check "crlf-$p: Read exit 0 sem stderr" [ "$RC$(cat "$TMP_DIR/read.err")" = 0 ]
     CTX="$(json_context "$OUT" | tr -d '\r')"   # the wrapper's own CRLF
     check "crlf-$p: dica do Read com o caminho exato" has_line "$CTX" "$(to_utf8_line "$d/FATA009.prw")"
+    # no session_id: list "nosession", exact paths (no CR)
+    check "crlf-$p: lista nosession com os dois caminhos exatos" \
+      [ "$(cat "$PEND_DIR/nosession" 2>/dev/null)" = "$f
+$d/FATA009.prw" ]
+    cp "$d/FATA009.prw" "$d/FATA009.original"
+    crlf_stop_json busy | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>&1
+    check "crlf-$p: Stop com tarefa exit 0 sem saida" [ "$?$(cat "$TMP_DIR/stop.out")" = 0 ]
+    check "crlf-$p: Stop com tarefa (array em varias linhas) nao converte" has_bytes "$UTF8_ACENTO" "$f"
+    check "crlf-$p: Stop com tarefa mantem a lista" [ -f "$PEND_DIR/nosession" ]
+    crlf_stop_json empty | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$STOP" >"$TMP_DIR/stop.out" 2>&1
+    check "crlf-$p: Stop vazio (array em varias linhas) exit 0 sem saida" [ "$?$(cat "$TMP_DIR/stop.out")" = 0 ]
+    check "crlf-$p: Stop vazio converte" has_bytes "$CP_ACENTO" "$f"
+    check "crlf-$p: Stop vazio mantem o CP1252 lido" cmp -s "$d/FATA009.prw" "$d/FATA009.original"
+    check "crlf-$p: lista removida" [ ! -e "$PEND_DIR/nosession" ]
   done
   PATH="$saved_path"
 }

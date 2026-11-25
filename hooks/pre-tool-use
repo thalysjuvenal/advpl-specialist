@@ -11,22 +11,24 @@
 # first, so a new file never inherits one left by a failed or denied call.
 #
 # This hook never blocks the tool call: it always exits 0.
-# post-tool-use sources this file for the advpl_* helpers; main runs only when
-# the file is executed. ADVPL_HOOK_NO_JQ=1 forces the awk fallback (tests).
+# post-tool-use (and through it post-tool-use-read and stop) sources this file
+# for the advpl_* helpers; main runs only when the file is executed.
+# ADVPL_HOOK_NO_JQ=1 forces the awk fallback (tests).
 
-# Prints tool_input.file_path of the hook JSON given in $1 (nothing if absent).
-advpl_hook_file_path() {
-  local path=""
+# advpl_hook_string FILTER KEY JSON: the string value at the jq FILTER (e.g.
+# .tool_input.file_path) of the hook JSON, nothing if absent.
+advpl_hook_string() {
+  local val=""
   if [ "${ADVPL_HOOK_NO_JQ:-0}" != 1 ] && command -v jq >/dev/null 2>&1; then
-    path=$(printf '%s' "$1" | jq -r '.tool_input.file_path // empty' 2>/dev/null) || path=""
+    val=$(printf '%s' "$3" | jq -r "$1 // empty" 2>/dev/null) || val=""
   fi
-  if [ -z "$path" ]; then
-    # First "file_path" key: an escaped occurrence inside another string is
-    # followed by \" and never matches. The value is JSON-unescaped (\\ \" \/
-    # \b \f \n \r \t); \uXXXX is kept as written (JSON.stringify and jq emit
-    # non-ASCII characters as raw UTF-8).
-    path=$(printf '%s\n' "$1" | LC_ALL=C awk '
-      match($0, /"file_path"[ \t]*:[ \t]*"/) {
+  if [ -z "$val" ]; then
+    # Without jq, or when jq finds nothing: the first "KEY" key. An escaped
+    # occurrence inside another string is followed by \" and never matches.
+    # The value is JSON-unescaped (\\ \" \/ \b \f \n \r \t); \uXXXX is kept
+    # as written (JSON.stringify and jq emit non-ASCII characters as raw UTF-8).
+    val=$(printf '%s\n' "$3" | KEY="$2" LC_ALL=C awk '
+      match($0, "\"" ENVIRON["KEY"] "\"[ \t]*:[ \t]*\"") {
         s = substr($0, RSTART + RLENGTH); n = length(s); out = ""
         for (i = 1; i <= n; i++) {
           c = substr(s, i, 1)
@@ -44,8 +46,11 @@ advpl_hook_file_path() {
   fi
   # jq.exe on Windows writes CRLF (text-mode stdout): drop the trailing CR.
   # Covered by check_crlf in tests/hooks/run-tests.sh.
-  printf '%s' "${path%$'\r'}"
+  printf '%s' "${val%$'\r'}"
 }
+
+# Prints tool_input.file_path of the hook JSON given in $1 (nothing if absent).
+advpl_hook_file_path() { advpl_hook_string .tool_input.file_path file_path "$1"; }
 
 # Prints the snapshot path for the file path $1.
 advpl_snapshot_file() {

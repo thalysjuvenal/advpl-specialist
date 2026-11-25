@@ -8,10 +8,16 @@
 # Claude reads a file before editing it: after a Read of a Windows-1252 ADVPL
 # source this hook gives Claude the editing flow as JSON additionalContext,
 # with both commands already resolved:
-#   bash ".../convert-encoding.sh" --to-utf8 "FILE"   then Read again and Edit;
-#       post-tool-use converts the file back to Windows-1252 and lints only
-#       the introduced lines
+#   bash ".../convert-encoding.sh" --to-utf8 "FILE"   then Read again and edit
+#       as often as needed: post-tool-use lints the lines each edit
+#       introduces, hooks/stop converts the file back to Windows-1252 at the
+#       end of the turn
 #   bash ".../convert-encoding.sh" "FILE"             gave up: back to CP1252
+# A subagent without Bash cannot run the first command: it hands the path to
+# its caller. Along with the hint, FILE goes on the session's pending list
+# (advpl_pending_add), so the end of the turn converts it back even when
+# Claude runs --to-utf8 and then never edits it; a file still in Windows-1252
+# at that point is left as it is.
 #
 # The hint is given only when tool_input.file_path of the stdin JSON (offset
 # and limit do not matter):
@@ -26,8 +32,9 @@
 #
 # Never blocks or fails the Read: always exit 0, and an internal error
 # (stderr included) ends in silence. The helpers (payload reader with the jq
-# fallback and CR removal, plugin_script, json_escape, finish) come from
-# post-tool-use, which stops right after its definitions when sourced.
+# fallback and CR removal, plugin_script, pending list, json_escape, finish)
+# come from post-tool-use, which stops right after its definitions when
+# sourced.
 
 set -u
 
@@ -80,9 +87,10 @@ advpl_read_hint() {
   # shellcheck disable=SC2034 # read by finish (post-tool-use)
   notes="advpl-specialist: $file esta em Windows-1252, e o Edit/Write do Claude Code recusa arquivo que nao e UTF-8 valido. Para editar, converta-o para UTF-8:
 bash $c --to-utf8 $f
-Depois leia o arquivo de novo, porque o conteudo mudou, e faca o Edit: o hook do plugin reconverte para Windows-1252 e faz o lint so das linhas introduzidas. Se desistir da edicao, rode o mesmo script sem --to-utf8 para voltar a Windows-1252:
+Depois leia o arquivo de novo, porque o conteudo mudou, e edite a vontade: o plugin faz o lint de cada edicao (so das linhas introduzidas) e reconverte o arquivo para Windows-1252 no fim do turno. Sem a ferramenta Bash (subagente), nao converta: devolva o caminho do arquivo a quem chamou, para que ele converta. Se desistir da edicao, rode o mesmo script sem --to-utf8 para voltar a Windows-1252:
 bash $c $f
 Nao edite com sed nem outro comando de shell: isso pula o lint."
+  advpl_pending_add "$input" "$file"
   finish
 }
 
