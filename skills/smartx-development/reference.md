@@ -41,7 +41,7 @@ Os três artefatos usam este conjunto de includes:
 
 O Modelo é marcado com a annotation `@totvsFrameworkStructureModel(lookup=.F., country="ALL", description="...")` e estende `totvs.framework.structure.model.data`. A Interface é marcada com `@totvsFrameworkStructureInterface(lookup=.F., country="ALL", description="...")`. O Launcher não exige annotation — é uma função ADVPL/TLPP simples que instancia `totvs.framework.application.smartx.launcher()`.
 
-> **Notas sobre includes:** o `totvs.ch` inclui o `protheus.ch`; o TDN ainda grafa `protheus.ch` nos exemplos de Smart X. O TDN também grafa `Interface.th` (maiúsculo); aqui o include vai em minúsculas (`totvs.framework.structure.interface.th`) e a diferenciação de caixa na compilação em Linux está a confirmar (TDN, item 13). O `fw-tlpp-core.th` é o include oficial dos fontes Smart X.
+> **Notas sobre includes:** o `totvs.ch` inclui o `protheus.ch`; o TDN ainda grafa `protheus.ch` nos exemplos de Smart X. O TDN também grafa `Interface.th` (maiúsculo); aqui o include vai em minúsculas (`totvs.framework.structure.interface.th`) e a diferenciação de caixa na compilação em Linux está a confirmar (TDN — "Construindo uma rotina do zero com Smart X", https://tdn.totvs.com/display/framework/Construindo+uma+rotina+do+zero+com+Smart+X). O `fw-tlpp-core.th` é o include oficial dos fontes Smart X.
 >
 > A chamada do Launcher segue os exemplos reais `FINA050SM`/`MATA110SX`/`MATA120SX` do TDN: `launcher():new():setInterface(cNamespace):open()`.
 
@@ -83,6 +83,8 @@ method setModel() class Model
     self:loadEventsFromMetadata()
 return
 ```
+
+> Exemplo publicado assim no TDN; segundo o breaking change #3 (ver `patterns-model.md`), os eventos do dicionário passam a ser carregados automaticamente, sem chamada de método.
 
 ### Interface (`interface.tlpp`)
 

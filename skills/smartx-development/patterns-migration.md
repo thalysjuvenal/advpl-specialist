@@ -107,7 +107,7 @@ No Modelo Smart X (sintaxe conforme `patterns-model.md`, ordem filho → pai):
 self:addObject(oSB5:getObject(), "SB5", {"B5_FILIAL", "B5_COD"}, {"B1_FILIAL", "B1_COD"}, "SB1")
 ```
 
-> **Nota de divergência:** o material local que descreve este mapeamento (`smartx-legacy-conversion-patterns.md`, `smartx-code-templates.md`) usa uma convenção de nomenclatura própria — classes fixas `class Model`/`class View`, função `executor()` e `launcher():show("namespace.view")` — que diverge da convenção já validada pelo TDN e documentada em `reference.md` (nomes de classe pelo nome real da rotina, `totvs.framework.application.smartx.launcher():new():setInterface(...):open()`). Como o TDN prevalece, ao reescrever o Modelo/Interface de uma migração use os templates de `patterns-model.md`/`patterns-interface.md`/`reference.md` — o mapeamento de `addObject`/`addArray`/`setObject` acima é válido em ambas as convenções, pois só descreve os parâmetros do método, não a estrutura de classe.
+> **Nota:** ao reescrever o Modelo/Interface de uma migração, use a convenção documentada pelo TDN ("Construindo uma rotina do zero com Smart X", https://tdn.totvs.com/display/framework/Construindo+uma+rotina+do+zero+com+Smart+X) e os templates de `patterns-model.md`/`patterns-interface.md`/`reference.md`: nomes de classe pelo nome real da rotina e `totvs.framework.application.smartx.launcher():new():setInterface(...):open()`. O mapeamento de `addObject`/`addArray`/`setObject` acima só descreve os parâmetros do método, não a estrutura de classe.
 
 ### Passo 5 — Legendas: `.BMP`/RGB → PO-UI
 

@@ -90,9 +90,7 @@ Notas do TDN:
    - Antes: `self:addArray( oSA5:getObject(), "SA5", {"B1_FILIAL", "B1_COD"}, {"A5_FILIAL", "A5_PRODUTO"}, "SB1")`
    - Novo: `self:addArray( oSA5:getObject(), "SA5", {"A5_FILIAL", "A5_PRODUTO"}, {"B1_FILIAL", "B1_COD"}, "SB1")`
 
-3. **Eventos do dicionário carregados automaticamente, sem método.** Não é mais necessário chamar `self:setOnChange()`, `self:setOnBeforeInsert()`, `self:setOnLoad()` ou `self:loadEventsFromMetaData()` — triggers, valids e inicializadores do dicionário passam a ser carregados automaticamente pelo framework.
-
-> Segundo o breaking change #3 do TDN, **não é necessário chamar método algum** (nem `loadEventsFromMetadata`) para carregar eventos do dicionário na versão descrita aqui.
+3. **Eventos do dicionário carregados automaticamente, sem método.** Não é necessário chamar método algum — nem `self:setOnChange()`, `self:setOnBeforeInsert()`, `self:setOnLoad()` ou `self:loadEventsFromMetaData()` — pois triggers, valids e inicializadores do dicionário passam a ser carregados automaticamente pelo framework.
 
 ### Eventos no Modelo
 
