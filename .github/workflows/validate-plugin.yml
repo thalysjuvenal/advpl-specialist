@@ -240,10 +240,10 @@ jobs:
           printf '  %s\n' "${files[@]}"
           shellcheck "${files[@]}"
 
-      # README.md, examples and documentation/content still have findings; they
-      # are fixed in Phase 11 (Task 28), which adds them to this list.
+      # Covers the plugin sources plus the README, the examples and the site
+      # content (documentation/content).
       - name: Dogfooding - ADVPL/TLPP blocks in the docs (lint-docs.sh)
-        run: bash scripts/lint-docs.sh skills commands agents AGENTS.md ai-commands .github/copilot-instructions.md
+        run: bash scripts/lint-docs.sh skills commands agents AGENTS.md ai-commands .github/copilot-instructions.md README.md examples documentation/content
 
       # Runs without authentication. The root CLAUDE.md is the maintainers' dev
       # file (a known --strict warning), so a copy with only the plugin parts,
