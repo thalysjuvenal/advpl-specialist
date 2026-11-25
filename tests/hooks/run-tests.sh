@@ -200,15 +200,51 @@ case_fffd() {
   check "fffd: exit 2" [ "$RC" = 2 ]
   check "fffd: stderr cita ADV014 na linha 4" contains "$ERR" "FATA004.prw:4: error ADV014"
   check "fffd: conversao pulada (bytes EF BF BD mantidos)" has_bytes "$FFFD" "$f"
+  check "fffd: stderr avisa que a conversao foi pulada" contains "$ERR" "conversao para Windows-1252 nao executada"
   check "fffd: snapshot removido" snap_empty
-  # U+FFFD already in the file before the edit is legacy debt: not reported
+  # U+FFFD already in the file before the edit is legacy debt: not reported,
+  # only the non-blocking note that the conversion was skipped
   printf '#include "totvs.ch"\n\nUser Function FATA005()\n\tLocal cMsg := "importa%so"\n\tLocal nX := 0\nReturn cMsg\n' "$FFFD" >"$g"
   pre "$g"
   set_line "$g" 5 "$(printf '\tLocal nX := 1')"
   post "$g"
   check "fffd-legado: exit 0" [ "$RC" = 0 ]
-  check "fffd-legado: sem saida" [ -z "$OUT$ERR" ]
+  check "fffd-legado: sem stderr" [ -z "$ERR" ]
+  check "fffd-legado: JSON valido" valid_hook_json "$OUT"
+  check "fffd-legado: contexto avisa conversao pulada" contains "$(json_context "$OUT")" "conversao para Windows-1252 nao executada"
+  check "fffd-legado: nenhum achado do lint" [ "$(finding_count "$(json_context "$OUT")")" = 0 ]
   check "fffd-legado: U+FFFD legado nao e transliterado" has_bytes "$FFFD" "$g"
+}
+
+case_legado_utf8() {
+  # legacy files never converted (still UTF-8, maybe with BOM): the snapshot is
+  # normalized like the file, so untouched accented/BOM lines are not "introduced"
+  local d="$TMP_DIR/$MODE/legado-utf8" f g h
+  mkdir -p "$d"; f="$d/FATA010.prw"; g="$d/FATA011.PRW"; h="$d/defs.th"
+  printf '#include "totvs.ch"\n\nUser Function FATA010()\n\tLocal nX := 0\n\tConOut("In\303\255cio da importa\303\247\303\243o")\nReturn nX\n' >"$f"
+  pre "$f"
+  set_line "$f" 4 "$(printf '\tLocal nX := 1')"
+  post "$f"
+  check "legado-utf8: exit 0" [ "$RC" = 0 ]
+  check "legado-utf8: sem saida (ConOut legado acentuado nao acusado)" [ -z "$OUT$ERR" ]
+  check "legado-utf8: arquivo convertido para CP1252" has_bytes "$CP_ACENTO" "$f"
+  check "legado-utf8: snapshot e copia removidos" snap_empty
+  # UTF-8 with BOM, editor kept the BOM: the conversion strips it from the file
+  printf '\357\273\277#Include "Protheus.ch"\n\nUser Function FATA011()\n\tLocal cMsg := "a\303\247\303\243o"\n\tLocal nX := 0\nReturn cMsg\n' >"$g"
+  pre "$g"
+  set_line "$g" 5 "$(printf '\tLocal nX := 1')"
+  post "$g"
+  check "legado-utf8-bom: exit 0" [ "$RC" = 0 ]
+  check "legado-utf8-bom: sem saida (#Include Protheus.ch legado nao acusado)" [ -z "$OUT$ERR" ]
+  check "legado-utf8-bom: BOM removido do arquivo" lacks_bytes "$(printf '\357\273\277')" "$g"
+  check "legado-utf8-bom: snapshot e copia removidos" snap_empty
+  # .th with BOM (not converted), editor dropped the BOM: line 1 still matches
+  printf '\357\273\277#Include "Protheus.ch"\n#define CMSG "x"\n' >"$h"
+  pre "$h"
+  printf '#Include "Protheus.ch"\n#define CMSG "y"\n' >"$h"
+  post "$h"
+  check "legado-bom-removido (.th): exit 0 sem saida" [ "$RC$OUT$ERR" = 0 ]
+  check "legado-bom-removido (.th): snapshot removido" snap_empty
 }
 
 case_nao_advpl() {
@@ -341,6 +377,7 @@ run_cases() {
   case_edit_crlf
   case_caminho_espaco_acento
   case_fffd
+  case_legado_utf8
   case_nao_advpl
   case_arquivo_grande
   case_somente_avisos

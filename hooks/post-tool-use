@@ -3,20 +3,23 @@
 # advpl-specialist - PostToolUse hook (Write|Edit|MultiEdit)
 #
 # After Claude writes or edits a file (tool_input.file_path of the stdin JSON):
-#   1. U+FFFD bytes (EF BF BD) in the file: the encoding step is skipped, so the
-#      corruption is not transliterated away; ADV014 reports it in step 4 when
-#      it is on an introduced line (U+FFFD already in the snapshot is legacy).
-#   2. Encoding: UTF-8 -> Windows-1252 (convert_encoding, the only call site;
-#      the converter decides which extensions it handles).
-#   3. Introduced lines: numbers of the lines of the converted file, CR
-#      stripped, whose text occurs nowhere in the pre-tool-use snapshot (CR
-#      stripped too). No snapshot = new file: the whole file is linted,
-#      file-scope rules included. No introduced line = nothing to lint.
+#   1. U+FFFD bytes (EF BF BD) in the file: the encoding step is skipped (a
+#      non-blocking note says so), so the corruption is not transliterated
+#      away; ADV014 reports it in step 4 when it is on an introduced line
+#      (U+FFFD already in the snapshot is legacy).
+#   2. Encoding: UTF-8 -> Windows-1252 through convert_encoding (the converter
+#      decides which extensions it handles). When the file was converted, a
+#      copy of the snapshot with the same extension goes through the same
+#      converter, so a legacy file still in UTF-8 compares like for like.
+#   3. Introduced lines: numbers of the lines of the file whose text occurs
+#      nowhere in the (normalized) snapshot; both sides compared without CR and
+#      without a leading UTF-8 BOM. No snapshot = new file: the whole file is
+#      linted, file-scope rules included. No introduced line = nothing to lint.
 #   4. advpl-lint.sh --lines-file, only for .prw .prx .tlpp .th (any case), with
 #      ${CLAUDE_PROJECT_DIR:-$PWD}/.advpl-specialist-ignore when readable.
 #   5. Errors: findings and a hint on stderr, exit 2 (Claude sees them and fixes
-#      the lines). Warnings only (or a failed conversion): JSON additionalContext
-#      on stdout, exit 0. Nothing to report: exit 0, no output.
+#      the lines). Warnings only (or a skipped/failed conversion): JSON
+#      additionalContext on stdout, exit 0. Nothing to report: exit 0, no output.
 #   6. The snapshot is always removed (EXIT trap).
 # Lint engine missing or failing: message on stderr, exit 1 (non-blocking).
 
@@ -30,7 +33,7 @@ esac
 # shellcheck source=pre-tool-use
 . "$HOOK_DIR/pre-tool-use"
 
-# Single call site of the UTF-8 -> Windows-1252 conversion.
+# Single call site of the UTF-8 -> Windows-1252 converter (file and snapshot).
 convert_encoding() {
   "${BASH:-bash}" "$HOOK_DIR/lib/convert-encoding.sh" process_file "$1"
 }
@@ -48,12 +51,22 @@ lint_engine() {
 }
 
 # introduced_lines SNAPSHOT FILE: 1-based numbers of the FILE lines whose text
-# (CR stripped) is absent from SNAPSHOT (CR stripped). Paths go through ENVIRON
-# and stdin: awk -v and file operands would mangle "\" and "a=b" names.
+# is absent from SNAPSHOT; on both sides a trailing CR and, on line 1, a UTF-8
+# BOM are ignored. Paths go through ENVIRON and stdin: awk -v and file operands
+# would mangle "\" and "a=b" names.
 introduced_lines() {
   SNAP="$1" awk '
-    BEGIN { while ((getline l < ENVIRON["SNAP"]) > 0) { sub(/\r$/, "", l); seen[l] = 1 } }
-    { sub(/\r$/, ""); if (!($0 in seen)) print NR }' <"$2"
+    BEGIN {
+      BOM = sprintf("%c%c%c", 239, 187, 191)
+      while ((getline l < ENVIRON["SNAP"]) > 0) {
+        if (++n == 1 && substr(l, 1, 3) == BOM) l = substr(l, 4)
+        sub(/\r$/, "", l); seen[l] = 1
+      }
+    }
+    {
+      if (NR == 1 && substr($0, 1, 3) == BOM) $0 = substr($0, 4)
+      sub(/\r$/, ""); if (!($0 in seen)) print NR
+    }' <"$2"
 }
 
 # Text on stdin -> body of a JSON string (no quotes), lines joined with \n.
@@ -82,13 +95,18 @@ input=$(cat)
 file=$(advpl_hook_file_path "$input")
 [ -n "$file" ] || exit 0
 snap=$(advpl_snapshot_file "$file")
-trap 'rm -f "$snap" "$snap.lines"' EXIT
+baseline=$snap   # what the file is compared with (step 3)
+trap 'rm -f "$snap" "$snap.lines" "$baseline"' EXIT
 [ -f "$file" ] || exit 0
 
 notes=""
+converted=0
 if grep -q "$(printf '\357\277\275')" "$file"; then
-  : # step 1: keep U+FFFD visible to ADV014
-elif ! conv=$(convert_encoding "$file" 2>&1); then
+  # step 1: keep U+FFFD visible to ADV014
+  notes="advpl-specialist: conversao para Windows-1252 nao executada em $file: o arquivo contem U+FFFD (bytes EF BF BD); restaure os caracteres originais"
+elif conv=$(convert_encoding "$file" 2>&1); then
+  converted=1
+else
   notes="advpl-specialist: falha na conversao para Windows-1252 de $file${conv:+: $conv}"
 fi
 
@@ -96,7 +114,13 @@ advpl_is_lint_file "$file" || finish
 
 lint_args=()
 if [ -f "$snap" ]; then
-  introduced_lines "$snap" "$file" >"$snap.lines"
+  # normalize the snapshot exactly like the file: same converter, same
+  # decision, and a copy named with the file's extension for its filter
+  if [ "$converted" = 1 ] && cp "$snap" "$snap.${file##*.}" 2>/dev/null; then
+    baseline="$snap.${file##*.}"
+    convert_encoding "$baseline" >/dev/null 2>&1
+  fi
+  introduced_lines "$baseline" "$file" >"$snap.lines"
   [ -s "$snap.lines" ] || finish
   lint_args=(--lines-file "$snap.lines")
 fi
