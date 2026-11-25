@@ -64,7 +64,7 @@ O plugin detecta automaticamente projetos Protheus ao iniciar uma sessao. Ele pr
 
 ## Windows
 
-Os hooks do plugin sao scripts bash e precisam do Git Bash no Windows (o Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e os hooks do plugin sao ignorados). O hook PreToolUse usa `onFailure: continue`, entao as edicoes nunca sao bloqueadas. Para uso manual sem bash, as skills trazem scripts PowerShell: `skills/advpl-code-review/scripts/advpl-lint.ps1` e `skills/advpl-code-generation/scripts/convert-encoding.ps1`.
+Os hooks do plugin sao scripts bash e precisam do Git Bash no Windows (o Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e podem nao executar ou exibir um erro nao bloqueante em quase toda chamada de ferramenta, porque ha hooks para Read, Bash, Write e Edit). Apenas o hook PreToolUse declara `onFailure: continue`; PostToolUse e SessionStart nao tem esse campo. Para uso manual sem bash, as skills trazem scripts PowerShell: `skills/advpl-code-review/scripts/advpl-lint.ps1` e `skills/advpl-code-generation/scripts/convert-encoding.ps1`.
 
 ## Plugins e MCPs recomendados
 

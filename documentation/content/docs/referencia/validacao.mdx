@@ -88,7 +88,7 @@ Se o conteudo for invalido (vazio, varias linhas, `12.1` sem numero final, nao n
 O Protheus compila fontes em Windows-1252, enquanto as IAs gravam UTF-8. No Claude Code, o plugin devolve o fonte para Windows-1252 no **fim do turno**, com `skills/advpl-code-generation/scripts/convert-encoding.sh --translit`. A conversao usa um decodificador proprio, sem `iconv`.
 
 - Cada `Write`, `Edit` ou `MultiEdit` de um fonte registra o arquivo em uma lista da sessao, faz o lint das linhas introduzidas e avisa na hora sobre caracteres sem equivalente em Windows-1252. O hook `Stop` converte os arquivos da lista; o `SessionEnd` tambem converte.
-- O `Stop` so converte quando nao ha trabalho de agente em segundo plano em andamento. Se houver, ele espera um proximo `Stop` e mostra um aviso curto.
+- O `Stop` so converte quando nao ha trabalho de agente em segundo plano em andamento. Se houver, ele espera um proximo `Stop` e, quando algum fonte da lista ainda esta em UTF-8, mostra um aviso curto.
 - Um caractere sem equivalente em Windows-1252 (emoji, kanji, setas) vira `?`, e uma nota visivel e nao bloqueante avisa quais arquivos tiveram essa troca. Falhas e transliteracoes tambem aparecem como mensagem do sistema.
 - Se o arquivo ja contem U+FFFD, a conversao e pulada, com aviso, para nao esconder a corrupcao; o ADV014 acusa a linha.
 - Extensoes convertidas: `.prw`, `.tlpp`, `.prx`, `.ch`, `.th`, `.prg`, `.apw`, `.aph` e `.tlh`.
@@ -103,7 +103,7 @@ O Claude Code (2.1.332) recusa `Edit` e `Write` em arquivo que nao e UTF-8, e es
 3. Um hook PostToolUse(Bash) tambem registra os alvos de comandos `--to-utf8`, com analise conservadora do comando.
 4. No fim do turno, o `Stop` devolve o arquivo para Windows-1252, como descrito acima.
 
-Se o turno terminar de forma anormal (Ctrl+C, erro de API), o arquivo continua em UTF-8 ate o proximo `Stop` ou `SessionEnd` da mesma sessao; a lista deixada por outra sessao nao e retomada. Nesse caso, rode o conversor sem `--to-utf8` ou `/advpl-specialist:validate`. O mesmo vale para desistir da edicao.
+Se o turno terminar de forma anormal (Ctrl+C, erro de API), o arquivo continua em UTF-8 ate o proximo `Stop` ou `SessionEnd` da mesma sessao; a lista deixada por outra sessao nao e retomada, mas o `SessionStart` da sessao seguinte cita os fontes dela, sem converter nada. Nesse caso, rode `convert-encoding.sh <arquivo>` (ou `-r <pasta>`) para devolve-los ao Windows-1252; o `/advpl-specialist:validate` nao converte o encoding. Para desistir da edicao, rode o mesmo conversor sem `--to-utf8`.
 
 Os comandos `/document`, `/refactor` e `/migrate` convertem antes os alvos CP1252 existentes, porque seus agentes nao tem Bash. `/refactor` e `/migrate` fazem isso logo antes das edicoes, depois da aprovacao.
 
@@ -119,7 +119,7 @@ Limites do `--to-utf8`:
 
 ## Windows
 
-Os hooks sao scripts bash e precisam do Git Bash no Windows. O Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e podem nao executar ou exibir um erro nao bloqueante. Apenas o hook PreToolUse declara `onFailure: continue`; PostToolUse e SessionStart nao tem esse campo.
+Os hooks sao scripts bash e precisam do Git Bash no Windows. O Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e podem nao executar ou exibir um erro nao bloqueante em quase toda chamada de ferramenta, porque ha hooks para Read, Bash, Write e Edit. Apenas o hook PreToolUse declara `onFailure: continue`; PostToolUse e SessionStart nao tem esse campo.
 
 Para uso manual sem bash, as skills trazem gemeos em PowerShell, com a mesma saida:
 
