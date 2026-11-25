@@ -1,0 +1,68 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# Needs --scaffold: scaffold.sh copies fixtures/ZFATR05.prw into the run's workspace.
+# The refactor edits ZFATR05.prw in place, so file_exists (created files only) does not
+# apply: graders on the file contents take its place. They read the file, not the trace,
+# because the edit may come from the refactorer subagent.
+schema_version: "1.1"
+name: refactor-modernize
+description: /refactor --focus modernize sobre fonte legado (ConOut, IIf, TCQuery concatenado).
+tags: [refactor, prw, scaffold, lint-output]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 60
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:refactor ZFATR05.prw --focus modernize
+graders:
+  # skills/advpl-refactoring/patterns-modernization.md RF-009 (ConOut -> FWLogMsg). The fixture
+  # has no FWLogMsg, so a match proves the source was changed.
+  - name: conout-virou-fwlogmsg
+    type: regex
+    target: { source: file, path: ZFATR05.prw }
+    pattern: 'FWLogMsg\('
+    flags: i
+  # AGENTS.md "Includes" (the refactor must keep the include)
+  - name: include-totvs
+    type: regex
+    target: { source: file, path: ZFATR05.prw }
+    pattern: '#include "totvs\.ch"'
+  # AGENTS.md "Prohibited patterns"; skills/advpl-refactoring/patterns-modernization.md RF-009
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: ZFATR05.prw }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # skills/advpl-refactoring/patterns-modernization.md RF-007 (MV_PAR01 is user input);
+  # AGENTS.md "Database access"
+  - name: entrada-com-bind
+    type: regex
+    target: { source: file, path: ZFATR05.prw }
+    pattern: 'FWPreparedStatement|FWExecStatement'
+    flags: i
+  # commands/refactor.md "With --focus modernize" steps 2-7
+  - name: rubrica-modernize
+    type: llm
+    criteria: |
+      Resposta final de /advpl-specialist:refactor ZFATR05.prw --focus modernize. O fonte tinha
+      dois ConOut (lint ADV003), um IIf fora de bloco de código (ADV009) e um TCQuery montado
+      por concatenação com MV_PAR01 (ADV015).
+      PASS se TODOS os itens valem:
+      1. Mostra a linha de resumo do lint ("advpl-lint: N error(s), M warning(s), K suppressed")
+         de antes e de depois das mudanças.
+      2. Liga cada mudança ao seu padrão: ConOut a RF-009, IIf a RF-011 e o TCQuery concatenado
+         a RF-007 (citando a linha ou o ID do lint).
+      3. Lista os testes de "mesmo comportamento" que o usuário deve rodar.
+      4. Diz que a compilação e a validação no TDS ou na extensão TOTVS do VS Code ficam
+         pendentes, e não afirma que o código compila.
+      FAIL se faltar qualquer item.

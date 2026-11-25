@@ -1,0 +1,62 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+schema_version: "1.1"
+name: generate-mvc-za1
+description: /generate mvc para tabela customizada, com carga em lote pela API do modelo.
+tags: [generate, mvc, prw, lint-output]
+runs: 1
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:generate mvc ZA1CAD --module FAT --output ZA1CAD.prw
+    Cadastro MVC da tabela customizada ZA1 (Comissões por Vendedor) com os campos ZA1_FILIAL,
+    ZA1_COD, ZA1_VEND, ZA1_PERC e ZA1_ATIVO. Na confirmação, bloquear percentual fora da faixa
+    de 0 a 100. Inclua também uma função para carregar comissões em lote, sem tela, que vou
+    chamar a partir de um job.
+graders:
+  - name: fonte-criado
+    type: file_exists
+    path: ZA1CAD.prw
+  # AGENTS.md "Includes"; skills/advpl-code-generation/reference.md
+  - name: include-totvs
+    type: regex
+    target: { source: file, path: ZA1CAD.prw }
+    pattern: '#include "totvs\.ch"'
+  # AGENTS.md "Prohibited patterns" (ConOut, uppercase TOTVS.CH, obsolete protheus.ch)
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: ZA1CAD.prw }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # skills/advpl-code-generation/patterns-mvc.md (FWMVCRotAuto restricted, not taught)
+  - name: sem-fwmvcrotauto
+    type: regex
+    target: { source: file, path: ZA1CAD.prw }
+    pattern: 'FWMVCRotAuto'
+    flags: i
+    match: not_contains
+  # skills/advpl-code-generation/patterns-mvc.md (sections 3-4, batch execution table);
+  # skills/advpl-code-generation/patterns-pontos-entrada-mvc.md (model ID differs from the routine name)
+  - name: rubrica-mvc
+    type: llm
+    focus: { source: file, path: ZA1CAD.prw }
+    criteria: |
+      Fonte ADVPL de um cadastro MVC da tabela ZA1.
+      PASS se TODOS os itens valem:
+      1. Existem MenuDef, ModelDef e ViewDef; o ModelDef usa FWFormStruct(1, "ZA1") e o ViewDef usa
+         FWFormStruct(2, "ZA1") e carrega o modelo com FWLoadModel.
+      2. O ID passado a MPFormModel():New() é diferente do nome da função ZA1CAD.
+      3. Há validação que impede gravar ZA1_PERC menor que 0 ou maior que 100, retornando .F.
+         com mensagem (Help ou SetErrorMessage).
+      4. A carga em lote sem tela usa a API do modelo (FWLoadModel + SetOperation + Activate +
+         SetValue + VldData + CommitData + DeActivate), sem FWMVCRotAuto.
+      FAIL se faltar qualquer item, ou se o fonte usar FWMVCRotAuto.

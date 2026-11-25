@@ -1,0 +1,56 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# Needs --scaffold: scaffold.sh copies fixtures/ZFATA09.prw into the run's workspace.
+# Needs Bash granted (--allow-tools ... Bash): /validate runs the lint engine.
+# /validate produces no source, so the file_exists and include graders do not apply.
+schema_version: "1.1"
+name: validate-fixture
+description: /validate de fonte com erros de lint e FWMVCRotAuto (achado semantico S6).
+tags: [validate, prw, scaffold]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:validate ZFATA09.prw
+graders:
+  # commands/validate.md step 2 (the engine runs through Bash). Plugin-fired indicator: the
+  # no-plugin arm has no lint engine, so it is not scored in a two-arm run.
+  - name: motor-de-lint-rodou
+    type: tool_used
+    tool: Bash
+    input_match: 'advpl-lint\.(sh|ps1)'
+    arm: with-only
+  # commands/validate.md step 4.1 (engine summary copied verbatim). Expected value measured with
+  # skills/advpl-code-review/scripts/advpl-lint.sh --scope all on fixtures/ZFATA09.prw; update it
+  # when advpl-lint.rules changes what this fixture triggers.
+  - name: resumo-do-motor
+    type: regex
+    pattern: 'advpl-lint: 2 error\(s\), 2 warning\(s\), 0 suppressed'
+  # commands/validate.md step 3 (S6 always reports FWMVCRotAuto) and step 4 (report order)
+  - name: rubrica-relatorio-validate
+    type: llm
+    criteria: |
+      Relatório de /advpl-specialist:validate ZFATA09.prw. O fonte tem #INCLUDE "TOTVS.CH" em
+      maiúsculas, um ConOut, um IIf e uma chamada a FWMVCRotAuto.
+      PASS se TODOS os itens valem:
+      1. As seções aparecem nesta ordem: resumo, erros, warnings, suprimidos pelo
+         .advpl-specialist-ignore, achados semânticos e pendências.
+      2. Os erros e warnings são as linhas do motor de lint no formato
+         "ARQUIVO:LINHA: error|warning ID MENSAGEM".
+      3. Há um achado semântico S6, marcado como semântico, sobre FWMVCRotAuto, apontando
+         MsExecAuto pelo exemplo documentado da rotina ou a API do modelo MVC (FWLoadModel,
+         SetValue, VldData, CommitData) como alternativa.
+      4. Termina dizendo que a compilação e a validação no TDS ou na extensão TOTVS do VS Code
+         ficam pendentes, sem afirmar que o código compila.
+      FAIL se faltar qualquer item.

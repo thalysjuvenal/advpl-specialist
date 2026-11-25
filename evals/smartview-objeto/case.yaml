@@ -1,0 +1,69 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+schema_version: "1.1"
+name: smartview-objeto
+description: /smartview --mode generate de objeto de negocio (Integrated Provider) com parametros.
+tags: [smartview, generate, tlpp, lint-output]
+runs: 1
+execution:
+  max_turns: 60
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:smartview --mode generate --type data-grid --output smartview
+    Objeto de negócio para uma visão de dados de pedidos de venda em aberto (SC5/SC6), com
+    parâmetros de emissão de/até e cliente. O id do objeto deve ser custom.sv.fat.pedidosabertos.
+graders:
+  # commands/smartview.md "Mapeamento --mode para arquivos" (<area>.sv.<modulo>.<nome>.tlpp)
+  - name: objeto-criado
+    type: file_exists
+    path: smartview/custom.sv.fat.pedidosabertos.tlpp
+  # commands/smartview.md (menu source .prw with callTReports)
+  - name: fonte-de-menu-criado
+    type: file_exists
+    path: 'smartview/**.prw'
+  # skills/smartview-development/reference.md (includes of the business object)
+  - name: include-tlpp-core
+    type: regex
+    target: { source: file, path: smartview/custom.sv.fat.pedidosabertos.tlpp }
+    pattern: '#include "tlpp-core\.th"'
+  # AGENTS.md "Prohibited patterns"
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: smartview/custom.sv.fat.pedidosabertos.tlpp }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # skills/smartview-development/reference.md (annotation of the Integrated Provider)
+  - name: annotation-integrated-provider
+    type: regex
+    target: { source: file, path: smartview/custom.sv.fat.pedidosabertos.tlpp }
+    pattern: '@totvsFrameworkTReportsIntegratedProvider'
+    flags: i
+  # skills/smartview-development/deploy-trp.md (the .trp comes from the web designer)
+  - name: ciclo-do-trp
+    type: regex
+    pattern: '\.trp'
+    flags: i
+  # commands/smartview.md "Modo generate" step 3; skills/smartview-development/reference.md,
+  # patterns-schema.md and patterns-getdata.md
+  - name: rubrica-objeto-de-negocio
+    type: llm
+    focus: { source: file, path: smartview/custom.sv.fat.pedidosabertos.tlpp }
+    criteria: |
+      Fonte TLPP de um objeto de negócio Smart View (Integrated Provider) de pedidos em aberto.
+      PASS se TODOS os itens valem:
+      1. O namespace termina em .treportsintegratedprovider e a classe tem a annotation
+         @totvsFrameworkTReportsIntegratedProvider.
+      2. getSchema() declara as colunas e os parâmetros de emissão de/até e cliente.
+      3. getData() lê os parâmetros e alimenta os dados linha a linha (appendData); os valores
+         dos parâmetros chegam ao SQL só por bind (FWExecStatement ou FWPreparedStatement com ?),
+         nunca concatenados.
+      4. As colunas de data são declaradas com tipo date.
+      FAIL se faltar qualquer item, ou se algum parâmetro for concatenado no SQL.

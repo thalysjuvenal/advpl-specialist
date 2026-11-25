@@ -1,0 +1,72 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# Needs --scaffold: scaffold.sh copies fixtures/ZCALCDES.prw (the code under test) into the
+# run's workspace.
+schema_version: "1.1"
+name: test-probat
+description: /test gera testes ProBat (.tlpp) para uma User Function legada.
+tags: [test, probat, tlpp, scaffold, lint-output]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:test ZCALCDES.prw --type unit --output test/unit/test_zcalcdes.tlpp
+    Cubra os casos normais e os limites: percentual zero, negativo, 100 e acima de 100, e
+    parâmetro não numérico.
+graders:
+  - name: teste-criado
+    type: file_exists
+    path: test/unit/test_zcalcdes.tlpp
+  # skills/probat-testing/reference.md "Required Include"
+  - name: include-probat
+    type: regex
+    target: { source: file, path: test/unit/test_zcalcdes.tlpp }
+    pattern: '#include "tlpp-probat\.th"'
+  # AGENTS.md "Prohibited patterns"
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: test/unit/test_zcalcdes.tlpp }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # skills/probat-testing/reference.md: assertions live in tlpp.probat (using namespace
+  # tlpp.probat or the fully qualified name)
+  - name: assercoes-probat
+    type: regex
+    target: { source: file, path: test/unit/test_zcalcdes.tlpp }
+    pattern: 'using\s+namespace\s+tlpp\.probat|tlpp\.probat\.assert'
+    flags: i
+  # AGENTS.md "Includes": using namespace tlpp.probat is the only documented exception
+  - name: so-tlpp-probat
+    type: regex
+    target: { source: file, path: test/unit/test_zcalcdes.tlpp }
+    pattern: 'using\s+namespace\s+tlpp\.(?!probat\b)'
+    flags: i
+    match: not_contains
+  # skills/probat-testing/reference.md (annotations, namespace convention) and
+  # patterns-unit-tests.md
+  - name: rubrica-probat
+    type: llm
+    focus: { source: file, path: test/unit/test_zcalcdes.tlpp }
+    criteria: |
+      Fonte TLPP de testes ProBat para U_ZCALCDES(nValor, nPerc): aplica o desconto quando
+      0 < nPerc <= 100 (arredondado em 2 casas), devolve nValor sem desconto quando o percentual
+      está fora da faixa e devolve 0 quando um parâmetro não é numérico.
+      PASS se TODOS os itens valem:
+      1. Há uma classe com a annotation @TestFixture e métodos com @Test.
+      2. Os testes chamam U_ZCALCDES e verificam o resultado com assertEquals (ou outra
+         asserção do ProBat).
+      3. Cobrem um caso normal e os limites pedidos: percentual 0, negativo, 100, acima de 100
+         e parâmetro não numérico, com os valores esperados coerentes com a regra acima.
+      4. O namespace segue test.<modulo> ou custom.tests.<modulo>.
+      FAIL se faltar qualquer item.

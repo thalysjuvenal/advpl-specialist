@@ -1,0 +1,58 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# Needs --scaffold: scaffold.sh copies fixtures/.protheus-version (12.1.2310) into the run's
+# workspace. TLPP with MVC needs 12.1.2410, so the expected output is a .prw.
+schema_version: "1.1"
+name: generate-tlpp-versao-antiga
+description: /generate mvc pedido em TLPP numa release 12.1.2310 cai para .prw.
+tags: [generate, mvc, release, scaffold, lint-output]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:generate mvc ZA2CAD --module FAT --lang tlpp
+    Cadastro MVC da tabela customizada ZA2 (Regiões de Venda) com os campos ZA2_FILIAL, ZA2_COD e
+    ZA2_DESC. Salve o fonte na raiz do projeto.
+graders:
+  # commands/generate.md Planning Phase step 1; skills/protheus-reference/releases.md
+  # ("TLPP com MVC" from 12.1.2410)
+  - name: fonte-prw-criado
+    type: file_exists
+    path: ZA2CAD.prw
+  - name: nenhum-tlpp
+    type: file_exists
+    path: '**.tlpp'
+    exists: false
+  # AGENTS.md "Includes"
+  - name: include-totvs
+    type: regex
+    target: { source: file, path: ZA2CAD.prw }
+    pattern: '#include "totvs\.ch"'
+  # AGENTS.md "Prohibited patterns"
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: ZA2CAD.prw }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # commands/generate.md Planning Phase step 1; skills/protheus-reference/releases.md
+  - name: rubrica-release
+    type: llm
+    criteria: |
+      Resposta final de /advpl-specialist:generate mvc ZA2CAD --lang tlpp num projeto cujo
+      arquivo .protheus-version declara a release 12.1.2310.
+      PASS se TODOS os itens valem:
+      1. Cita a release 12.1.2310 lida do .protheus-version.
+      2. Explica que TLPP com MVC exige a release 12.1.2410 ou maior.
+      3. Diz que gerou o cadastro em .prw (ADVPL) como alternativa, em vez de .tlpp.
+      FAIL se faltar qualquer item, ou se disser que gerou um fonte .tlpp.

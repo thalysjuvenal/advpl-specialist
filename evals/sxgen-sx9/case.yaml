@@ -1,0 +1,60 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# The output is a key-value dictionary script (.txt), not an ADVPL source: the include
+# graders do not apply; the field-name graders take their place.
+schema_version: "1.1"
+name: sxgen-sx9
+description: /sxgen --type sx9 de relacionamento SA1 x ZA1, so com campos documentados no TDN.
+tags: [sxgen, sx9]
+runs: 1
+execution:
+  max_turns: 25
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:sxgen --type sx9 --output dicionario/sx9-sa1-za1.txt
+    Relacionamento entre clientes (SA1) e a tabela customizada ZA1 (comissões por cliente) pelos
+    campos ZA1_CLIENT e ZA1_LOJA: um cliente para muitos registros da ZA1.
+graders:
+  - name: script-criado
+    type: file_exists
+    path: dicionario/sx9-sa1-za1.txt
+  # skills/sx-configuration/patterns-sx6-sx9.md "SX9 - Table Relationships" (domain = referenced side)
+  - name: x9-dom
+    type: regex
+    target: { source: file, path: dicionario/sx9-sa1-za1.txt }
+    pattern: 'X9_DOM\s*=\s*SA1\b'
+  - name: x9-cdom
+    type: regex
+    target: { source: file, path: dicionario/sx9-sa1-za1.txt }
+    pattern: 'X9_CDOM\s*=\s*ZA1\b'
+  # Only the fields documented in skills/sx-configuration/patterns-sx6-sx9.md (from the TDN
+  # pages it lists); any other X9_ name is invented.
+  - name: so-campos-do-tdn
+    type: regex
+    target: { source: file, path: dicionario/sx9-sa1-za1.txt }
+    pattern: 'X9_(?!(?:DOM|IDENT|CDOM|EXPDOM|EXPCDOM|LIGDOM|LIGCDOM|CONDSQL|USEFIL|ENABLE|VINFIL|CHVFOR|PROPRI)\b)[A-Z0-9]+'
+    match: not_contains
+  # skills/sx-configuration/patterns-sx6-sx9.md (SX9 fields, example and Rules: sequence, strong key)
+  - name: rubrica-relacionamento
+    type: llm
+    criteria: |
+      Resposta final de /advpl-specialist:sxgen --type sx9 para o relacionamento SA1 x ZA1
+      (um cliente para muitos registros da ZA1, pelos campos ZA1_CLIENT e ZA1_LOJA).
+      PASS se TODOS os itens valem:
+      1. O domínio é SA1 e o contradomínio é ZA1, com as expressões A1_COD+A1_LOJA e
+         ZA1_CLIENT+ZA1_LOJA e a cardinalidade 1 para N.
+      2. Não assume X9_IDENT = 001: indica a próxima sequência livre da SA1 (ou marca o valor
+         como a confirmar).
+      3. Mantém a chave forte desligada (X9_CHVFOR/X9_VINFIL = 2) ou só a liga depois de citar a
+         página do TDN sobre chave forte.
+      4. Traz ao menos uma observação "a confirmar" (no TDS ou no TDN) herdada da skill, por
+         exemplo os valores de X9_USEFIL, em vez de apresentar esse ponto como fato.
+      FAIL se faltar qualquer item.

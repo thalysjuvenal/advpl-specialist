@@ -1,0 +1,62 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+schema_version: "1.1"
+name: generate-rest-tlpp
+description: /generate rest em TLPP com filtro vindo do usuario e paginacao.
+tags: [generate, rest, tlpp, lint-output]
+runs: 1
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:generate rest clientes --module fat --lang tlpp --output api/clientes.tlpp
+    Endpoint GET /api/custom/v1/clientes que lista clientes (SA1) com filtro opcional por parte
+    do nome (query param "nome") e paginação por page e pageSize. Retornar JSON no padrão
+    { items, hasNext }.
+graders:
+  - name: fonte-criado
+    type: file_exists
+    path: api/clientes.tlpp
+  # AGENTS.md "Includes" (.tlpp uses tlpp-core.th); skills/advpl-code-generation/patterns-rest.md section 2
+  - name: include-tlpp-core
+    type: regex
+    target: { source: file, path: api/clientes.tlpp }
+    pattern: '#include "tlpp-core\.th"'
+  # AGENTS.md "Prohibited patterns"
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: api/clientes.tlpp }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # AGENTS.md "Database access": user input goes through FWPreparedStatement;
+  # skills/advpl-code-generation/patterns-rest.md 6.5 (request values as ? parameters)
+  - name: entrada-com-bind
+    type: regex
+    target: { source: file, path: api/clientes.tlpp }
+    pattern: 'FWPreparedStatement|FWExecStatement'
+    flags: i
+  # skills/advpl-code-generation/patterns-rest.md (2. TLPP REST Pattern, 6.1 Pagination, 6.5);
+  # AGENTS.md "TLPP namespaces" and "Includes" (no using namespace tlpp.*)
+  - name: rubrica-rest
+    type: llm
+    focus: { source: file, path: api/clientes.tlpp }
+    criteria: |
+      Fonte TLPP de uma API REST que lista clientes da SA1.
+      PASS se TODOS os itens valem:
+      1. Declara namespace em minúsculas no formato custom.fat.<servico> e não tem nenhum
+         "using namespace tlpp.".
+      2. Usa annotation @Get com a rota /api/custom/v1/clientes e inclui tlpp-rest.th.
+      3. Lê "nome", page e pageSize da query string; o valor de "nome" chega ao SQL só como
+         parâmetro ligado (? do FWPreparedStatement ou bind equivalente), nunca concatenado
+         ao texto da consulta.
+      4. A resposta de sucesso é um JSON com o array items e o lógico hasNext, e há resposta
+         de erro com status HTTP quando a consulta falha.
+      FAIL se faltar qualquer item, ou se o filtro do usuário for concatenado no SQL.

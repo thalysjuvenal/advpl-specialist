@@ -1,0 +1,74 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# Needs --scaffold: scaffold.sh copies fixtures/ZA3BRW.prw into the run's workspace.
+schema_version: "1.1"
+name: smartx-migrate-browse
+description: /smartx --mode migrate de um mBrowse legado, com relatorio de lacunas.
+tags: [smartx, migrate, tlpp, scaffold, lint-output]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 60
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:smartx --mode migrate --output smartx
+    Quero migrar o cadastro de Regiões de Venda (fonte ZA3BRW.prw, mBrowse da tabela ZA3) para
+    Smart X, no namespace custom.cadastros.za3. Grave o modelo em
+    smartx/custom.cadastros.za3.model.tlpp e a interface em
+    smartx/custom.cadastros.za3.interface.tlpp.
+graders:
+  - name: modelo-criado
+    type: file_exists
+    path: smartx/custom.cadastros.za3.model.tlpp
+  - name: interface-criada
+    type: file_exists
+    path: smartx/custom.cadastros.za3.interface.tlpp
+  # skills/smartx-development/reference.md "Includes e annotation" (Smart X sources include
+  # fw-tlpp-core.th and "totvs.ch", not tlpp-core.th)
+  - name: include-totvs-modelo
+    type: regex
+    target: { source: file, path: smartx/custom.cadastros.za3.model.tlpp }
+    pattern: '#include "totvs\.ch"'
+  # AGENTS.md "Prohibited patterns" (the TDN still writes protheus.ch in Smart X examples)
+  - name: sem-padrao-proibido-modelo
+    type: regex
+    target: { source: file, path: smartx/custom.cadastros.za3.model.tlpp }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  - name: sem-padrao-proibido-interface
+    type: regex
+    target: { source: file, path: smartx/custom.cadastros.za3.interface.tlpp }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # commands/smartx.md "Modo migrate" step 4; skills/advpl-to-tlpp-migration/gap-report.md
+  - name: tabela-de-lacunas
+    type: regex
+    pattern: '\|\s*Item\s*\|\s*(Status|Situa)'
+  # skills/advpl-to-tlpp-migration/gap-report.md checklist items 2, 6, 8, 9 and 10;
+  # commands/smartx.md (release step) and skills/protheus-reference/releases.md
+  - name: rubrica-relatorio-de-lacunas
+    type: llm
+    criteria: |
+      Resposta final da migração do mBrowse ZA3BRW.prw para Smart X. O fonte de origem tem
+      legenda (aLegendas), filtro padrão (cFilterDefault), checagem de permissão por usuário
+      (RetCodUsr contra o parâmetro MV_XUSRZA3) e o ponto de entrada ZA3BRWBT
+      (ExistBlock/ExecBlock).
+      PASS se TODOS os itens valem:
+      1. Há um relatório de lacunas em tabela com as colunas Item | Situação | Motivo | Ação
+         (ou Item | Status | Reason | Action), com uma linha por ocorrência.
+      2. A tabela cobre a legenda, o filtro, a checagem de permissão (ou o MV_XUSRZA3) e o ponto
+         de entrada ZA3BRWBT, cada linha com situação migrado, não migrável ou mantido no legado
+         (ou migrated, not migratable, kept in legacy).
+      3. A resposta avisa que não há arquivo .protheus-version (ou trata a release mínima do
+         recurso) e diz que a compilação e a validação no TDS ficam pendentes, sem afirmar que
+         o código compila.
+      FAIL se faltar qualquer item.

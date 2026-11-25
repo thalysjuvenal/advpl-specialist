@@ -1,0 +1,62 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+schema_version: "1.1"
+name: generate-job
+description: /generate job sem interface, com semaforo e log padrao.
+tags: [generate, job, prw, lint-output]
+runs: 1
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:generate job ZJOBTIT --module FIN --output ZJOBTIT.prw
+    Job noturno, sem interface, que roda na empresa 99 filial 01, lista os títulos a receber
+    (SE1) vencidos há mais de 5 dias e registra no log um resumo por cliente (quantidade de
+    títulos e saldo total). Não pode rodar duas instâncias ao mesmo tempo.
+graders:
+  - name: fonte-criado
+    type: file_exists
+    path: ZJOBTIT.prw
+  # AGENTS.md "Includes"
+  - name: include-totvs
+    type: regex
+    target: { source: file, path: ZJOBTIT.prw }
+    pattern: '#include "totvs\.ch"'
+  # AGENTS.md "Prohibited patterns"; skills/advpl-code-generation/patterns-jobs.md section 1 (FWLogMsg only)
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: ZJOBTIT.prw }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # skills/advpl-code-generation/patterns-jobs.md section 1 (LockByName semaphore)
+  - name: semaforo
+    type: regex
+    target: { source: file, path: ZJOBTIT.prw }
+    pattern: 'LockByName\('
+    flags: i
+  # skills/advpl-code-generation/patterns-jobs.md sections 1 and 4; AGENTS.md "Database access"
+  # and "Error handling"
+  - name: rubrica-job
+    type: llm
+    focus: { source: file, path: ZJOBTIT.prw }
+    criteria: |
+      Fonte ADVPL de um job sem interface.
+      PASS se TODOS os itens valem:
+      1. Prepara o ambiente da empresa 99 filial 01 com RpcSetEnv e o libera com RpcClearEnv
+         também no caminho de erro.
+      2. Impede execução concorrente com LockByName e libera o semáforo (UnLockByName) em todos
+         os caminhos de saída.
+      3. Registra o log com FWLogMsg e não chama função de interface (MsgInfo, MsgAlert,
+         MsgStop, Aviso, Alert).
+      4. A consulta usa Embedded SQL (BeginSQL/EndSQL) com %table%, %xFilial% e %notDel%.
+      5. Trata erro com BEGIN SEQUENCE ... RECOVER ... END SEQUENCE (ou ErrorBlock equivalente),
+         sem engolir o erro em silêncio.
+      FAIL se faltar qualquer item.

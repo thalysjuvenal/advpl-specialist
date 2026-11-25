@@ -1,0 +1,49 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# Needs --scaffold: scaffold.sh copies fixtures/ZCOMR02.prw into the run's workspace.
+# A review produces no source, so the file_exists and include graders do not apply.
+schema_version: "1.1"
+name: review-legado
+description: /review de fonte legado com injecao de SQL, credencial fixa e lock sem liberacao.
+tags: [review, prw, scaffold]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:review ZCOMR02.prw
+graders:
+  # commands/review.md "Output" (findings grouped by severity CRITICAL / WARNING / INFO)
+  - name: agrupado-por-severidade
+    type: regex
+    pattern: 'critical|cr[ií]tico'
+    flags: i
+  # skills/advpl-code-review/rules-security.md, rules-best-practices.md, rules-performance.md
+  # and sonarqube-rules-catalog.md; AGENTS.md "Prohibited patterns", "Database access", "Locking"
+  - name: rubrica-review
+    type: llm
+    criteria: |
+      Relatório de revisão do fonte legado ZCOMR02.prw.
+      PASS se o relatório aponta TODOS os problemas abaixo, cada um com a linha (ou arquivo:linha)
+      e uma correção:
+      1. SQL montado por concatenação com MV_PAR01 (cFornece) e TCQuery: risco de injeção;
+         correção com parâmetro do FWPreparedStatement (ou bind equivalente).
+      2. Senha fixa no código (cSenha := "Compras@2015").
+      3. RecLock dentro do While sem MsUnlock no caminho do Loop (pedido acima do limite): o
+         registro fica travado.
+      4. Include #INCLUDE "PROTHEUS.CH" em maiúsculas e obsoleto; correção para
+         #include "totvs.ch".
+      5. ConOut; correção para FWLogMsg.
+      6. Acesso direto à tabela de sistema SX3 (DbSelectArea("SX3")/DbSeek); correção com a API
+         do framework (por exemplo FWSX3Util).
+      FAIL se faltar qualquer um dos seis, ou se o relatório afirmar que o código compila.

@@ -29,3 +29,6 @@ linkedin-post.txt
 
 # Superpowers SDD scratch
 /.superpowers/
+
+# Local eval runs (claude plugin eval results, eval.log)
+/evals/results/

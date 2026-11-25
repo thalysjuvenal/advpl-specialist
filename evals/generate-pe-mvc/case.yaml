@@ -1,0 +1,61 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+schema_version: "1.1"
+name: generate-pe-mvc
+description: /generate ponto-entrada MVC do MATA010 (User Function ITEM, hub de eventos).
+tags: [generate, ponto-entrada, mvc, prw, lint-output]
+runs: 1
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:generate ponto-entrada --module EST --output PEITEM.prw
+    Ponto de entrada MVC do cadastro de produtos (MATA010) que impede confirmar a inclusão ou a
+    alteração de produto do tipo PA (B1_TIPO) sem grupo (B1_GRUPO) preenchido, mostrando a
+    mensagem padrão de erro do MVC.
+graders:
+  - name: fonte-criado
+    type: file_exists
+    path: PEITEM.prw
+  # AGENTS.md "Includes"; patterns-pontos-entrada-mvc.md section 4 (template)
+  - name: include-totvs
+    type: regex
+    target: { source: file, path: PEITEM.prw }
+    pattern: '#include "totvs\.ch"'
+  # AGENTS.md "Prohibited patterns"
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: PEITEM.prw }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # skills/advpl-code-generation/patterns-pontos-entrada-mvc.md section 1 (MATA010 -> User Function ITEM())
+  - name: funcao-do-id-do-modelo
+    type: regex
+    target: { source: file, path: PEITEM.prw }
+    pattern: 'user\s+function\s+item\s*\('
+    flags: i
+  # skills/advpl-code-generation/patterns-pontos-entrada-mvc.md sections 2-3 ("Regras criticas" 1-3)
+  - name: rubrica-pe-mvc
+    type: llm
+    focus: { source: file, path: PEITEM.prw }
+    criteria: |
+      Fonte ADVPL de um ponto de entrada MVC do MATA010.
+      PASS se TODOS os itens valem:
+      1. É a User Function ITEM() e lê o objeto do modelo e o cIdPonto das posições 1 e 2 do
+         PARAMIXB.
+      2. No evento de validação total (MODELPOS ou FORMPOS) retorna .F. quando B1_TIPO = "PA" e
+         B1_GRUPO está vazio, nas operações de inclusão e alteração, registrando a mensagem com
+         SetErrorMessage (e não só com MsgAlert/Alert).
+      3. Os demais eventos que esperam retorno recebem um retorno do tipo certo (por exemplo,
+         xRet iniciado com .T.).
+      4. Não chama função de interface (MsgAlert, MsgYesNo, Aviso, Alert) em eventos de commit
+         dentro de transação (MODELCOMMITTTS).
+      FAIL se faltar qualquer item.

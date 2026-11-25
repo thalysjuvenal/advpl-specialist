@@ -1,0 +1,67 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# Needs --scaffold: scaffold.sh copies fixtures/ZFATA02.prw into the run's workspace.
+schema_version: "1.1"
+name: migrate-prw-tlpp
+description: /migrate de fonte procedural para classe TLPP com relatorio de lacunas.
+tags: [migrate, tlpp, scaffold, lint-output]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 60
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:migrate ZFATA02.prw --output custom.fat.comissao.tlpp
+    Use o namespace custom.fat.comissao.
+graders:
+  - name: fonte-criado
+    type: file_exists
+    path: custom.fat.comissao.tlpp
+  # AGENTS.md "Includes"; commands/migrate.md step 8 (the .tlpp uses tlpp-core.th)
+  - name: include-tlpp-core
+    type: regex
+    target: { source: file, path: custom.fat.comissao.tlpp }
+    pattern: '#include "tlpp-core\.th"'
+  # AGENTS.md "Prohibited patterns"
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: custom.fat.comissao.tlpp }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # AGENTS.md "TLPP namespaces"
+  - name: namespace-pedido
+    type: regex
+    target: { source: file, path: custom.fat.comissao.tlpp }
+    pattern: 'namespace\s+custom\.fat\.comissao'
+  # skills/advpl-to-tlpp-migration/gap-report.md (table headers, en or pt-BR)
+  - name: tabela-de-lacunas
+    type: regex
+    pattern: '\|\s*Item\s*\|\s*(Status|Situa)'
+  # skills/advpl-to-tlpp-migration/gap-report.md (checklist items 2, 5 and 6, rules for filling it in);
+  # commands/migrate.md step 15
+  - name: rubrica-relatorio-de-lacunas
+    type: llm
+    criteria: |
+      Resposta final de uma migração de ZFATA02.prw (ADVPL procedural) para uma classe TLPP.
+      O fonte de origem lê o parâmetro MV_XPCOMIS com SuperGetMV, guarda o percentual numa
+      variável Private (nZPerc) e chama o ponto de entrada ZFT02COM com ExistBlock/ExecBlock.
+      PASS se TODOS os itens valem:
+      1. Há um relatório de lacunas em tabela com as colunas Item | Situação | Motivo | Ação
+         (ou Item | Status | Reason | Action).
+      2. A tabela tem uma linha para o parâmetro MV_XPCOMIS e uma linha para o ponto de entrada
+         ZFT02COM (ExecBlock e/ou ExistBlock), cada uma com situação migrado, não migrável ou
+         mantido no legado (ou migrated, not migratable, kept in legacy).
+      3. Há a linha dos itens pesquisados e não encontrados ("Pesquisado, não encontrado" ou
+         "Searched, not found") e os totais por situação.
+      4. A resposta diz que a compilação e a validação no TDS ou na extensão TOTVS do VS Code
+         ficam pendentes, e não afirma que o código compila.
+      FAIL se faltar qualquer item.

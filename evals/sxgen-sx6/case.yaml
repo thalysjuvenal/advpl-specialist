@@ -1,0 +1,66 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+# The output is a key-value dictionary script (.txt), not an ADVPL source: the include
+# graders do not apply; the field-name graders take their place.
+schema_version: "1.1"
+name: sxgen-sx6
+description: /sxgen --type sx6 de parametro MV_ customizado, so com campos documentados no TDN.
+tags: [sxgen, sx6]
+runs: 1
+execution:
+  max_turns: 25
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:sxgen --type sx6 --output dicionario/sx6-mv_xdiasvl.txt
+    Parâmetro MV_XDIASVL, numérico, com a quantidade de dias de validade dos orçamentos de venda.
+    Valor padrão 15, igual para todas as filiais.
+graders:
+  - name: script-criado
+    type: file_exists
+    path: dicionario/sx6-mv_xdiasvl.txt
+  # skills/sx-configuration/patterns-sx6-sx9.md "SX6 - Fields"
+  - name: x6-var
+    type: regex
+    target: { source: file, path: dicionario/sx6-mv_xdiasvl.txt }
+    pattern: 'X6_VAR\s*=\s*MV_XDIASVL\b'
+  - name: x6-tipo
+    type: regex
+    target: { source: file, path: dicionario/sx6-mv_xdiasvl.txt }
+    pattern: 'X6_TIPO\s*=\s*N\b'
+  # Only the fields documented in skills/sx-configuration/patterns-sx6-sx9.md (from the TDN
+  # pages it lists); any other X6_ name is invented.
+  - name: so-campos-do-tdn
+    type: regex
+    target: { source: file, path: dicionario/sx6-mv_xdiasvl.txt }
+    pattern: 'X6_(?!(?:FIL|VAR|TIPO|DESCRIC|DESC1|DESC2|DSCSPA|DSCSPA1|DSCSPA2|DSCENG|DSCENG1|DSCENG2|CONTEUD|CONTSPA|CONTENG|PROPRI|PRIORI|VALID|PYME|INIT|DEFPOR|DEFSPA|DEFENG|ACTIVE|EXPDEST)\b)[A-Z0-9]+'
+    match: not_contains
+  # skills/sx-configuration/patterns-sx6-sx9.md: X6_INIT, X6_DEFPOR/DEFSPA/DEFENG and X6_ACTIVE
+  # are not filled for a custom parameter (a value in parentheses is a note, not a value).
+  - name: sem-campos-de-parametro-padrao
+    type: regex
+    target: { source: file, path: dicionario/sx6-mv_xdiasvl.txt }
+    pattern: '^\s*X6_(INIT|DEFPOR|DEFSPA|DEFENG|ACTIVE)\s*=[ \t]*[^ \t(\r\n]'
+    flags: m
+    match: not_contains
+  # commands/sxgen.md ("Uses only the TDN-documented SX6/SX9 fields and keeps their 'a confirmar
+  # no TDS' notes"); skills/sx-configuration/patterns-sx6-sx9.md (header note and Rules)
+  - name: rubrica-notas-a-confirmar
+    type: llm
+    criteria: |
+      Resposta final de /advpl-specialist:sxgen --type sx6 para o parâmetro MV_XDIASVL.
+      PASS se TODOS os itens valem:
+      1. Diz onde o script foi gravado (dicionario/sx6-mv_xdiasvl.txt) ou mostra o bloco
+         gerado com X6_VAR = MV_XDIASVL, X6_TIPO = N e conteúdo 15.
+      2. Traz ao menos uma observação "a confirmar" (no TDS ou no TDN) herdada da skill, por
+         exemplo o nome do campo de proprietário (X6_PROPRI ou X6_PRIORI) ou o formato de
+         gravação, em vez de apresentar esse ponto como fato.
+      3. Não afirma que o TDN define quais campos do SX6 são obrigatórios.
+      FAIL se faltar qualquer item.

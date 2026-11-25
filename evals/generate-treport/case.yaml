@@ -1,0 +1,60 @@
+# Eval case for `claude plugin eval` (case.yaml, schema 1.1).
+# runs: 1 keeps the cost down (the CLI default is 3 runs per arm); --runs N overrides it.
+schema_version: "1.1"
+name: generate-treport
+description: /generate treport com perguntas SX1 que chegam a consulta.
+tags: [generate, treport, prw, lint-output]
+runs: 1
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Agent, TodoWrite, Write, Edit, Bash]
+  # The eval is non-interactive: plan mode and questions would stall the run.
+  disallowed_tools: [EnterPlanMode, ExitPlanMode, AskUserQuestion]
+  append_system_prompt: >-
+    Execução não interativa de avaliação: ninguém vai responder perguntas nem aprovar planos.
+    Considere aprovado qualquer plano ou confirmação que o comando pedir e siga até entregar
+    o resultado completo. Quando o comando oferecer alternativas ao usuário, siga a recomendada
+    pelo próprio comando e diga na resposta qual escolheu.
+  prompt: |
+    /advpl-specialist:generate treport ZFATR01 --module FAT --output ZFATR01.prw
+    Relatório de pedidos de venda por cliente, com perguntas de emissão de/até e cliente de/até
+    (grupo de perguntas ZFATR01). Colunas: número do pedido, emissão, cliente, loja, nome do
+    cliente e valor total.
+graders:
+  - name: fonte-criado
+    type: file_exists
+    path: ZFATR01.prw
+  # AGENTS.md "Includes"
+  - name: include-totvs
+    type: regex
+    target: { source: file, path: ZFATR01.prw }
+    pattern: '#include "totvs\.ch"'
+  # AGENTS.md "Prohibited patterns"
+  - name: sem-padrao-proibido
+    type: regex
+    target: { source: file, path: ZFATR01.prw }
+    pattern: 'ConOut\(|TOTVS\.CH|protheus\.ch'
+    match: not_contains
+  # AGENTS.md "Database access"; skills/advpl-code-generation/patterns-treport.md section 9
+  # (Pergunte filters as FWPreparedStatement parameters)
+  - name: perguntas-com-bind
+    type: regex
+    target: { source: file, path: ZFATR01.prw }
+    pattern: 'FWPreparedStatement|FWExecStatement'
+    flags: i
+  # skills/advpl-code-generation/patterns-treport.md sections 2-4, 7 and 9
+  - name: rubrica-treport
+    type: llm
+    focus: { source: file, path: ZFATR01.prw }
+    criteria: |
+      Fonte ADVPL de um relatório TReport de pedidos de venda por cliente.
+      PASS se TODOS os itens valem:
+      1. Cria o relatório com TReport():New passando o grupo de perguntas "ZFATR01", define
+         seção (TRSection) e as colunas pedidas (TRCell), e separa definição e impressão
+         (por exemplo, ReportDef e PrintReport).
+      2. Os valores das perguntas (MV_PAR01..MV_PAR04) chegam ao SQL só como parâmetros ligados
+         (? do FWPreparedStatement ou equivalente), nunca concatenados ao texto da consulta.
+      3. A consulta filtra filial (xFilial ou %xFilial%) e registros deletados (D_E_L_E_T_ ou
+         %notDel%).
+      FAIL se faltar qualquer item, ou se algum MV_PAR for concatenado no SQL.
