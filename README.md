@@ -59,7 +59,7 @@ Repositorio: [https://github.com/thalysjuvenal/advpl-specialist](https://github.
 - **Refatoracao** - Sugestoes de melhoria de estrutura com 6 padroes (RF-001 a RF-006)
 - **Documentacao automatica** - Cabecalho Protheus.doc, documentacao completa e documentacao de API
 - **Changelog** - Geracao de changelog a partir do git diff com classificacao de impacto
-- **Conversao automatica para CP1252** - Todo arquivo ADVPL/TLPP (`.prw`, `.tlpp`, `.prx`, `.ch`, `.prg`, `.apw`, `.aph`, `.tlh`) escrito ou editado pelo plugin e automaticamente convertido para Windows-1252 (CP1252), encoding esperado pelo TOTVS Protheus. Caracteres incompativeis (ex: emojis, kanji) geram um warning visivel e o arquivo permanece em UTF-8 — o plugin nunca bloqueia o fluxo. Requer `iconv` no PATH (presente nativamente em macOS, Linux, WSL e Git Bash).
+- **Conversao automatica para CP1252** - Todo arquivo ADVPL/TLPP (`.prw`, `.tlpp`, `.prx`, `.ch`, `.th`, `.prg`, `.apw`, `.aph`, `.tlh`) escrito ou editado pelo plugin e automaticamente convertido para Windows-1252 (CP1252), encoding esperado pelo TOTVS Protheus. Caracteres incompativeis (ex: emojis, kanji) geram um warning visivel e o arquivo permanece em UTF-8 — o plugin nunca bloqueia o fluxo. Requer `iconv` no PATH (presente nativamente em macOS, Linux, WSL e Git Bash).
 
 ### Para Consultores Funcionais
 
@@ -90,14 +90,14 @@ git clone https://github.com/thalysjuvenal/advpl-specialist.git
 claude --plugin-dir ./advpl-specialist
 ```
 
-O plugin detecta automaticamente projetos Protheus (`.prw`, `.tlpp`, `.prx`, `.ch`) ao iniciar uma sessao.
+O plugin detecta automaticamente projetos Protheus (`.prw`, `.tlpp`, `.prx`, `.th`, `.ch`) ao iniciar uma sessao.
 
 ### Recomendado: Playwright MCP
 
 O plugin utiliza o **Playwright MCP** como fallback quando o acesso direto a documentacao (WebSearch/WebFetch) falha. Com ele, o plugin abre a pagina em um navegador real para extrair o conteudo:
 
 ```bash
-claude mcp add playwright -- npx @anthropic-ai/mcp-playwright@latest
+claude mcp add playwright -- npx @playwright/mcp@latest
 ```
 
 ### Recomendado: Plugin superpowers
@@ -105,9 +105,13 @@ claude mcp add playwright -- npx @anthropic-ai/mcp-playwright@latest
 Para uma experiencia completa, recomendamos instalar o plugin oficial **superpowers** que adiciona skills de planejamento, brainstorming, debugging sistematico e code review:
 
 ```bash
-/plugin marketplace add anthropics/claude-code-plugins
-/plugin install superpowers@anthropics-claude-code-plugins
+/plugin marketplace add anthropics/claude-plugins-official
+/plugin install superpowers@claude-plugins-official
 ```
+
+### Windows
+
+Os hooks do plugin sao scripts bash e precisam do Git Bash no Windows (o Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e os hooks do plugin sao ignorados). O hook PreToolUse usa `onFailure: continue`, entao as edicoes nunca sao bloqueadas. Para uso manual sem bash, as skills trazem scripts PowerShell: `skills/advpl-code-review/scripts/advpl-lint.ps1` e `skills/advpl-code-generation/scripts/convert-encoding.ps1`.
 
 ## Uso com Copilot, Cursor, Gemini e outras IAs
 

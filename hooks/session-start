@@ -1,69 +1,42 @@
 #!/usr/bin/env bash
 
 # advpl-specialist SessionStart hook
-# Detects ADVPL/TLPP project files and activates plugin context
+# Detects ADVPL/TLPP project files and activates plugin context.
+# Sem efeitos colaterais: nao remove arquivos nem executa comandos externos.
 
-# --- Cache cleanup: remove old plugin versions ---
-CACHE_DIR="$HOME/.claude/plugins/cache/advpl-specialist-marketplace/advpl-specialist"
-MARKETPLACE_FILE="${CLAUDE_PLUGIN_ROOT}/.claude-plugin/marketplace.json"
-if [ -d "$CACHE_DIR" ] && [ -f "$MARKETPLACE_FILE" ]; then
-    CURRENT_VERSION=$(grep '"version"' "$MARKETPLACE_FILE" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
-    if [ -n "$CURRENT_VERSION" ]; then
-        for dir in "$CACHE_DIR"/*/; do
-            VERSION_DIR=$(basename "$dir")
-            if [ "$VERSION_DIR" != "$CURRENT_VERSION" ]; then
-                rm -rf "$dir"
-            fi
-        done
-    fi
-fi
-# --- End cache cleanup ---
-
+# Detecta arquivos ADVPL/TLPP (case-insensitive, profundidade 3, para no primeiro)
 FOUND=0
-COUNTS=""
-
-# Check for ADVPL/TLPP files in current directory (max depth 3 for performance)
-PRW_COUNT=$(find . -maxdepth 3 -name "*.prw" -type f 2>/dev/null | head -50 | wc -l | tr -d ' ')
-TLPP_COUNT=$(find . -maxdepth 3 -name "*.tlpp" -type f 2>/dev/null | head -50 | wc -l | tr -d ' ')
-PRX_COUNT=$(find . -maxdepth 3 -name "*.prx" -type f 2>/dev/null | head -50 | wc -l | tr -d ' ')
-CH_COUNT=$(find . -maxdepth 3 -name "*.ch" -type f 2>/dev/null | head -50 | wc -l | tr -d ' ')
-
-if [ "$PRW_COUNT" -gt 0 ] || [ "$TLPP_COUNT" -gt 0 ] || [ "$PRX_COUNT" -gt 0 ] || [ "$CH_COUNT" -gt 0 ]; then
+if [ -n "$(find . -maxdepth 3 -type f \( -iname '*.prw' -o -iname '*.prx' -o -iname '*.tlpp' -o -iname '*.th' -o -iname '*.ch' \) 2>/dev/null | head -n 1)" ]; then
     FOUND=1
-    [ "$PRW_COUNT" -gt 0 ] && COUNTS="$COUNTS $([ "$PRW_COUNT" -ge 50 ] && echo '50+' || echo "$PRW_COUNT") .prw"
-    [ "$TLPP_COUNT" -gt 0 ] && COUNTS="$COUNTS $([ "$TLPP_COUNT" -ge 50 ] && echo '50+' || echo "$TLPP_COUNT") .tlpp"
-    [ "$PRX_COUNT" -gt 0 ] && COUNTS="$COUNTS $([ "$PRX_COUNT" -ge 50 ] && echo '50+' || echo "$PRX_COUNT") .prx"
-    [ "$CH_COUNT" -gt 0 ] && COUNTS="$COUNTS $([ "$CH_COUNT" -ge 50 ] && echo '50+' || echo "$CH_COUNT") .ch"
 fi
 
 if [ "$FOUND" -eq 1 ]; then
-    echo "ADVPL/TLPP project detected (${COUNTS# }). advpl-specialist plugin is active."
+    echo "ADVPL/TLPP project detected. advpl-specialist plugin is active."
     echo ""
     echo "Available commands:"
-    echo "  /advpl-specialist:generate  - Generate ADVPL/TLPP code"
-    echo "  /advpl-specialist:migrate   - Migrate ADVPL to TLPP"
-    echo "  /advpl-specialist:diagnose  - Diagnose errors"
-    echo "  /advpl-specialist:docs      - Look up documentation"
+    echo "  /advpl-specialist:generate"
+    echo "  /advpl-specialist:migrate"
+    echo "  /advpl-specialist:diagnose"
+    echo "  /advpl-specialist:docs"
+    echo "  /advpl-specialist:review"
+    echo "  /advpl-specialist:refactor"
+    echo "  /advpl-specialist:explain"
+    echo "  /advpl-specialist:document"
+    echo "  /advpl-specialist:changelog"
+    echo "  /advpl-specialist:process"
+    echo "  /advpl-specialist:test"
+    echo "  /advpl-specialist:advpr"
+    echo "  /advpl-specialist:sxgen"
+    echo "  /advpl-specialist:smartx"
+    echo "  /advpl-specialist:smartview"
 
-    # Check if superpowers plugin is installed
-    SUPERPOWERS_DIR="$HOME/.claude/plugins/cache/claude-plugins-official/superpowers"
-    if [ ! -d "$SUPERPOWERS_DIR" ]; then
-        echo ""
-        echo "Recommended: Install the 'superpowers' plugin for better planning, debugging and code review:"
-        echo "  /plugin marketplace add anthropics/claude-plugins-official"
-        echo "  /plugin install superpowers@claude-plugins-official"
-    fi
-
-    # Check if Playwright MCP is available (used as fallback for web documentation access)
-    if ! claude mcp list 2>/dev/null | grep -q "playwright"; then
-        echo ""
-        echo "Recommended: Install the 'playwright' MCP server for reliable documentation access (fallback when WebFetch/WebSearch fail):"
-        echo "  claude mcp add playwright -- npx @anthropic-ai/mcp-playwright@latest"
-    fi
+    # Dica estatica (sem consultar o sistema)
+    echo ""
+    echo "Tip: install the 'superpowers' plugin for planning, debugging and review: /plugin install superpowers@claude-plugins-official"
 
     # --- Protheus release detection ---
     if [ -f "${CLAUDE_PLUGIN_ROOT}/hooks/lib/detect-protheus-version.sh" ]; then
-        # shellcheck source=./lib/detect-protheus-version.sh
+        # shellcheck source=./lib/detect-protheus-version.sh disable=SC1091
         . "${CLAUDE_PLUGIN_ROOT}/hooks/lib/detect-protheus-version.sh"
         DETECTED_VERSION=$(detect_protheus_version)
         MIN_TLPP_MVC="12.1.2410"

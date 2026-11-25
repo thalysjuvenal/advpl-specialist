@@ -427,8 +427,35 @@ check_hooks_json() {
   fi
 }
 
+check_session_start() {
+  local d="$TMP_DIR/ss" fake="$TMP_DIR/ss-bin" home="$TMP_DIR/ss-home" out n
+  echo "[session-start]"
+  rm -rf "$d" "$fake" "$home"
+  mkdir -p "$d" "$fake" "$home/.claude/plugins/cache/advpl-specialist-marketplace/advpl-specialist/0.0.1"
+  printf '#!/bin/sh\necho called > "%s/claude-called"\n' "$TMP_DIR" > "$fake/claude"
+  chmod +x "$fake/claude"
+  rm -f "$TMP_DIR/claude-called"
+
+  out="$(cd "$d" && HOME="$home" PATH="$fake:$PATH" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  check "session-start: sem arquivos ADVPL nao imprime nada" [ -z "$out" ]
+
+  touch "$d/FOO.PRW"
+  out="$(cd "$d" && HOME="$home" PATH="$fake:$PATH" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  check "session-start: FOO.PRW detectado" grep -q "ADVPL/TLPP project detected" <<<"$out"
+  n="$(grep -c '/advpl-specialist:' <<<"$out")"
+  check "session-start: lista 15 comandos (achou $n)" [ "$n" = 15 ]
+  check "session-start: nunca chama claude" [ ! -e "$TMP_DIR/claude-called" ]
+  check "session-start: nao apaga cache de plugins" \
+    [ -d "$home/.claude/plugins/cache/advpl-specialist-marketplace/advpl-specialist/0.0.1" ]
+
+  rm -f "$d/FOO.PRW"; touch "$d/x.TH"
+  out="$(cd "$d" && HOME="$home" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  check "session-start: .TH detectado" grep -q "ADVPL/TLPP project detected" <<<"$out"
+}
+
 echo "hook bash: $HOOK_BASH ($("$HOOK_BASH" --version | head -n 1))"
 check_hooks_json
+check_session_start
 if command -v jq >/dev/null 2>&1; then
   MODE=jq NO_JQ=0 run_cases
 fi

@@ -60,7 +60,11 @@ Se o plugin responder com a documentacao da funcao `FWExecView`, a instalacao fo
 
 ## Deteccao automatica de projetos
 
-O plugin detecta automaticamente projetos Protheus ao iniciar uma sessao. Ele procura por arquivos com as extensoes `.prw`, `.tlpp`, `.prx` e `.ch` no diretorio atual. Quando encontra, ativa todo o contexto especializado.
+O plugin detecta automaticamente projetos Protheus ao iniciar uma sessao. Ele procura por arquivos com as extensoes `.prw`, `.tlpp`, `.prx`, `.th` e `.ch` no diretorio atual. Quando encontra, ativa todo o contexto especializado.
+
+## Windows
+
+Os hooks do plugin sao scripts bash e precisam do Git Bash no Windows (o Claude Code executa os hooks pelo Git Bash quando ele esta instalado; sem ele, os hooks rodam no PowerShell e os hooks do plugin sao ignorados). O hook PreToolUse usa `onFailure: continue`, entao as edicoes nunca sao bloqueadas. Para uso manual sem bash, as skills trazem scripts PowerShell: `skills/advpl-code-review/scripts/advpl-lint.ps1` e `skills/advpl-code-generation/scripts/convert-encoding.ps1`.
 
 ## Plugins e MCPs recomendados
 
@@ -68,7 +72,7 @@ Para uma experiencia completa, recomendamos instalar o **Playwright MCP** (usado
 
 ```bash
 # Playwright MCP — fallback para documentacao do TDN
-claude mcp add playwright -- npx @anthropic-ai/mcp-playwright@latest
+claude mcp add playwright -- npx @playwright/mcp@latest
 
 # Plugin superpowers — planejamento, brainstorming, debugging
 /plugin marketplace add anthropics/claude-plugins-official
