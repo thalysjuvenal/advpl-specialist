@@ -55,10 +55,21 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 11. **Exit plan mode** - Use `ExitPlanMode` after approval
 
 ### Implementation Phase (only after approval)
-12. **Execute migration** - Generate .tlpp file(s) following the approved plan and `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/reference.md`
-13. **Generate wrapper** - Create backward compatibility .prw wrapper if --wrapper
-14. **Run checklist** - Validate against `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/migration-checklist.md`
-15. **Report** - Show summary of changes, followed by the final gap report (mandatory): the `Item | Status | Reason | Action` table of `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md`, filled after running its checklist on the source
+12. **Prepare Windows-1252 sources** - Claude Code's Edit and Write refuse a file that is not valid UTF-8, and the migrator agent has no Bash to convert it. New `.tlpp` files need nothing: they are written in UTF-8 and the plugin converts them to Windows-1252 at the end of the turn. For each existing file with extension `.prw`, `.prx`, `.tlpp` or `.th` that will be edited or overwritten (usually the source `.prw`, when it becomes the wrapper), in the same turn as the edits:
+    1. Read the file before converting it, even if its content is already known: the plugin's hook then puts it on the list converted back at the end of the turn, edited or not, and shows the conversion hint.
+    2. Convert it to UTF-8:
+
+       ```bash
+       bash "${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/scripts/convert-encoding.sh" --to-utf8 "<file>"
+       ```
+
+    3. On `converted:` or `already-utf8:`, go on. On `failed: <file> (undefined byte)`, tell the user and do not delegate the editing of that file.
+
+    The plugin lints each edit and converts the file back to Windows-1252 at the end of the turn, so an edit left for a later turn needs this step again. If the user cancels before any edit, run the same script without `--to-utf8` on those files to return them to Windows-1252.
+13. **Execute migration** - Generate .tlpp file(s) following the approved plan and `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/reference.md`
+14. **Generate wrapper** - Create backward compatibility .prw wrapper if --wrapper
+15. **Run checklist** - Validate against `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/migration-checklist.md`
+16. **Report** - Show summary of changes, followed by the final gap report (mandatory): the `Item | Status | Reason | Action` table of `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md`, filled after running its checklist on the source
 
 ## Examples
 

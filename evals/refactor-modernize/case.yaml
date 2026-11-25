@@ -50,7 +50,7 @@ graders:
     target: { source: file, path: ZFATR05.prw }
     pattern: 'FWPreparedStatement|FWExecStatement'
     flags: i
-  # commands/refactor.md "With --focus modernize" steps 2-7
+  # commands/refactor.md "With --focus modernize" steps 2-8
   - name: rubrica-modernize
     type: llm
     criteria: |

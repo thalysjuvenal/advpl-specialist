@@ -47,7 +47,7 @@ graders:
     type: regex
     pattern: '\|\s*Item\s*\|\s*(Status|Situa)'
   # skills/advpl-to-tlpp-migration/gap-report.md (checklist items 2, 5 and 6, rules for filling it in);
-  # commands/migrate.md step 15
+  # commands/migrate.md step 16
   - name: rubrica-relatorio-de-lacunas
     type: llm
     criteria: |

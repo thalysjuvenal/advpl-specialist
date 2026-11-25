@@ -51,8 +51,19 @@ RF-007 to RF-012 run only with `--focus modernize`.
 3. **Delegate to refactorer agent** — Pass target and options to the refactorer agent
 4. **Present plan** — Structured list of refactorings with before/after for each
 5. **Wait for approval** — User must approve before changes are applied
-6. **Apply changes** — One refactoring at a time (unless --dry-run)
-7. **Report** — Summary of changes applied
+6. **Prepare Windows-1252 sources** — Unless `--dry-run`. Claude Code's Edit refuses a file that is not valid UTF-8, and the refactorer agent has no Bash to convert it. After approval, for each existing target with extension `.prw`, `.prx`, `.tlpp` or `.th` that the agent will edit, in the same turn as the edits:
+   1. Read the file before converting it, even if its content is already known: the plugin's hook then puts it on the list converted back at the end of the turn, edited or not, and shows the conversion hint.
+   2. Convert it to UTF-8:
+
+      ```bash
+      bash "${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/scripts/convert-encoding.sh" --to-utf8 "<file>"
+      ```
+
+   3. On `converted:` or `already-utf8:`, go on. On `failed: <file> (undefined byte)`, tell the user and do not delegate the editing of that file.
+
+   The plugin lints each edit the agent makes and converts the file back to Windows-1252 at the end of the turn, so an edit left for a later turn needs this step again. If the user cancels before any edit, run the same script without `--to-utf8` on those targets to return them to Windows-1252.
+7. **Apply changes** — One refactoring at a time (unless --dry-run)
+8. **Report** — Summary of changes applied
 
 ### With `--focus modernize`
 
@@ -69,8 +80,9 @@ Only RF-007 to RF-012. The lint engine finds the candidates; the approval, one-c
 3. **Map findings to patterns** — Use the table in "Finding candidates" of `${CLAUDE_PLUGIN_ROOT}/skills/advpl-refactoring/patterns-modernization.md`: ADV015 → RF-007, ADV003 → RF-009, ADV010/ADV011 → RF-010, ADV009 → RF-011, ADV008 → RF-012. RF-008 has no lint rule: in `.tlpp` targets, search `ErrorBlock(` with Grep; never propose RF-008 for `.prw`. Findings with other IDs are fixes, not refactorings: list them apart as outside this focus.
 4. **Filter** — Check each candidate against the pattern's "Do not apply when" list (for example `IIf` inside a code block or dictionary expression, static SQL with internal values only, `CriaTrab(NIL, .F.)` used only for a file name). Report excluded candidates with the reason; do not change them.
 5. **Plan** — Delegate to the refactorer agent, passing the target, `--focus modernize` and the engine's finding lines verbatim. The agent has no Bash: this command runs the lint engine, and the agent classifies and filters the findings (steps 3 and 4) with the patterns file. For each candidate the plan shows `FILE:LINE`, the engine line verbatim, the RF ID, before/after, the risk, and the "Same behavior" checks of the pattern. Wait for approval.
-6. **Apply** — One pattern in one function at a time (unless `--dry-run`). After each change, this command re-runs the lint engine on the changed file: the finding must be gone and no new error may appear; otherwise the change goes back to the plan.
-7. **Report** — The engine summary line before and after, the warnings kept and why, the "Same behavior" tests the user must run, and that compilation and validation in TDS / the VS Code TOTVS extension are still pending. Never claim the code compiles.
+6. **Prepare Windows-1252 sources** — Unless `--dry-run`: after approval, convert the targets the agent will edit as in step 6 "Prepare Windows-1252 sources" above. The lint engine already ran in step 2, on the original bytes; its re-runs in step 7 read the converted file, with the same line numbers.
+7. **Apply** — One pattern in one function at a time (unless `--dry-run`). After each change, this command re-runs the lint engine on the changed file: the finding must be gone and no new error may appear; otherwise the change goes back to the plan.
+8. **Report** — The engine summary line before and after, the warnings kept and why, the "Same behavior" tests the user must run, and that compilation and validation in TDS / the VS Code TOTVS extension are still pending. Never claim the code compiles.
 
 ## Examples
 
