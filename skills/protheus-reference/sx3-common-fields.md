@@ -33,6 +33,7 @@ usando WebFetch.
 | A1_CONTA | C | 20 | Conta Contabil do cliente |
 | A1_EMAIL | C | 30 | E-Mail |
 | A1_LC | N | 14 | Limite de Cred.do cliente |
+| A1_SALDUP | N | 16 | Saldo Duplic. do cliente |
 | A1_ULTCOM | D | 8 | Data da ultima Compra |
 | A1_MSBLQL | C | 1 | Status do Registro |
 

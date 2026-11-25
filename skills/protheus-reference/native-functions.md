@@ -3101,12 +3101,12 @@ Sets the return field for a query opened with TCGenQry or embedded SQL.
 
 **Example:**
 ```advpl
-Local cQuery := "SELECT A1_COD, A1_NOME, A1_SALDO FROM " + RetSqlName("SA1")
+Local cQuery := "SELECT A1_COD, A1_NOME, A1_SALDUP FROM " + RetSqlName("SA1")
 Local cAlias := GetNextAlias()
 
 cQuery += " WHERE D_E_L_E_T_ = ' '"
 DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
-TCSetField(cAlias, "A1_SALDO", "N", 14, 2)
+TCSetField(cAlias, "A1_SALDUP", "N", 14, 2)
 ```
 
 ---
@@ -4010,7 +4010,7 @@ Creates a totalizer/aggregation function attached to a TRCell. Inherits from TRC
 
 **Example:**
 ```advpl
-// Sum the A1_SALDO field at the end of the report
+// Sum the A1_SALDUP field at the end of the report
 TRFunction():New(oCell, NIL, "SUM",, , "@E 999,999,999.99")
 
 // Count records with a break

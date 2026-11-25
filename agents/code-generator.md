@@ -674,6 +674,7 @@ If Layers 1 and 2 did not confirm the field, ask the user:
 
 ### Forbidden patterns
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // WRONG — field not confirmed by any layer:
 SE2->E2_CCONTAB := cContab
@@ -691,8 +692,12 @@ SE2->E2_VALOR := nValor
 // CORRECT — field confirmed via SempreJu WebFetch (Layer 2):
 // Agent fetched tabela_se2.html, found E2_PORTADO (C, 3, "Código do Portador")
 SE2->E2_PORTADO := cPortador
+```
 
-// CORRECT — field confirmed by user (Layer 3):
+<!-- advpl-lint: anti-exemplo -->
+```advpl
+// CORRECT flow, but E2_CCONTAB is a fictitious name used only to illustrate Layer 3 (not in the reference):
+// field confirmed by user (Layer 3):
 // Agent: "O campo E2_CCONTAB não foi encontrado. Confirma o nome?"
 // User: "Sim, E2_CCONTAB existe na minha base."
 SE2->E2_CCONTAB := cContab

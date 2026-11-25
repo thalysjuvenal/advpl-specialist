@@ -73,7 +73,7 @@ User Function ProcessData()
 
     If DbSeek(xFilial("SA1") + "000001")
         Local cNome := AllTrim(SA1->A1_NOME)  // WRONG: Local inside If block
-        Local nSaldo := SA1->A1_SALDO         // WRONG: Local after executable code
+        Local nSaldo := SA1->A1_SALDUP         // WRONG: Local after executable code
     EndIf
 
     RestArea(aArea)
@@ -94,7 +94,7 @@ User Function ProcessData()
 
     If DbSeek(xFilial("SA1") + "000001")
         cNome  := AllTrim(SA1->A1_NOME)
-        nSaldo := SA1->A1_SALDO
+        nSaldo := SA1->A1_SALDUP
     EndIf
 
     RestArea(aArea)
