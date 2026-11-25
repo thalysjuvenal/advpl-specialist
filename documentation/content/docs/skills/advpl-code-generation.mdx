@@ -62,8 +62,8 @@ Padroes e templates para gerar codigo ADVPL e TLPP limpo e padronizado para TOTV
 Toda User Function DEVE seguir este padrao:
 
 ```c
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 /*/{Protheus.doc} FATA001
 Descricao breve da funcao
@@ -77,11 +77,11 @@ Descricao breve da funcao
     u_FATA001("001")
 /*/
 User Function FATA001(cParam1)
-    Local lRet := .T.
-    Local cAlias := "SA1"
-
-    // Salva area de trabalho
-    Local aArea := GetArea()
+    Local lRet      := .T.
+    Local cAlias    := "SA1"
+    Local aArea     := GetArea() // Salva area de trabalho
+    Local oError
+    Local bOldError := ErrorBlock({|e| Break(e)})
 
     Begin Sequence
 
@@ -98,10 +98,11 @@ User Function FATA001(cParam1)
 
     Recover Using oError
         lRet := .F.
-        Conout("Erro em FATA001: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "FATA001", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro em FATA001: " + oError:Description)
     End Sequence
 
-    // Restaura area
+    // Restaura o tratamento de erro e a area
+    ErrorBlock(bOldError)
     RestArea(aArea)
 
 Return lRet
@@ -122,21 +123,22 @@ Return lRet
 
 ```c
 Local oError
-Local bErrorOld := ErrorBlock({|e| oError := e, Break(e)})
+Local bOldError := ErrorBlock({|e| oError := e, Break(e)})
 
 Begin Sequence
 
     // Codigo que pode falhar
 
 Recover Using oError
-    Conout("Erro: " + oError:Description)
-    Conout("Linha: " + cValToChar(oError:GenCode))
-    // Tratar erro ou re-raise
+    FWLogMsg("ERROR", /*cTransactionId*/, "MinhaRotina", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Erro: " + oError:Description)
+    // Tratar o erro (retorno .F., DisarmTransaction(), etc.)
 
 End Sequence
 
-ErrorBlock(bErrorOld)
+ErrorBlock(bOldError)
 ```
+
+Em `.tlpp` o equivalente e `Try` / `Catch oError` / `EndTry`. Logging sempre com `FWLogMsg()`, nunca `Conout()`.
 
 ## Referencia Rapida - Tipos de Codigo
 
@@ -151,6 +153,14 @@ ErrorBlock(bErrorOld)
 | Ponto de Entrada MVC | .prw ou .tlpp | patterns-pontos-entrada-mvc.md |
 | Web Service SOAP | .prw | patterns-soap.md |
 | Relatorio PDF (por coordenadas) | .prw | patterns-fwmsprinter.md |
+
+## Regras Criticas do Gerador
+
+As regras CRITICAS abaixo (palavra-chave `User Function` vs `Function`, `namespace` TLPP, limites de tamanho de identificador, metodos validos de `JsonObject`/`TWsdlManager`/`FWFormView` e validacao de nomes de campo `ALIAS_CAMPO`) vivem em `skills/advpl-code-generation/critical-rules.md`. O agente `code-generator` as carrega na Fase 2 e qualquer outra IA que so le as skills deve le-las antes de planejar ou gerar codigo.
+
+### Release do Protheus (`.protheus-version`)
+
+Se existir um arquivo `.protheus-version` na raiz do projeto (uma unica string de release, por exemplo `12.1.2310`), o `/generate` o respeita: consulta a release minima do recurso pedido em `skills/protheus-reference/releases.md` (por exemplo, TLPP com `namespace` e TLPP com MVC exigem `12.1.2410`) e avisa antes de gerar se a release declarada for menor. Se o conteudo nao for `12.1.N` com N numerico, o arquivo e ignorado e o usuario e avisado; se o arquivo nao existir, a geracao segue normalmente com uma linha sugerindo criar o `.protheus-version`.
 
 ## Regras de Palavra-chave de Funcao (CRITICO)
 
@@ -250,20 +260,34 @@ ADVPL herda um **limite de 10 caracteres** em identificadores (funcoes, metodos,
 | Usar Private em vez de Local | Sempre declarar como Local, passar via parametros |
 | Declarar Local dentro de If/While/For | TODAS as declaracoes Local devem estar no topo da funcao, antes de qualquer codigo executavel |
 | Nao salvar/restaurar area (GetArea/RestArea) | Sempre envolver operacoes de DB com save/restore de area |
-| Sem tratamento de erros | Sempre usar Begin Sequence / Recover / End Sequence |
+| Sem tratamento de erros | `.prw`: `ErrorBlock` + `Begin Sequence` / `Recover Using oError` / `End Sequence` + restaurar o `ErrorBlock`; `.tlpp`: `Try` / `Catch oError` / `EndTry` |
+| Logar com `ConOut()` | Usar `FWLogMsg()` |
+| Automatizar rotina com `FWMVCRotAuto` | Restrita ao uso interno da TOTVS desde 2019 -- usar `MsExecAuto` conforme o exemplo documentado da rotina; em MVC, a API do modelo (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`) conforme os exemplos documentados (veja `patterns-workflow.md`) |
 | Nao fechar RecLock | Sempre usar MsUnlock() apos RecLock() |
 | Filial (branch) hardcoded | Usar xFilial(cAlias) para compatibilidade multi-filial |
-| Include TOTVS.CH faltando | Sempre incluir no minimo: #Include "TOTVS.CH" |
+| Include `totvs.ch` faltando | `.prw`: sempre `#include "totvs.ch"` (minusculo; `protheus.ch` e obsoleto); `.tlpp` que usa o framework: `#include "tlpp-core.th"` + `#include "totvs.ch"` |
 | Nao validar parametros da funcao | Verificar ValType() e valores vazios no inicio da funcao |
 | Usar metodos inexistentes de JsonObject | Somente usar metodos documentados: New, FromJSON, toJSON, GetNames, HasProperty, etc. |
 | Usar GetSoapFault() em TWsdlManager | NAO existe — usar propriedades cFaultCode, cFaultString |
 | Usar EnableTitleGroup em FWFormView | NAO existe — usar EnableTitleView |
 | **Inventar nome de campo `ALIAS_CAMPO` nao confirmado no SX3** | **Perguntar ao usuario o nome exato ou usar variavel local `cx*` com `// TODO: confirmar campo no SX3`** |
 
+## Depois de Gravar o Fonte
+
+IAs sem hooks (Copilot, Cursor, Gemini CLI e outras) devem verificar o arquivo elas mesmas, nesta ordem, antes de entregar:
+
+1. Converter para Windows-1252 com `scripts/convert-encoding.sh <arquivo>` desta skill (modo estrito). Em `failed: ... (incompatible char)`, remova ou troque o caractere, ou rode de novo com `--translit` e informe ao usuario quais caracteres viraram `?`.
+2. Rodar o lint no arquivo inteiro com `scripts/advpl-lint.sh --scope all <arquivo>` da skill `advpl-code-review`. Saida 1 significa erros: corrija e rode de novo ate zerar. Avalie os avisos e mencione os que mantiver.
+3. No Windows sem bash, usar os equivalentes `.ps1` com `pwsh -File` ou `powershell -File`.
+4. No Claude Code, os hooks do plugin fazem isso automaticamente a cada gravacao (lint nas linhas introduzidas e conversao de encoding sem `iconv`); use `/advpl-specialist:validate` para lintar arquivos inteiros sob demanda.
+5. Nunca diga que o codigo compilou: a compilacao e a validacao no TDS / extensao TOTVS do VS Code continuam pendentes.
+
 ## Arquivos de Suporte
 
 Esta referencia inclui os seguintes arquivos de suporte com templates e padroes detalhados:
 
+- **critical-rules.md** - Regras criticas do gerador (leitura obrigatoria antes de gerar codigo)
+- **reference.md** - Visao geral, nomenclatura, estrutura obrigatoria da User Function, escopo de variaveis, tratamento de erros e erros comuns
 - **catalogo-top-50-pes.md** - Catalogo dos top 50 pontos de entrada por modulo (cobertura inicial: 20 PEs em COM, FAT, EST e FIN) com nome, rotina chamadora, momento, PARAMIXB, retorno esperado e link TDN. Usado como **Tier 1 (cache local)** pela skill `tdn-lookup` antes de qualquer busca online
 - **patterns-fwformbrowse.md** - Padroes para telas FWFormBrowse/FWExecView
 - **patterns-fwmsprinter.md** - Padroes para relatorios PDF por coordenadas com FWMSPrinter (TFont, TBrush, SayAlign, FillRect, layout em pixels)

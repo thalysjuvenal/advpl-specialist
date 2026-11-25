@@ -35,7 +35,7 @@ Todo `RecLock` deve ser pareado com `MsUnlock` em **todo** caminho de codigo, in
 ### Padrao 1 — Atualizacao de Registro Unico com Recovery
 
 ```c
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function FlagCust(cCustCode, cLoja, cFlag)
     Local lOk      := .F.
@@ -58,7 +58,7 @@ User Function FlagCust(cCustCode, cLoja, cFlag)
         SA1->A1_XFLAG := cFlag
         lOk := .T.
     RECOVER USING oError
-        ConOut("[FlagCust] Error: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "FLAGCUST", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Error: " + oError:Description, /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
     END SEQUENCE
 
     // Unlock executado em AMBOS os caminhos (sucesso e erro)
@@ -76,7 +76,7 @@ O flag `lLocked` rastreia se `RecLock` teve sucesso — `MsUnlock` so e chamado 
 ### Padrao 2 — Transacao Multi-Registro
 
 ```c
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function ApproveOrder(cOrderNum)
     Local lOk        := .F.
@@ -105,11 +105,15 @@ User Function ApproveOrder(cOrderNum)
 
         lOk := .T.
     RECOVER USING oError
-        ConOut("[ApproveOrder] Error: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "APPROVEORDER", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Error: " + oError:Description, /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
     END SEQUENCE
 
-    If lLockedSC5 ; SC5->(MsUnlock()) ; EndIf
-    If lLockedSE1 ; SE1->(MsUnlock()) ; EndIf
+    If lLockedSC5
+        SC5->(MsUnlock())
+    EndIf
+    If lLockedSE1
+        SE1->(MsUnlock())
+    EndIf
 
     If lOk
         EndTran()
@@ -124,7 +128,7 @@ A **ordem de lock** deve ser consistente em todo o projeto (ex: alfabetica por a
 ### Padrao 3 — Batch com SoftLock (Nao Bloqueante)
 
 ```c
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function BatchProcess()
     Local nProcessed := 0
@@ -188,7 +192,7 @@ Nao ajuste `MV_TIMEOUT` para mascarar leaks — corrija o leak.
 ```c
 User Function DiagLocks()
     MemoWrite("\\dba_locks.txt", TopMemoStatus())
-    ConOut("[DiagLocks] Snapshot do DBAccess gravado")
+    FWLogMsg("INFO", /*cTransactionId*/, "LOCKDIAG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "[DiagLocks] Snapshot do DBAccess gravado", /*nMensure*/, /*nElapseTime*/, /*aMessage*/)
 Return Nil
 ```
 
@@ -225,7 +229,7 @@ Se voce identificou a rotina mas nao a linha, adicione logs temporarios antes e 
 | Misturar `RecLock` e `TCSqlExec` na mesma tabela | Deadlock | Escolha um modelo por fluxo |
 | `RecLock` dentro de expressao SX7 | Deadlock cascateante | Mantenha triggers somente leitura |
 | `MsUnlockAll()` dentro de transacao | Quebra atomicidade do `BeginTran` | Use `MsUnlock()` direcionado por alias |
-| Query de leitura sem `%nolock%` (MSSQL) | Leitura bloqueia em escritor | Adicione `WITH (%nolock%)` |
+| Leitura bloqueada por escritor longo (MSSQL) | Leitura espera o escritor | Encurte a transacao do escritor; nao fixe hints de lock especificos de banco (`WITH(NOLOCK)`): nao sao portaveis e o `%nolock%` nao esta documentado no TDN (a confirmar no TDS) |
 | `BeginTran` sem `EndTran` / `DisarmTransaction` em todos os caminhos | Transacao aberta — impacto em todo o DB | Envolva com recovery |
 
 ## Arquivos de Suporte

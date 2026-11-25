@@ -20,7 +20,7 @@ Metodologia sistematica para diagnosticar e resolver erros em ADVPL/TLPP no TOTV
 
 1. **Erro reportado** - Coletar a mensagem de erro, stack trace e passos de reproducao
 2. **Compilacao?** - Se sim, consultar `common-errors.md` para correcao imediata
-3. **Adicionar logging** - Inserir Conout/FWLogMsg em pontos estrategicos ao redor da falha
+3. **Adicionar logging** - Inserir `FWLogMsg` em pontos estrategicos ao redor da falha
 4. **Reproduzir** - Recriar o erro em um ambiente controlado
 5. **Analisar stack** - Ler o stack trace completo, identificar a linha e funcao que falhou
 6. **Identificar causa raiz** - Determinar por que o erro ocorre (dados, logica, ambiente)
@@ -31,7 +31,7 @@ Metodologia sistematica para diagnosticar e resolver erros em ADVPL/TLPP no TOTV
 | Sintoma | Causa Provavel | Primeira Verificacao |
 |---------|----------------|----------------------|
 | Variable does not exist | Local nao declarada ou typo no nome | Verificar se declaracao corresponde ao uso (case-sensitive) |
-| Array access out of bounds | Indice excede `Len(aArray)` ou indice `<= 0` | Adicionar `Conout(Len(aArray))` antes da linha de acesso |
+| Array access out of bounds | Indice excede `Len(aArray)` ou indice `<= 0` | Registrar `Len(aArray)` com `FWLogMsg` antes da linha de acesso |
 | Type mismatch on operation | Operando em NIL ou tipo errado | Verificar `ValType()` de ambos operandos antes da linha |
 | File not found / Include error | Arquivo .ch faltando ou RPO errado | Verificar caminhos de `#Include` e compilacao do RPO |
 | Lock timeout (RecLock) | Registro bloqueado por outro usuario/thread | Verificar `RecLock(cAlias, .F.)` com timeout, usar monitor de lock SM0/SMA |
@@ -40,10 +40,11 @@ Metodologia sistematica para diagnosticar e resolver erros em ADVPL/TLPP no TOTV
 
 ## Ferramentas de Logging
 
-### Conout (Console Output)
+### Conout (Console Output) - legado, evitar
 
-Logging simples de console. Saida aparece no console do AppServer Protheus.
+`Conout` e a saida de console legada (aparece no console do AppServer). Codigo novo deve usar `FWLogMsg` (proxima secao); o bloco abaixo apenas ilustra o que procurar ao ler fontes antigos.
 
+{/* advpl-lint: anti-exemplo */}
 ```c
 // Inspecao basica de variaveis
 Conout(">>> [FATA001] cCodCli: " + cValToChar(cCodCli))
@@ -66,16 +67,18 @@ Conout(">>> Leaving FATA001 at " + Time())
 
 Logging estruturado com niveis de severidade. Logs sao armazenados no sistema de log do Protheus e podem ser consultados.
 
+Assinatura (TDN): `FWLogMsg(cSeverity, [cTransactionId], cGroup, [cCategory], [cStep], [cMsgId], [cMessage], [nMensure], [nElapseTime], [aMessage])`. Apenas `cSeverity` e `cGroup` sao obrigatorios.
+
 ```c
-// Niveis de severidade: "INFO", "WARNING", "ERROR"
-FWLogMsg("INFO", , "FATA001", "MyModule", "", 01, ;
+// Niveis de severidade: "INFO", "WARN", "ERROR", "FATAL", "DEBUG"
+FWLogMsg("INFO", /*cTransactionId*/, "FATA001", "MyModule", /*cStep*/, /*cMsgId*/, ;
     "Processing started for client: " + cCodCli)
 
-FWLogMsg("ERROR", , "FATA001", "MyModule", "", 02, ;
+FWLogMsg("ERROR", /*cTransactionId*/, "FATA001", "MyModule", /*cStep*/, /*cMsgId*/, ;
     "Failed to lock record SA1. Alias: " + cAlias + ;
     " RecNo: " + cValToChar(RecNo()))
 
-FWLogMsg("WARNING", , "FATA001", "MyModule", "", 03, ;
+FWLogMsg("WARN", /*cTransactionId*/, "FATA001", "MyModule", /*cStep*/, /*cMsgId*/, ;
     "Slow query detected. Elapsed: " + cValToChar(nElapsed) + "s")
 ```
 
@@ -96,15 +99,15 @@ Begin Sequence
     cNome := SA1->A1_NOME
 
 Recover Using oError
-    Conout("=== ERROR CAPTURED ===")
-    Conout("Description: " + oError:Description)
-    Conout("GenCode:     " + cValToChar(oError:GenCode))
-    Conout("SubCode:     " + cValToChar(oError:SubCode))
-    Conout("OsCode:      " + cValToChar(oError:OsCode))
-    Conout("FileName:    " + cValToChar(oError:FileName))
-    Conout("Operation:   " + oError:Operation)
-    Conout("Args:        " + cValToChar(oError:Args))
-    Conout("======================")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "=== ERROR CAPTURED ===")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Description: " + oError:Description)
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "GenCode:     " + cValToChar(oError:GenCode))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "SubCode:     " + cValToChar(oError:SubCode))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "OsCode:      " + cValToChar(oError:OsCode))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "FileName:    " + cValToChar(oError:FileName))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Operation:   " + oError:Operation)
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Args:        " + cValToChar(oError:Args))
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "======================")
 
 End Sequence
 
@@ -126,10 +129,10 @@ If DbSeek(xFilial("SD1") + cDoc + cSerie)
     If RecLock("SD1", .F.)
         SD1->D1_TOTAL := nNewTotal
         MsUnlock()
-        Conout(">>> Record updated successfully")
+        FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Record updated successfully")
     Else
-        Conout(">>> ERROR: Could not lock SD1 RecNo " + cValToChar(RecNo()))
-        Conout(">>> Another user/thread may be editing this record")
+        FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Could not lock SD1 RecNo " + cValToChar(RecNo()))
+        FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Another user/thread may be editing this record")
     EndIf
 EndIf
 ```
@@ -191,9 +194,9 @@ aSize(aResult, nIdx) // remover slots nao usados
 
 | Erro | Por que e Errado | Abordagem Melhor |
 |------|-----------------|------------------|
-| Deixar Conout em producao | Inunda console, impacta performance | Usar FWLogMsg com severidade, remover Conouts de debug antes do deploy |
+| Deixar `Conout` de debug em producao | Inunda console, impacta performance | Usar `FWLogMsg` com severidade e remover os `Conout` antes do deploy |
 | Nao salvar ErrorBlock | Sobrescreve handler global de erros | Sempre salvar com `bOld := ErrorBlock(...)` e restaurar depois |
-| Usar MsgAlert para debug | Bloqueia execucao, nao visivel no server | Usar Conout ou FWLogMsg para debug nao-interativo |
+| Usar MsgAlert para debug | Bloqueia execucao, nao visivel no server | Usar `FWLogMsg` para debug nao-interativo |
 | Ignorar retorno do RecLock | Escreve em registro desbloqueado - corrupcao de dados | Sempre verificar `If RecLock(cAlias, .F.)` |
 | Nao verificar ValType antes de operacoes | Perde valores NIL que causam erros de runtime | Adicionar verificacoes `ValType(xVar) == "C"` antes de operacoes de string |
 | Debugar em ambiente de producao | Risco de corrupcao de dados ou downtime | Reproduzir em ambiente de desenvolvimento/QA primeiro |

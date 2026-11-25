@@ -12,7 +12,7 @@ Abordagem sistematica para converter codigo ADVPL procedural legado para TLPP mo
 - Converter funcoes ADVPL procedurais para classes TLPP
 - Refatorar User Functions em classes de servico orientadas a objeto
 - Substituir escopo de variaveis Private/Public por propriedades de classe
-- Modernizar multiplas diretivas `#Include` para includes TLPP `.th` (`tlpp-core.th`, `tlpp-rest.th`, etc.) e adicionar declaracoes de `namespace` apropriadas
+- Modernizar multiplas diretivas `#include` para includes TLPP `.th` (`tlpp-core.th`, `tlpp-rest.th`, etc.), mantendo o `totvs.ch` onde o framework e usado, e adicionar declaracoes de `namespace` apropriadas
 - Migrar Static Functions para metodos privados de classe
 - Encapsular chamadas de funcoes legadas para compatibilidade retroativa durante migracao gradual
 - Qualquer conversao de arquivo `.prw` para `.tlpp`
@@ -25,13 +25,16 @@ Abordagem sistematica para converter codigo ADVPL procedural legado para TLPP mo
 4. **Usuario aprova** o design de classe proposto antes da geracao de codigo
 5. **Gerar** o arquivo `.tlpp` com namespace adequado, definicao de classe e implementacoes de metodos
 6. **Executar checklist** do `migration-checklist.md` para verificar completude
-7. **Validar** que o codigo compila e todos os chamadores existentes ainda funcionam
+7. **Entregar o relatorio de lacunas** (obrigatorio): tabela `Item | Situacao | Motivo | Acao` do `gap-report.md` com o que nao migrou (`migrado`, `nao migravel` ou `mantido no legado`), em versao preliminar ja no plano (inclusive com `--dry-run`) e final na entrega
+8. **Validar** no TDS / extensao TOTVS do VS Code que o codigo compila e todos os chamadores existentes ainda funcionam (nao ha compilador na CLI; a validacao fica pendente ate esse passo)
+
+Se existir um arquivo `.protheus-version` na raiz do projeto, o `/migrate` o respeita: compara a release declarada com o minimo exigido pelos recursos TLPP de destino (por exemplo, `namespace` e TLPP com MVC exigem `12.1.2410`, conforme `skills/protheus-reference/releases.md`) e avisa antes de prosseguir se a release for menor.
 
 ## Regras de Conversao Principais
 
 | Construto ADVPL | Equivalente TLPP | Notas |
 |-----------------|------------------|-------|
-| `#Include "TOTVS.CH"` | `#Include "tlpp-core.th"` | Usar includes especificos TLPP (arquivos `.th`); `Protheus.ch` e obsoleto. NAO adicionar `using namespace tlpp.core`, `tlpp.rest` ou `tlpp.log` -- usar os includes `.th` |
+| `#include "totvs.ch"` | `#include "tlpp-core.th"` e manter `#include "totvs.ch"` quando o codigo usa o framework (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...) | O `tlpp-core.th` e recomendado, ainda que opcional em classes migradas de ADVPL (TDN, "Estrutura"); `protheus.ch` e obsoleto, sempre em minusculas. NAO adicionar `using namespace tlpp.core`, `tlpp.rest` ou `tlpp.log` -- usar os includes `.th` |
 | `User Function Name()` | `namespace custom.module.service; class NameService; method execute()` | Ponto de entrada principal se torna o metodo publico primario |
 | `Static Function Helper()` | `method helper() as private` | Funcoes internas se tornam metodos privados |
 | `Private cVar := "x"` | `data cVar as character` (propriedade de classe) | Variaveis Private se tornam declaracoes `data` de classe |
@@ -86,9 +89,10 @@ Comeca com `custom.`, o restante e livre. Exemplos:
 
 ### Antes (ADVPL Procedural) -- `CalcPed.prw`
 
+{/* advpl-lint: anti-exemplo */}
 ```c
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 /*/{Protheus.doc} CalcPed
 Calcula o total de um pedido de venda
@@ -100,10 +104,10 @@ Calcula o total de um pedido de venda
 /*/
 User Function CalcPed(cPedido)
     Local nTotal := 0
+    Local aArea  := GetArea()
+
     Private cAliasPed := "SC5"
     Private cAliasItens := "SC6"
-
-    Local aArea := GetArea()
 
     Begin Sequence
 
@@ -143,7 +147,8 @@ Return nSoma
 ### Depois (TLPP Orientado a Objetos) -- `custom.faturamento.pedido.tlpp`
 
 ```c
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
+#include "totvs.ch"
 
 namespace custom.faturamento.pedido
 
@@ -158,38 +163,35 @@ class PedidoService
 
 endclass
 
-method new() class PedidoService
+method new() as object class PedidoService
     ::cAliasPed   := "SC5"
     ::cAliasItens := "SC6"
 return self
 
-method calcTotal(cPedido as character) class PedidoService
+method calcTotal(cPedido as character) as numeric class PedidoService
     local nTotal := 0
     local aArea  := GetArea()
 
-    begin sequence
+    try
 
         DbSelectArea(::cAliasPed)
         DbSetOrder(1)
 
-        if !DbSeek(xFilial(::cAliasPed) + cPedido)
-            FWLogMsg("WARN", , "PedidoService", "calcTotal", , , ;
-                "Pedido nao encontrado: " + cPedido)
-            break
+        if DbSeek(xFilial(::cAliasPed) + cPedido)
+            nTotal := ::somaItens(cPedido)
+        else
+            FWLogMsg("WARN", /*cTransactionId*/, "PedidoService", "calcTotal", /*cStep*/, /*cMsgId*/, "Pedido nao encontrado: " + cPedido)
         endif
 
-        nTotal := ::somaItens(cPedido)
-
-    recover using oError
-        FWLogMsg("ERROR", , "PedidoService", "calcTotal", , , ;
-            "Erro: " + oError:Description)
+    catch oError
+        FWLogMsg("ERROR", /*cTransactionId*/, "PedidoService", "calcTotal", /*cStep*/, /*cMsgId*/, "Erro: " + oError:Description)
         nTotal := 0
-    end sequence
+    endtry
 
     RestArea(aArea)
 return nTotal
 
-method somaItens(cPedido as character) class PedidoService
+method somaItens(cPedido as character) as numeric class PedidoService
     local nSoma := 0
 
     DbSelectArea(::cAliasItens)
@@ -207,7 +209,7 @@ return nSoma
 ### Wrapper de Compatibilidade Retroativa -- `CalcPed.prw` (preservado)
 
 ```c
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} CalcPed
 Wrapper de compatibilidade - delega para PedidoService (TLPP)
@@ -231,7 +233,8 @@ Return oService:calcTotal(cPedido)
 | User Function preservada como wrapper | Manter a User Function original `.prw` como wrapper fino que delega para a nova classe |
 | Migracao gradual | Migrar um grupo de funcoes por vez; wrappers garantem que chamadores existentes nao quebrem |
 | Construtor para estado compartilhado | Valores que eram variaveis `Private`/`Public` compartilhadas entre funcoes devem ser passados pelo construtor ou definidos como propriedades de classe |
-| Logging sobre Conout | Preferir `FWLogMsg()` ou `FWLogError()` sobre `Conout()` raw em classes TLPP |
+| Logging e erros | Usar `FWLogMsg()` (nunca `Conout()`) e `Try`/`Catch` em classes `.tlpp`; `Begin Sequence`/`Recover` fica para ADVPL `.prw` |
+| Relatorio de lacunas | Toda migracao termina com o relatorio de lacunas (`gap-report.md`): o que nao migrou, por que e o que o usuario deve fazer |
 
 ## Erros Comuns
 

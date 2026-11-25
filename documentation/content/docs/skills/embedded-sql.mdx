@@ -5,7 +5,7 @@ description: Escrita de queries SQL em ADVPL/TLPP usando blocos BeginSQL/EndSQL 
 
 # Embedded SQL in ADVPL/TLPP
 
-Embedded SQL permite escrever queries SQL diretamente em codigo ADVPL/TLPP usando blocos `BeginSQL ... EndSQL` com expressoes macro especiais. Substitui a concatenacao de strings propensa a erros (`cQuery += "SELECT..."`) por blocos SQL legiveis, type-safe e manteníveis.
+Embedded SQL permite escrever queries SQL diretamente em codigo ADVPL/TLPP usando blocos `BeginSQL ... EndSQL` com expressoes macro especiais. Substitui a concatenacao de strings propensa a erros (`cQuery += "SELECT..."`) por blocos SQL legiveis e manteniveis. Atencao: `%exp:` insere o valor no texto do SQL, nao e binding de parametro; texto digitado pelo usuario ou recebido de fora passa por `FWPreparedStatement`.
 
 ## Quando Usar
 
@@ -23,12 +23,12 @@ Embedded SQL permite escrever queries SQL diretamente em codigo ADVPL/TLPP usand
 | Nomes de tabela | `%table:SE2%` automatico | `RetSqlName("SE2")` manual |
 | Filtro de filial | `%xfilial:SE2%` automatico | `xFilial("SE2")` manual |
 | Filtro de delecao | `%notDel%` automatico | `D_E_L_E_T_ = ' '` manual |
-| Binding de variaveis | `%exp:cVar%` | `"'" + cVar + "'"` (risco de SQL injection) |
+| Valores de variaveis | `%exp:cVar%` (valor inserido no texto do SQL, sem aspas manuais) | `"'" + cVar + "'"` (aspas manuais) |
 | Tipos de colunas | `column X as Date` | `TCSetField` manual |
 | Manutencao | Facil de ler e modificar | Dificil achar erros em strings |
-| SQL Injection | Protegido via macros | Vulneravel se nao tiver cuidado |
+| SQL Injection | `%exp:` nao e binding: so valores internos; entrada do usuario/externa vai para `FWPreparedStatement` | Vulneravel |
 
-**Sempre preferir BeginSQL para codigo novo.**
+**Preferir BeginSQL para codigo novo com valores internos; usar `FWPreparedStatement` para entrada do usuario ou externa.**
 
 ## Sintaxe Principal
 
@@ -47,6 +47,7 @@ EndSQL
 
 ```c
 Local cAlias := GetNextAlias()
+Local aNomes := {}
 
 BeginSQL Alias cAlias
     SELECT A1_COD, A1_LOJA, A1_NOME
@@ -56,11 +57,11 @@ BeginSQL Alias cAlias
 EndSQL
 
 DbSelectArea(cAlias)
-While !Eof()
-    Conout(cAlias->A1_NOME)
-    DbSkip()
+While !(cAlias)->(Eof())
+    aAdd(aNomes, AllTrim((cAlias)->A1_NOME))
+    (cAlias)->(DbSkip())
 EndDo
-DbCloseArea()
+(cAlias)->(DbCloseArea())
 ```
 
 ## Expressoes Macro Especiais
@@ -107,9 +108,11 @@ WHERE SA1.D_E_L_E_T_ <> '*'
 
 ### %exp:EXPRESSION%
 
-Faz binding de variaveis ADVPL, expressoes ou resultados de funcao no SQL.
+Insere no texto do SQL o valor de uma variavel ADVPL, expressao ou resultado de funcao. Tipos aceitos: C, D, N e L; qualquer outro aborta com `Query Argument Error: Invalid Value Type` (TDN).
 
 ```c
+// Valores internos (literais e uma data montada pela rotina).
+// Texto digitado pelo usuario ou recebido de fora passa por FWPreparedStatement.
 Local cCodCli := "000001"
 Local cLoja   := "01"
 Local dDataIni := CtoD("01/01/2026")
@@ -125,7 +128,7 @@ BeginSQL Alias cAlias
 EndSQL
 ```
 
-**Nota:** `%exp:%` trata quoting automaticamente para campos character. Para datas, usar `DtoS()` para converter.
+**`%exp:` nao e parametro de binding.** O pre-compilador transforma `%exp:cVar%` em `'+___SQLGetValue(CVAR)+'`: o valor e concatenado no texto do comando em tempo de execucao (codigo pre-compilado mostrado na pagina "Embedded SQL" do TDN). Como o tratamento de uma aspa simples dentro do valor nao esta documentado (a confirmar no TDS), use `%exp:` somente com valores que a propria rotina controla (literais, `DtoS()` de uma data, numeros calculados, `xFilial()`). Entrada do usuario (campo de tela, respostas do `Pergunte` em `MV_PAR*`) ou externa (payload REST/SOAP, arquivo, integracao) vai por `FWPreparedStatement` -- veja a secao "SQL Injection e Entrada do Usuario". Para datas, usar `DtoS()`.
 
 ### %Order:TABLE%
 
@@ -248,8 +251,8 @@ EndSQL
 ## Padrao Completo: Query com Iteracao de Cursor
 
 ```c
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 User Function QueryEx()
     Local cAlias := GetNextAlias()
@@ -280,7 +283,7 @@ User Function QueryEx()
         AND SE2.E2_EMISSAO >= %exp:DtoS(dDataIni)%
         AND (SE2.E2_VALOR - SE2.E2_PAGO) > 0
         ORDER BY SE2.E2_VENCTO
-    EndSQL
+EndSQL
 
     DbSelectArea(cAlias)
     While !(cAlias)->(Eof())
@@ -303,47 +306,81 @@ Return aResult
 
 | Regra | Por que |
 |-------|---------|
+| `EndSQL` deve comecar na coluna 1 (sem espacos ou tabulacoes antes); `BeginSQL` pode ser indentado | Caso contrario ha erro de compilacao C2001 (TDN Embedded SQL, "Erros de compilacao") |
 | NAO iniciar uma linha com `*` dentro de BeginSQL | Pre-compilador ADVPL trata `*` no inicio da linha como comentario |
 | Sempre incluir `%notDel%` | Protheus usa delecao logica, nunca confiar em fisica |
 | Sempre incluir `%xfilial%` ou filtro de filial | Ambientes multi-filial retornarao dados errados |
 | Usar `GetNextAlias()` para o alias | Evita conflitos de nome de alias com work areas abertas |
 | Sempre `DbCloseArea()` ao terminar | Previne vazamento de work areas (numero limitado de aliases) |
 | NAO usar `SELECT *` | Especificar colunas explicitamente para performance e clareza |
+| `%exp:` so com valores internos | Nao e binding; entrada do usuario/externa vai por `FWPreparedStatement` |
+| NAO usar `?` no texto da query nem em valores de `%exp:` | O `?` e reservado pelo Embedded SQL (TDN); nesse caso o TDN recomenda `FWPreparedStatement` ou `FWExecStatement` |
 | Valores de data devem usar `DtoS()` | Banco armazena datas como strings YYYYMMDD |
 | Declaracoes `column` vao ANTES do SELECT | Definem tipos do resultado, nao colunas da query |
 
-## Operacoes DML
+## SQL Injection e Entrada do Usuario
 
-Para INSERT, UPDATE, DELETE usar `TCSqlExec` em vez de BeginSQL:
+O Embedded SQL elimina as aspas manuais e o boilerplate de `RetSqlName`/`xFilial`/`D_E_L_E_T_`, mas `%exp:` continua inserindo cada valor no texto do SQL. Escolha pela origem de cada valor:
+
+| Valor | Usar |
+|---|---|
+| Texto fixo, `xFilial()`, `DtoS()` de uma data, numeros calculados pela rotina | `BeginSQL` + `%exp:` |
+| Digitado pelo usuario (campo de tela, respostas do `Pergunte` em `MV_PAR*`), recebido de fora (payload REST/SOAP, arquivo, integracao) ou texto livre | `FWPreparedStatement` com parametros `?` |
+| Fragmento de SQL recebido do chamador ou montado a partir de texto do usuario | Nunca -- monte a clausula com texto fixo na rotina e passe so os valores como parametros `?` |
 
 ```c
-// INSERT
-Local cSql := "INSERT INTO " + RetSqlName("ZZ1") + " "
-cSql += "(ZZ1_FILIAL, ZZ1_CODIGO, ZZ1_DESCRI, D_E_L_E_T_, R_E_C_N_O_) "
-cSql += "VALUES ('" + xFilial("ZZ1") + "', '001', 'Teste', ' ', " + cValToChar(GetSxeNum("ZZ1","ZZ1_CODIGO")) + ")"
-nRet := TCSqlExec(cSql)
+// cNome foi digitado pelo usuario: vai como parametro ?, nunca por %exp:
+Local cAlias := GetNextAlias()
+Local oStmt  := FWPreparedStatement():New()
+Local cQuery := ""
 
-// UPDATE
-cSql := "UPDATE " + RetSqlName("ZZ1") + " SET "
-cSql += "ZZ1_DESCRI = 'Novo Valor' "
-cSql += "WHERE ZZ1_FILIAL = '" + xFilial("ZZ1") + "' "
-cSql += "AND ZZ1_CODIGO = '001' "
-cSql += "AND D_E_L_E_T_ = ' '"
-nRet := TCSqlExec(cSql)
+cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME FROM " + RetSqlName("SA1") + " SA1 "
+cQuery += "WHERE SA1.D_E_L_E_T_ = ' ' AND SA1.A1_FILIAL = ? AND SA1.A1_NOME LIKE ? "
+
+oStmt:SetQuery(cQuery)
+oStmt:SetString(1, xFilial("SA1"))
+oStmt:SetString(2, AllTrim(cNome) + "%")
+DbUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+// ... ler (cAlias)->A1_COD, (cAlias)->A1_NOME ...
+(cAlias)->(DbCloseArea())
+oStmt:Destroy()
+```
+
+Padroes completos (JOIN, DML, LIKE, lista IN): `skills/query-builder/patterns-fwpreparedstatement.md`.
+
+## Operacoes DML
+
+**BeginSQL e somente para SELECT.** Para UPDATE/DELETE usar `TCSqlExec`, com os valores passados como parametros do `FWPreparedStatement`:
+
+```c
+// UPDATE: valores vao como parametros ?
+Local oStmt := FWPreparedStatement():New()
+Local cSql  := ""
+Local nRet  := 0
+
+cSql := "UPDATE " + RetSqlName("ZZ1") + " SET ZZ1_DESCRI = ? "
+cSql += "WHERE ZZ1_FILIAL = ? AND ZZ1_CODIGO = ? AND D_E_L_E_T_ = ' '"
+
+oStmt:SetQuery(cSql)
+oStmt:SetString(1, cDescri)
+oStmt:SetString(2, xFilial("ZZ1"))
+oStmt:SetString(3, cCodigo)
+nRet := TCSqlExec(oStmt:GetFixQuery())
+oStmt:Destroy()
 
 If nRet < 0
-    Conout("SQL Error: " + TCSqlError())
+    FWLogMsg("ERROR", /*cTransactionId*/, "EMBEDDEDSQL", "DML", /*cStep*/, /*cMsgId*/, "SQL Error: " + TCSqlError())
 EndIf
 ```
 
-**BeginSQL e somente para SELECT.** Usar `TCSqlExec` para DML (INSERT/UPDATE/DELETE).
+Para incluir um registro, nao monte um `INSERT` a mao: use a work area (`RecLock(cAlias, .T.)` + `MsUnlock()`, veja `skills/query-builder/patterns-workarea.md`, Padrao 1.4).
 
 ## Dicas de Performance
 
 1. **Usar declaracoes `column`** para evitar conversoes de tipo pos-query
 2. **Usar JOINs** em vez de subqueries quando possivel
 3. **Filtrar cedo** com WHERE, nao apos ler todas as linhas em ADVPL
-4. **Usar hint NOLOCK** para queries somente leitura (SQL Server): `FROM %table:SA1% SA1 WITH(NOLOCK)`
+4. **Sem hints de lock**: nao fixe `WITH(NOLOCK)` -- existe so no SQL Server e permite leitura suja. O `ChangeQuery()`, que o Embedded SQL aplica salvo com `%noparser%`, remove `NOLOCK`/`(NOLOCK)` da query, e o TDN nao documenta macro `%nolock%`
 5. **Usar TOP N** quando precisar apenas de resultados limitados
 6. **Fechar aliases** imediatamente apos uso para liberar work areas
 7. **Evitar loops com BeginSQL dentro** - construir uma query que retorna todos os dados necessarios
@@ -351,6 +388,8 @@ EndIf
 ## Migracao de TCQuery para BeginSQL
 
 **Antes (concatenacao de strings):**
+
+{/* advpl-lint: anti-exemplo */}
 ```c
 Local cQuery := ""
 cQuery += "SELECT A1_COD, A1_NOME "
@@ -361,9 +400,10 @@ cQuery += "AND A1_TIPO = '" + cTipo + "'"
 TCQuery cQuery New Alias "QRY_CLI"
 ```
 
-**Depois (Embedded SQL):**
+**Depois (Embedded SQL) -- `cTipo` e um valor interno da rotina:**
 ```c
 Local cAlias := GetNextAlias()
+Local cTipo  := "F"   // definido pela rotina, nao digitado pelo usuario
 
 BeginSQL Alias cAlias
     SELECT A1_COD, A1_NOME
@@ -374,4 +414,6 @@ BeginSQL Alias cAlias
 EndSQL
 ```
 
-Beneficios: Sem `RetSqlName` manual, sem `D_E_L_E_T_`, sem `xFilial()`, sem quoting de strings, sem risco de SQL injection.
+Se `cTipo` vier do usuario ou de fora, migre para `FWPreparedStatement` (veja "SQL Injection e Entrada do Usuario").
+
+Beneficios: sem `RetSqlName` manual, sem `D_E_L_E_T_`, sem `xFilial()`, sem aspas manuais. `%exp:` nao torna a query imune a injecao -- nao e parametro de binding.
