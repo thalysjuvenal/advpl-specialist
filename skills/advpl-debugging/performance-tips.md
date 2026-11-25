@@ -40,15 +40,16 @@ EndIf
 Before choosing an index, check SIX for the table:
 
 ```advpl
-// Query SIX to see available indexes for SA1
-DbSelectArea("SIX")
-DbSetOrder(1) // INDICE+ORDEM
-DbSeek("SA1")
-While !Eof() .And. SIX->INDICE == "SA1"
-    Conout("Order: " + SIX->ORDEM + " Key: " + Alltrim(SIX->CHAVE))
-    DbSkip()
-EndDo
-// Output:
+// Inspect the available indexes of SA1 through the work area, not by opening SIX
+// (direct access to SX*/SIX tables is blocked by the SonarQube rules)
+Local nOrd := 0
+
+DbSelectArea("SA1")
+For nOrd := 1 To 3
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLPERF", /*cCategory*/, /*cStep*/, /*cMsgId*/, ;
+        "Order: " + cValToChar(nOrd) + " Key: " + Alltrim(SA1->(IndexKey(nOrd))))
+Next
+// Output (example):
 // Order: 1 Key: A1_FILIAL+A1_COD+A1_LOJA
 // Order: 2 Key: A1_FILIAL+A1_CGC
 // Order: 3 Key: A1_FILIAL+A1_NOME
@@ -104,14 +105,14 @@ EndDo
 **After (optimized) - SQL for aggregation:**
 ```advpl
 // SQL aggregation is handled by the database engine - much faster
-Local cQuery := ""
-cQuery += "SELECT SUM(D1_TOTAL) AS TOTAL "
-cQuery += "FROM " + RetSqlName("SD1") + " SD1 "
-cQuery += "WHERE D1_FILIAL = '" + xFilial("SD1") + "' "
-cQuery += "AND D1_DOC = '" + cDoc + "' "
-cQuery += "AND SD1.D_E_L_E_T_ = ' ' "
-
-TCQuery cQuery New Alias "QRY_SUM"
+// (%exp: inserts the value in the SQL text; for external input use FWPreparedStatement)
+BeginSQL Alias "QRY_SUM"
+    SELECT SUM(D1_TOTAL) AS TOTAL
+    FROM %table:SD1% SD1
+    WHERE D1_FILIAL = %xFilial:SD1%
+      AND D1_DOC = %exp:cDoc%
+      AND SD1.%notDel%
+EndSQL
 nTotal := QRY_SUM->TOTAL
 DbSelectArea("QRY_SUM")
 DbCloseArea()
@@ -119,29 +120,29 @@ DbCloseArea()
 
 ### SELECT Optimization Tips
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
-// TIP 1: Select only needed columns (avoid SELECT *)
-// WRONG
+// TIP 1 - WRONG: SELECT * returns every column
 cQuery := "SELECT * FROM " + RetSqlName("SA1") + " SA1 "
-// RIGHT
-cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME FROM " + RetSqlName("SA1") + " SA1 "
-
-// TIP 2: Always filter by D_E_L_E_T_
-cQuery += "WHERE SA1.D_E_L_E_T_ = ' ' "
-
-// TIP 3: Always filter by branch (filial)
-cQuery += "AND A1_FILIAL = '" + xFilial("SA1") + "' "
-
-// TIP 4: Use NOLOCK hint (SQL Server) for read-only queries
-cQuery := "SELECT A1_COD, A1_NOME FROM " + RetSqlName("SA1") + " SA1 WITH(NOLOCK) "
-cQuery += "WHERE SA1.D_E_L_E_T_ = ' ' "
-
-// TIP 5: Limit results when only checking existence
-cQuery := "SELECT TOP 1 A1_COD FROM " + RetSqlName("SA1") + " SA1 "
-cQuery += "WHERE A1_FILIAL = '" + xFilial("SA1") + "' "
-cQuery += "AND A1_CGC = '" + cCGC + "' "
-cQuery += "AND SA1.D_E_L_E_T_ = ' ' "
 ```
+
+```advpl
+// TIP 1 - RIGHT: select only needed columns
+// TIP 2: always filter by D_E_L_E_T_ (%notDel%)
+// TIP 3: always filter by branch (%xFilial:%)
+BeginSQL Alias "QRY_TIP"
+    SELECT A1_COD, A1_LOJA, A1_NOME
+    FROM %table:SA1% SA1
+    WHERE A1_FILIAL = %xFilial:SA1%
+      AND A1_CGC = %exp:cCGC%
+      AND SA1.%notDel%
+EndSQL
+// TIP 4: when only checking existence, limit the result. The row-limit syntax
+// (TOP / FETCH FIRST / LIMIT) differs per database; Embedded SQL already passes
+// the query through ChangeQuery() (confirm the translation in TDS).
+```
+
+> **Locking hints are not portable.** Do not add database-specific hints such as `WITH(NOLOCK)` to queries: they only exist on SQL Server (PostgreSQL and Oracle reject or ignore them) and allow dirty reads. The TDN documents no portable macro for them, and `ChangeQuery()` removes `NOLOCK`/`(NOLOCK)` from the query it returns. Let the framework and the DBAccess handle read consistency.
 
 ---
 
@@ -208,6 +209,8 @@ aSize(aItems, 0)
 ### Avoiding Memory Leaks in Loops
 
 **Before (slow):**
+
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // TCQuery opens alias but never closes it - each iteration leaks a workarea
 For nI := 1 To Len(aDocs)
@@ -222,10 +225,12 @@ Next
 ```advpl
 // Always close temporary aliases inside loops
 For nI := 1 To Len(aDocs)
-    cQuery := "SELECT D1_TOTAL FROM " + RetSqlName("SD1") + " SD1 "
-    cQuery += "WHERE D1_DOC = '" + aDocs[nI] + "' "
-    cQuery += "AND SD1.D_E_L_E_T_ = ' ' "
-    TCQuery cQuery New Alias "QRY_TMP"
+    BeginSQL Alias "QRY_TMP"
+        SELECT D1_TOTAL
+        FROM %table:SD1% SD1
+        WHERE D1_DOC = %exp:aDocs[nI]%
+          AND SD1.%notDel%
+    EndSQL
     If Select("QRY_TMP") > 0
         nTotal += QRY_TMP->D1_TOTAL
         DbSelectArea("QRY_TMP")
@@ -234,14 +239,20 @@ For nI := 1 To Len(aDocs)
 Next
 
 // Even better - use a single query with IN clause
+// (values come from internal data; for external input bind them with FWPreparedStatement)
 cInList := ""
 For nI := 1 To Len(aDocs)
-    cInList += IIf(!Empty(cInList), ",", "") + "'" + aDocs[nI] + "'"
+    If !Empty(cInList)
+        cInList += ","
+    EndIf
+    cInList += "'" + aDocs[nI] + "'"
 Next
-cQuery := "SELECT D1_DOC, D1_TOTAL FROM " + RetSqlName("SD1") + " SD1 "
-cQuery += "WHERE D1_DOC IN (" + cInList + ") "
-cQuery += "AND SD1.D_E_L_E_T_ = ' ' "
-TCQuery cQuery New Alias "QRY_BATCH"
+BeginSQL Alias "QRY_BATCH"
+    SELECT D1_DOC, D1_TOTAL
+    FROM %table:SD1% SD1
+    WHERE D1_DOC IN (%exp:cInList%)
+      AND SD1.%notDel%
+EndSQL
 ```
 
 ---
@@ -387,19 +398,18 @@ Next
 
 **After (optimized):**
 ```advpl
-// Create TRB for indexed access
-Local cTrb := CriaTrab(NIL, .F.)
+// Create the temporary table with FWTemporaryTable (relational mode)
+Local oTmp := FWTemporaryTable():New("TMP_ITENS")
 
-DbCreate(cTrb, {;
-    {"PEDIDO", "C", 15, 0},;
-    {"ITEM",   "C", 6,  0},;
-    {"TOTAL",  "N", 14, 2};
-}, "DBFCDXADS")
+oTmp:SetFields({ ;
+    {"PEDIDO", "C", 15, 0}, ;
+    {"ITEM",   "C", 6,  0}, ;
+    {"TOTAL",  "N", 14, 2} ;
+})
+oTmp:AddIndex("01", {"PEDIDO", "ITEM"})
+oTmp:Create()
 
-DbUseArea(.T., "DBFCDXADS", cTrb, "TMP_ITENS", .F., .F.)
-IndRegua("TMP_ITENS", cTrb, "PEDIDO+ITEM")
-
-// Populate TRB
+// Populate the temporary table
 For nI := 1 To Len(aItens)
     RecLock("TMP_ITENS", .T.)
     TMP_ITENS->PEDIDO := aItens[nI][1]
@@ -420,12 +430,11 @@ For nI := 1 To Len(aPedidos)
     EndIf
 Next
 
-// Cleanup
-DbSelectArea("TMP_ITENS")
-DbCloseArea()
-FErase(cTrb + ".dbf")
-FErase(cTrb + OrdBagExt())
+// Cleanup - Delete() drops the temporary table and closes its alias
+oTmp:Delete()
 ```
+
+> `CriaTrab(NIL, .F.)` + `DbCreate()` (ISAM-era temporary files) is no longer the recommended approach; use `FWTemporaryTable` in relational mode. Validation of this example in TDS is pending (a confirmar).
 
 ---
 
@@ -543,7 +552,7 @@ Begin Transaction
     EndIf
 
     // Heavy logging
-    FWLogMsg("INFO", , , , , , "Starting process...")
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLPERF", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Starting process...")
 
     // The actual write (this is what needs the transaction)
     RecLock("SC5", .T.)
@@ -552,7 +561,7 @@ Begin Transaction
     MsUnlock()
 
     // More logging
-    FWLogMsg("INFO", , , , , , "Process complete")
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLPERF", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Process complete")
 End Transaction
 ```
 
@@ -562,11 +571,11 @@ End Transaction
 DbSelectArea("SA1")
 DbSetOrder(1)
 If !DbSeek(xFilial("SA1") + cCodCli)
-    Conout("Client not found: " + cCodCli)
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLPERF", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Client not found: " + cCodCli)
     Return .F.
 EndIf
 
-FWLogMsg("INFO", , , , , , "Starting process...")
+FWLogMsg("INFO", /*cTransactionId*/, "ADVPLPERF", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Starting process...")
 
 // Transaction wraps only the writes - minimal scope
 Begin Transaction
@@ -576,7 +585,7 @@ Begin Transaction
     MsUnlock()
 End Transaction
 
-FWLogMsg("INFO", , , , , , "Process complete")
+FWLogMsg("INFO", /*cTransactionId*/, "ADVPLPERF", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Process complete")
 ```
 
 ### What to Include/Exclude from Transactions

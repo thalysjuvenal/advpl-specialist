@@ -118,9 +118,9 @@ cMsg := "Value: " + cValToChar(100)
 // Verify file exists in the includes directory
 // Check the includes path in your project configuration
 // Standard includes are always available:
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "topconn.ch"
+#include "fwmvcdef.ch"
 ```
 
 ### 8. Duplicate function name
@@ -208,7 +208,7 @@ Local cNome := ""
 cNome := SA1->A1_NOME
 ```
 
-### 13. Missing #Include "TOTVS.CH"
+### 13. Missing #include "totvs.ch"
 
 **Error Message:** `Undefined symbol 'PSAY'` or `Syntax error` on standard macros
 
@@ -222,7 +222,7 @@ User Function FATA001()
 Return
 
 // FIXED - always include as first line
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function FATA001()
     @ 10,10 Say "Hello"
@@ -261,7 +261,7 @@ Class MyService
 EndClass
 
 // Consumer file
-#Include "TOTVS.CH"
+#include "totvs.ch"
 Using Namespace mycompany.services
 
 User Function TestSvc()
@@ -310,7 +310,7 @@ Local aItems := {"A", "B", "C"}
 If Len(aItems) >= 5
     cVal := aItems[5]
 Else
-    Conout("Index out of bounds. Array size: " + cValToChar(Len(aItems)))
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Index out of bounds. Array size: " + cValToChar(Len(aItems)))
 EndIf
 ```
 
@@ -350,8 +350,12 @@ Else
     nPerc := 0
 EndIf
 
-// Alternative - inline with NoRound or IIf
-nPerc := IIf(nTotal > 0, nParcial / nTotal, 0)
+// Alternative - same guard, written as a short If/Else block
+If nTotal > 0
+    nPerc := nParcial / nTotal
+Else
+    nPerc := 0
+EndIf
 ```
 
 ### 20. NIL value in expression
@@ -451,7 +455,7 @@ If lLocked
     SD1->D1_TOTAL := nVal
     MsUnlock()
 Else
-    Conout("ERROR: Unable to lock record after retries")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "ERROR: Unable to lock record after retries")
 EndIf
 ```
 
@@ -488,7 +492,7 @@ Return xVal
 **Solution:**
 ```advpl
 // Debug - check object class
-Conout("Class: " + GetClassName(oObj))
+FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Class: " + GetClassName(oObj))
 
 // WRONG - calling wrong method
 oObj:Process()  // method does not exist
@@ -497,7 +501,7 @@ oObj:Process()  // method does not exist
 If FindMember(oObj, "Process")
     oObj:Process()
 Else
-    Conout("Method Process not found on " + GetClassName(oObj))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Method Process not found on " + GetClassName(oObj))
 EndIf
 ```
 
@@ -599,7 +603,7 @@ SD1->D1_TOTAL := 99999999999.99  // field is N(14,2) - too large
 If nTotal <= 99999999999.99 .And. nTotal >= -99999999999.99
     SD1->D1_TOTAL := nTotal
 Else
-    Conout("ERROR: Numeric overflow for D1_TOTAL: " + cValToChar(nTotal))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "ERROR: Numeric overflow for D1_TOTAL: " + cValToChar(nTotal))
 EndIf
 ```
 
@@ -665,7 +669,7 @@ Next
 // Use ExeDllRun2/ExeDllRun3 with full path:
 Local nHandle := ExeDllRun2("C:\TOTVS\bin\appserver\mylib.dll", "MyFunction")
 If nHandle < 0
-    Conout("ERROR: DLL load failed. Verify path and architecture.")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "ERROR: DLL load failed. Verify path and architecture.")
 EndIf
 ```
 
@@ -685,8 +689,8 @@ EndIf
 
 // In code - check connection before operations:
 If !TCSqlExec("SELECT 1") == 0
-    Conout("ERROR: Database connection failed")
-    Conout("Check DBAccess configuration and network connectivity")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "ERROR: Database connection failed")
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Check DBAccess configuration and network connectivity")
 EndIf
 ```
 
@@ -723,10 +727,10 @@ oRest:SetContentType("application/json; charset=utf-8")
 **Solution:**
 ```advpl
 // Check if table exists in SX2
-DbSelectArea("SX2")
-DbSetOrder(1)
-If !DbSeek("ZA1")
-    Conout("Table ZA1 not found in SX2. Run UPDDISTR or add via configurator.")
+// Do not open SX2 directly (DbSelectArea("SX2")): use the framework API.
+// Check the physical table instead (TCCanOpen) and review the SX2 registration in the configurator.
+If !TCCanOpen(RetSqlName("ZA1"))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Table ZA1 not found in the database. Check the SX2 registration in the configurator and run UPDDISTR.")
 EndIf
 
 // If table exists in SX2 but not in DB, run:
@@ -750,7 +754,7 @@ DbSetOrder(15)  // order 15 does not exist for SA1
 // Use IndexOrd() to check current order
 DbSelectArea("SA1")
 If IndexOrd() == 0
-    Conout("No indexes available for SA1")
+    FWLogMsg("WARN", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "No indexes available for SA1")
 EndIf
 DbSetOrder(1)  // use a known valid index
 ```
@@ -771,7 +775,7 @@ If RecLock("SC5", .F.)
     // perform update
     MsUnlock()
 Else
-    FWLogMsg("WARNING", , "LOCKMON", "MyModule", "", 01, ;
+    FWLogMsg("WARN", /*cTransactionId*/, "LOCKMON", "MyModule", /*cStep*/, /*cMsgId*/, ;
         "Lock timeout on SC5 RecNo: " + cValToChar(RecNo()))
 EndIf
 ```
@@ -811,20 +815,35 @@ End Transaction
 
 **Cause:** Malformed embedded SQL query, missing quotes, wrong table name, or database-specific syntax issues.
 
+**Wrong (anti-example):**
+
+<!-- advpl-lint: anti-exemplo -->
+```advpl
+// WRONG - missing quotes around string value (also open to SQL injection)
+Local cQuery := "SELECT * FROM " + RetSqlName("SA1") + " WHERE A1_COD = " + cCodCli
+```
+
 **Solution:**
 ```advpl
-// WRONG - missing quotes around string value
-Local cQuery := "SELECT * FROM " + RetSqlName("SA1") + " WHERE A1_COD = " + cCodCli
+// FIXED - values bound by FWPreparedStatement (no manual quoting, no injection)
+Local cAlias := GetNextAlias()
+Local oStmt  := FWPreparedStatement():New()
+Local cQuery := ""
 
-// FIXED - proper quoting
-Local cQuery := "SELECT * FROM " + RetSqlName("SA1") + " SA1 "
-cQuery += "WHERE A1_FILIAL = '" + xFilial("SA1") + "' "
-cQuery += "AND A1_COD = '" + cCodCli + "' "
+cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME FROM " + RetSqlName("SA1") + " SA1 "
+cQuery += "WHERE SA1.A1_FILIAL = ? "
+cQuery += "AND SA1.A1_COD = ? "
 cQuery += "AND SA1.D_E_L_E_T_ = ' ' "
 
-// Always include D_E_L_E_T_ filter
-// Always use RetSqlName() for table names
-TCQuery cQuery New Alias "QRY_SA1"
+oStmt:SetQuery(cQuery)
+oStmt:SetString(1, xFilial("SA1"))
+oStmt:SetString(2, cCodCli)
+
+// Always include the D_E_L_E_T_ filter and RetSqlName() for table names
+DBUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+// ... use (cAlias) ...
+(cAlias)->(DBCloseArea())
+oStmt:Destroy()
 ```
 
 ### 41. Connection lost
@@ -844,14 +863,14 @@ While nRetries > 0 .And. !lOk
         lOk := .T.
     Else
         nRetries--
-        Conout("DB connection lost. Retrying... (" + cValToChar(nRetries) + " left)")
+        FWLogMsg("WARN", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "DB connection lost. Retrying... (" + cValToChar(nRetries) + " left)")
         Sleep(2000)
         TCSqlReconnect()  // attempt reconnection
     EndIf
 EndDo
 
 If !lOk
-    FWLogMsg("ERROR", , "DBCONN", "MyModule", "", 01, "Database connection unrecoverable")
+    FWLogMsg("ERROR", /*cTransactionId*/, "DBCONN", "MyModule", /*cStep*/, /*cMsgId*/, "Database connection unrecoverable")
 EndIf
 ```
 
@@ -899,7 +918,7 @@ If FLock()  // try to lock entire file
     DbPack()
     DbUnlock()
 Else
-    Conout("Cannot obtain exclusive lock on table. Users may be connected.")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Cannot obtain exclusive lock on table. Users may be connected.")
 EndIf
 ```
 
@@ -915,7 +934,7 @@ EndIf
 If FieldPos("A1_XTEST") > 0
     cVal := SA1->A1_XTEST
 Else
-    Conout("Field A1_XTEST not found in SA1 dictionary")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Field A1_XTEST not found in SA1 dictionary")
     cVal := ""
 EndIf
 
@@ -941,7 +960,7 @@ If FLock()
     DbClearIndex()
     DbSetIndex(RetSqlName("SA1") + OrdBagExt())
     DbUnlock()
-    Conout("Index rebuilt for SA1")
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Index rebuilt for SA1")
 EndIf
 
 // Prevention: ensure proper MsUnlock() after RecLock()
@@ -967,8 +986,8 @@ oRest:SetTimeout(30) // 30 seconds
 If oRest:Get("/endpoint")
     cResponse := oRest:GetResult()
 Else
-    Conout("HTTP Error: " + cValToChar(oRest:GetLastError()))
-    Conout("Check network connectivity and server availability")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "HTTP Error: " + cValToChar(oRest:GetLastError()))
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Check network connectivity and server availability")
 EndIf
 ```
 
@@ -986,9 +1005,9 @@ EndIf
 
 Local oRest := FWRest():New("https://api.example.com")
 If !oRest:Get("/health")
-    Conout("Connection failed to api.example.com")
-    Conout("Error: " + cValToChar(oRest:GetLastError()))
-    Conout("Check: URL, port, firewall, DNS resolution")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Connection failed to api.example.com")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Error: " + cValToChar(oRest:GetLastError()))
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Check: URL, port, firewall, DNS resolution")
 EndIf
 ```
 
@@ -1012,11 +1031,11 @@ If oRest:Get("/data")
             // Valid JSON - process
             cValue := oJson:GetJsonText("field")
         Else
-            Conout("Invalid JSON: " + cResponse)
+            FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Invalid JSON: " + cResponse)
         EndIf
         FreeObj(oJson)
     Else
-        Conout("Response is not JSON: " + Left(cResponse, 200))
+        FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Response is not JSON: " + Left(cResponse, 200))
     EndIf
 EndIf
 ```
@@ -1040,7 +1059,7 @@ oRest:SetAuthorization("Bearer " + cToken)
 If dTokenExpiry < Date() .Or. cToken == ""
     cToken := RefreshAuthToken()
     If Empty(cToken)
-        Conout("ERROR: Unable to obtain auth token")
+        FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "ERROR: Unable to obtain auth token")
         Return .F.
     EndIf
 EndIf

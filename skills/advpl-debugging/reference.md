@@ -66,10 +66,11 @@ digraph debug_flow {
 
 ## Logging Tools
 
-### Conout (Console Output)
+### Conout (Console Output) - legacy, avoid
 
-Simple console logging. Output appears in the Protheus AppServer console.
+`Conout` is the legacy console output (appears in the AppServer console). New code must use `FWLogMsg` (next section); the block below only illustrates what to look for when reading old sources.
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 // Basic variable inspection
 Conout(">>> [FATA001] cCodCli: " + cValToChar(cCodCli))
@@ -92,16 +93,18 @@ Conout(">>> Leaving FATA001 at " + Time())
 
 Structured logging with severity levels. Logs are stored in the Protheus log system and can be queried.
 
+Signature (TDN): `FWLogMsg(cSeverity, [cTransactionId], cGroup, [cCategory], [cStep], [cMsgId], [cMessage], [nMensure], [nElapseTime], [aMessage])`. Only `cSeverity` and `cGroup` are required.
+
 ```advpl
-// Severity levels: "INFO", "WARNING", "ERROR"
-FWLogMsg("INFO", , "FATA001", "MyModule", "", 01, ;
+// Severity levels: "INFO", "WARN", "ERROR", "FATAL", "DEBUG"
+FWLogMsg("INFO", /*cTransactionId*/, "FATA001", "MyModule", /*cStep*/, /*cMsgId*/, ;
     "Processing started for client: " + cCodCli)
 
-FWLogMsg("ERROR", , "FATA001", "MyModule", "", 02, ;
+FWLogMsg("ERROR", /*cTransactionId*/, "FATA001", "MyModule", /*cStep*/, /*cMsgId*/, ;
     "Failed to lock record SA1. Alias: " + cAlias + ;
     " RecNo: " + cValToChar(RecNo()))
 
-FWLogMsg("WARNING", , "FATA001", "MyModule", "", 03, ;
+FWLogMsg("WARN", /*cTransactionId*/, "FATA001", "MyModule", /*cStep*/, /*cMsgId*/, ;
     "Slow query detected. Elapsed: " + cValToChar(nElapsed) + "s")
 ```
 
@@ -122,15 +125,15 @@ Begin Sequence
     cNome := SA1->A1_NOME
 
 Recover Using oError
-    Conout("=== ERROR CAPTURED ===")
-    Conout("Description: " + oError:Description)
-    Conout("GenCode:     " + cValToChar(oError:GenCode))
-    Conout("SubCode:     " + cValToChar(oError:SubCode))
-    Conout("OsCode:      " + cValToChar(oError:OsCode))
-    Conout("FileName:    " + cValToChar(oError:FileName))
-    Conout("Operation:   " + oError:Operation)
-    Conout("Args:        " + cValToChar(oError:Args))
-    Conout("======================")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "=== ERROR CAPTURED ===")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Description: " + oError:Description)
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "GenCode:     " + cValToChar(oError:GenCode))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "SubCode:     " + cValToChar(oError:SubCode))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "OsCode:      " + cValToChar(oError:OsCode))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "FileName:    " + cValToChar(oError:FileName))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Operation:   " + oError:Operation)
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Args:        " + cValToChar(oError:Args))
+    FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "======================")
 
 End Sequence
 
@@ -152,10 +155,10 @@ If DbSeek(xFilial("SD1") + cDoc + cSerie)
     If RecLock("SD1", .F.)
         SD1->D1_TOTAL := nNewTotal
         MsUnlock()
-        Conout(">>> Record updated successfully")
+        FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Record updated successfully")
     Else
-        Conout(">>> ERROR: Could not lock SD1 RecNo " + cValToChar(RecNo()))
-        Conout(">>> Another user/thread may be editing this record")
+        FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Could not lock SD1 RecNo " + cValToChar(RecNo()))
+        FWLogMsg("INFO", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Another user/thread may be editing this record")
         // Check who is locking:
         // Use Protheus Monitor (SIGAMNT) or AppServer console
     EndIf
@@ -228,15 +231,15 @@ If DbSeek(xFilial("SA1") + cCodCli + cLoja)
 EndIf
 
 // Embedded SQL - good for filtered/aggregated queries
-Local cQuery := ""
-cQuery += "SELECT D1_DOC, D1_SERIE, SUM(D1_TOTAL) AS TOTAL "
-cQuery += "FROM " + RetSqlName("SD1") + " SD1 "
-cQuery += "WHERE D1_FILIAL = '" + xFilial("SD1") + "' "
-cQuery += "AND D1_EMISSAO >= '" + DtoS(dDataIni) + "' "
-cQuery += "AND SD1.D_E_L_E_T_ = ' ' "
-cQuery += "GROUP BY D1_DOC, D1_SERIE"
-
-TCQuery cQuery New Alias "QRY_TMP"
+// (%exp: inserts the value in the SQL text; for external input use FWPreparedStatement)
+BeginSQL Alias "QRY_TMP"
+    SELECT D1_DOC, D1_SERIE, SUM(D1_TOTAL) AS TOTAL
+    FROM %table:SD1% SD1
+    WHERE D1_FILIAL = %xFilial:SD1%
+      AND D1_EMISSAO >= %exp:DtoS(dDataIni)%
+      AND SD1.%notDel%
+    GROUP BY D1_DOC, D1_SERIE
+EndSQL
 ```
 
 See `performance-tips.md` for comprehensive optimization techniques.

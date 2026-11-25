@@ -31,7 +31,7 @@ Returns a memo string describing all currently active DBAccess sessions, includi
 ```advpl
 User Function DiagLocks()
     MemoWrite("\\dba_locks.txt", TopMemoStatus())
-    ConOut("[DiagLocks] Wrote DBAccess status snapshot")
+    FWLogMsg("INFO", /*cTransactionId*/, "LOCKDIAG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "[DiagLocks] Wrote DBAccess status snapshot")
 Return Nil
 ```
 
@@ -76,18 +76,18 @@ User Function MyRoutine()
     // ... existing code ...
 
     If lDebug
-        ConOut("[MyRoutine] Pre-RecLock @ " + Time())
+        FWLogMsg("INFO", /*cTransactionId*/, "LOCKDIAG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "[MyRoutine] Pre-RecLock @ " + Time())
     EndIf
     RecLock("SA1", .F.)
     If lDebug
-        ConOut("[MyRoutine] RecLock acquired @ " + Time())
+        FWLogMsg("INFO", /*cTransactionId*/, "LOCKDIAG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "[MyRoutine] RecLock acquired @ " + Time())
     EndIf
 
     // ... business logic ...
 
     SA1->(MsUnlock())
     If lDebug
-        ConOut("[MyRoutine] MsUnlock done @ " + Time())
+        FWLogMsg("INFO", /*cTransactionId*/, "LOCKDIAG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "[MyRoutine] MsUnlock done @ " + Time())
     EndIf
 Return Nil
 ```

@@ -4,7 +4,7 @@
 
 Protheus uses a hybrid locking model: record-level Workarea locks (`RecLock`/`MsUnlock`) coordinated by **DBAccess** on top of the underlying database (PostgreSQL / MSSQL / Oracle). Lock leaks, deadlocks, and contention are among the most common production issues. This skill documents lock semantics, leak patterns, prevention rules (`BEGIN SEQUENCE / RECOVER`, `SoftLock`, transaction scoping), and diagnostic procedures.
 
-> **Companion skills:** `query-builder` (query design + `%nolock%`), `advpl-debugging` (general performance and errors), `embedded-sql` (BeginSQL with macros).
+> **Companion skills:** `query-builder` (query design), `advpl-debugging` (general performance and errors), `embedded-sql` (BeginSQL with macros).
 
 ## When to Use
 
@@ -89,7 +89,7 @@ BEGIN SEQUENCE
     EndIf
 RECOVER USING oError
     DisarmTransaction()
-    ConOut("[MyRoutine] Rolled back: " + oError:Description)
+    FWLogMsg("ERROR", /*cTransactionId*/, "LOCKDIAG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "[MyRoutine] Rolled back: " + oError:Description)
 END SEQUENCE
 EndTran()
 ```
@@ -170,7 +170,7 @@ When a query joins multiple physical tables (different `RetSqlName` results), th
 
 - A `RecLock("SA1")` on customer X **does not** block a `TCQuery` selecting from `SF2010` joined to `SA1010` (different rows).
 - A `TCSqlExec("UPDATE SF2010 ... WHERE F2_DOC = 'X'")` **will block** any concurrent `RecLock("SF2", .F.)` on document `'X'` until the DB transaction commits.
-- `WITH (%nolock%)` (MSSQL) or implicit MVCC (PG/Oracle) lets reads bypass write locks — see `query-builder/cross-database.md`.
+- Read-consistency behavior differs per database (SQL Server locking vs. MVCC on PostgreSQL/Oracle). A portable `%nolock%` macro is not documented in the TDN (a confirmar no TDS), and `ChangeQuery()` removes `NOLOCK` hints — see `query-builder/cross-database.md`.
 
 ## Quick Diagnostic Checklist
 
@@ -185,7 +185,7 @@ When a lock-related issue is reported:
 - [ ] Check `MV_TIMEOUT` — if too short, healthy contention looks like errors; if too long, deadlocks take forever to resolve
 - [ ] If recurring at the same time/day: review scheduled jobs (`SCHEDDEF`) for overlapping windows
 - [ ] If after a recent deploy: diff the routine for new `TCSqlExec` calls or removed `MsUnlock`
-- [ ] If across DB engines: verify `%nolock%` macro is present on read queries
+- [ ] If across DB engines: do not hard-code database-specific locking hints (`WITH(NOLOCK)`) on read queries
 
 See [`patterns-prevention.md`](patterns-prevention.md) for the full prevention rules and [`diagnostics.md`](diagnostics.md) for live diagnostic procedures.
 
@@ -201,7 +201,7 @@ See [`patterns-prevention.md`](patterns-prevention.md) for the full prevention r
 | `RecLock` inside SX7 trigger expression | Cascading deadlock | Keep triggers read-only |
 | `MsUnlockAll()` mid-transaction | Breaks in-flight `BeginTran` | Use targeted `MsUnlock()` |
 | No `BEGIN SEQUENCE / RECOVER` around lock block | Lock leak on error | Always wrap |
-| Read query without `%nolock%` (MSSQL) | Read blocks on writer | Add `WITH (%nolock%)` |
+| Read query blocked by a long writer (MSSQL) | Read blocks on writer | Shorten the writer transaction; do not hard-code `WITH(NOLOCK)` (not portable; `%nolock%` a confirmar no TDS) |
 | `BeginTran` without matching `EndTran` in all paths | Open transaction → DB-wide impact | Wrap with recovery |
 | Closing alias while locked | Inconsistent state | Unlock first, close after |
 | Trusting `MV_TIMEOUT` to "auto-fix" leaks | Just hides the leak; users still see errors | Fix the leak |
