@@ -31,6 +31,10 @@ usando WebFetch.
 | A1_COND | C | 3 | Condicao de Pagamento |
 | A1_VEND | C | 6 | Codigo do Vendedor |
 | A1_CONTA | C | 20 | Conta Contabil do cliente |
+| A1_EMAIL | C | 30 | E-Mail |
+| A1_LC | N | 14 | Limite de Cred.do cliente |
+| A1_ULTCOM | D | 8 | Data da ultima Compra |
+| A1_MSBLQL | C | 1 | Status do Registro |
 
 ## SA2 — Fornecedores
 
@@ -75,6 +79,7 @@ usando WebFetch.
 | B1_CONTA | C | 20 | Conta Contabil do Prod. |
 | B1_PROC | C | 6 | Fornecedor Padrao |
 | B1_CODBAR | C | 15 | Codigo de Barras |
+| B1_MSBLQL | C | 1 | Bloqueio de Tela |
 
 ## SB2 — Saldos em Estoque
 
