@@ -114,7 +114,7 @@ For each item: what to search for in the source, why it gets lost, and what goes
 
 ## Example — fictitious customer routine
 
-`ZFATA01.prw` is a fictitious customer routine that computes the sales commission of an order and records it in the custom table `ZA1`. It was migrated to the class `ComissaoService` in `custom.faturamento.comissao.tlpp`, and `ZFATA01.prw` was kept as the compatibility wrapper. All names are illustrative.
+`ZFATA01.prw` is a fictitious customer routine that computes the sales commission of an order and records it in the custom table `ZA1`. It was migrated to the class `ComissaoService` in `custom.faturamento.comissao.tlpp`, and `ZFATA01.prw` was kept as the compatibility wrapper. Because the moved code calls the entry point with `PARAMIXB`, a framework feature, the `.tlpp` has `#include "tlpp-core.th"` and `#include "totvs.ch"`; the `.prw` wrapper keeps `#include "totvs.ch"`. All names are illustrative.
 
 **Gap report — ZFATA01** (`ZFATA01.prw` → `custom.faturamento.comissao.tlpp`)
 
@@ -123,7 +123,7 @@ For each item: what to search for in the source, why it gets lost, and what goes
 | `U_ZFATA01` (menu) | kept in legacy | The wrapper in `ZFATA01.prw` delegates to `ComissaoService` | None: the menu still calls the wrapper |
 | `VerifyAccess` in `ZFATA01()`, before the edit screen | kept in legacy | Stays on the wrapper's screen path; `ComissaoService:calcular()` has no `VerifyAccess` call | Confirm in TDS what it checks; repeat it before any new direct caller of `ComissaoService` (job, REST endpoint, Smart X action) |
 | `SuperGetMV("MV_ZPCOMI", .F., 5)` | migrated | Read in `calcular()`, same default | Check that `MV_ZPCOMI` exists in the SX6 of every branch |
-| `ExistBlock("ZFAT01GR")` + `ExecBlock("ZFAT01GR", .F., .F., {cNumPed})` | migrated | Guard and call moved to `gravar()`; `PARAMIXB` unchanged | Test with `ZFAT01GR` compiled |
+| `ExistBlock("ZFAT01GR")` + `ExecBlock("ZFAT01GR", .F., .F., {cNumPed})` | migrated | Guard and call moved to `gravar()` (the `.tlpp` includes `totvs.ch`); `PARAMIXB` unchanged | Test with `ZFAT01GR` compiled |
 | `Private cZTpCom`, read by the entry point `ZFAT01GR` | not migratable | Became `data cTipoCom`; the entry point no longer sees it | Pass it as `PARAMIXB[2]` and adapt `ZFAT01GR` (customer's decision) |
 | SX7 trigger `ZA1_XVEND` → `ZA1_XNOMVE` | not migratable | `gravar()` writes with `RecLock`; the screen trigger does not run (a confirmar no TDS) | Fill `ZA1_XNOMVE` in `gravar()` or keep the screen path; test both |
 

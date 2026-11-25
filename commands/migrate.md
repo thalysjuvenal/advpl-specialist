@@ -46,7 +46,7 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
    - Target class structure (class name, namespace, properties, methods)
    - Mapping: which function becomes which method (public/private)
    - Private/Public variables to convert to class properties
-   - Includes to update (TOTVS.CH -> tlpp-core.th, etc.)
+   - Includes: the `.tlpp` uses `#include "tlpp-core.th"`, plus `#include "totvs.ch"` when it uses framework features (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...); the `.prw` wrapper keeps `#include "totvs.ch"`; includes always in lowercase
    - Whether a backward compatibility wrapper is needed
    - Any risks or breaking changes
    - Preliminary gap report: the items already visible in the source that will not carry over, in the `gap-report.md` format

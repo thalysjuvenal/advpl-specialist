@@ -77,10 +77,12 @@ Create the TLPP class structure and convert all functions.
 
 Verify that the migration is complete and correct.
 
-### Compilation
+### Compilation (in TDS / VS Code TOTVS extension)
 
-- [ ] The `.tlpp` file compiles without errors
-- [ ] The `.prw` wrapper file compiles without errors
+These items are checked by a person compiling in TDS / the VS Code TOTVS extension. An AI never ticks them: it reports "compilation and validation pending in TDS / VS Code TOTVS extension".
+
+- [ ] The `.tlpp` file compiles in TDS without errors
+- [ ] The `.prw` wrapper file compiles in TDS without errors
 - [ ] No warnings related to undefined variables or methods
 
 ### Functional Validation
@@ -88,7 +90,7 @@ Verify that the migration is complete and correct.
 - [ ] All external callers (other functions, menus, jobs) work correctly through the wrapper
 - [ ] Database operations produce the same results as the original code
 - [ ] Record locking and unlocking (`RecLock` / `MsUnlock`) work correctly
-- [ ] Error handling (`Begin Sequence` / `Recover`) catches and reports errors correctly
+- [ ] Error handling (`Try`/`Catch oError`/`EndTry` in the `.tlpp`, `Begin Sequence`/`Recover` in the `.prw` wrapper) catches and reports errors correctly
 - [ ] Return values match the original function's return type and behavior
 
 ### Code Quality

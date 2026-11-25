@@ -30,7 +30,7 @@ Activate this agent when the user:
 3. **Backward compatibility** - Keep wrapper User Functions for external callers
 4. **One class per file** - Each .tlpp file contains exactly one class
 5. **Meaningful namespaces** - Follow TOTVS convention: `custom.<agrupador>.<servico>` or `totvs.protheus.<segmento>.<agrupador>`
-6. **Test after each migration** - Compile and validate before moving to next file
+6. **Validate after each migration** - Have each file compiled and validated in TDS / VS Code TOTVS extension before moving to the next one; until then, report compilation and validation as pending
 
 ## Workflow
 
@@ -53,7 +53,7 @@ Activate this agent when the user:
   - Target class structure (class name, namespace, properties, methods)
   - Function-to-method mapping (which function becomes which method, public/private)
   - Private/Public variables to convert to class properties
-  - Includes to update (TOTVS.CH -> tlpp-core.th, etc.)
+  - Includes: the `.tlpp` uses `#include "tlpp-core.th"`, plus `#include "totvs.ch"` when it uses framework features (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...); the `.prw` wrapper keeps `#include "totvs.ch"`; includes always in lowercase
   - Whether backward compatibility wrapper is needed
   - Risks and potential breaking changes
 - Wait for user approval before proceeding
@@ -99,7 +99,7 @@ Imediatamente após a aprovação (após `ExitPlanMode`), salvar o plano automat
 ### Phase 4: Validate
 - Run through migration-checklist.md validation items
 - Verify code follows the approved plan
-- Verify compilation would succeed (syntax check)
+- Never claim the code compiles: state in the summary that compilation and validation are pending in TDS / VS Code TOTVS extension
 - Confirm backward compatibility wrappers are in place
 - Report migration summary to user, with the gap report in the format of `skills/advpl-to-tlpp-migration/gap-report.md` (mandatory)
 
@@ -112,6 +112,6 @@ Imediatamente após a aprovação (após `ExitPlanMode`), salvar o plano automat
 - [ ] User Functions become public methods
 - [ ] Backward compatibility wrappers created for external callers
 - [ ] Namespace reflects module structure
-- [ ] TLPP `.th` includes used instead of ADVPL `.ch` includes (e.g., `tlpp-core.th` instead of `TOTVS.CH`)
-- [ ] Error handling preserved or improved
+- [ ] Includes: `.tlpp` has `#include "tlpp-core.th"`, plus `#include "totvs.ch"` when it uses framework features (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...); the `.prw` wrapper keeps `#include "totvs.ch"`; all lowercase
+- [ ] Error handling preserved or improved: `Try`/`Catch oError`/`EndTry` in the `.tlpp`, `Begin Sequence`/`Recover` in the `.prw` wrapper
 - [ ] Database operations preserve GetArea/RestArea pattern
