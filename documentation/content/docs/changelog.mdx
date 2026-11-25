@@ -8,6 +8,35 @@ Todas as mudancas notaveis deste projeto sao documentadas neste arquivo.
 O formato e baseado no [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 e este projeto segue o [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-11-25
+
+Nota: Exemplos ADVPL/TLPP nao compilados; validacao no TDS pendente. A suite local de evals foi criada, mas ainda nao foi executada.
+
+### Adicionado
+
+- Motor de lint deterministico para ADVPL/TLPP em bash (`skills/advpl-code-review/scripts/advpl-lint.sh`) e PowerShell 5.1 (`advpl-lint.ps1`) com saida identica byte a byte e sem `jq`, Node ou Python em tempo de execucao: regras ADV001–ADV022 em um unico arquivo de regras (`advpl-lint.rules`), cobrindo os padroes proibidos do `AGENTS.md` e o catalogo alinhado ao SonarQube (atribuicao no `NOTICE`), com excecoes por projeto em `.advpl-specialist-ignore`.
+- Par de hooks `PreToolUse`/`PostToolUse` em `Write|Edit|MultiEdit` que acusa apenas as linhas introduzidas pela edicao (regras de escopo de arquivo so em arquivo novo); erros voltam ao Claude para correcao no mesmo turno, avisos chegam como contexto nao bloqueante.
+- Novo comando `/advpl-specialist:validate`: lint do arquivo inteiro (`--scope all`) seguido das checagens semanticas S1–S6, somente leitura, em um unico relatorio.
+- Scripts avulsos de conversao UTF-8 para Windows-1252 em bash e PowerShell (sem `iconv`) e secoes de autoverificacao para outras IAs fora do Claude Code.
+- `/advpl-specialist:refactor --focus modernize` (RF-007–RF-012); relatorio obrigatorio de lacunas pos-migracao no `/migrate`, no `/smartx` e na migracao de relatorios para Smart View; SX6 (parametros `MV_*`) e SX9 no `/sxgen`.
+- `/generate`, `/migrate` e `/smartx` respeitam a release declarada em `.protheus-version` (`skills/protheus-reference/releases.md`); novo `skills/advpl-code-generation/critical-rules.md`; os agentes pre-carregam suas skills pelo frontmatter `skills:`.
+- CI ampliado: motores em Linux e Windows, testes de hooks e encoding, ShellCheck, `scripts/check-refs.sh`, saidas multi-IA orfas, limites de descricao, build do site, `claude plugin validate --strict` e dogfooding dos blocos ADVPL/TLPP em skills, comandos, agentes, site, exemplos e README.
+- Suite local de evals em `evals/` (15 casos) mais `evals/lint-outputs.sh`; criada, ainda nao executada.
+- Novas paginas: [validate](/docs/comandos/validate), [Validacao](/docs/referencia/validacao) e [smartview-development](/docs/skills/smartview-development), alem dos scripts na pagina [Outras IAs](/docs/outras-ias); 6 novos exemplos (`examples/07` a `examples/12`).
+
+### Alterado
+
+- `#include "totvs.ch"` em minusculas em todo o plugin (`protheus.ch` e obsoleto); `FWMVCRotAuto` documentado como restrito e nao mais recomendado: use `MsExecAuto` conforme o exemplo documentado da rotina ou, em MVC, a API do modelo (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`).
+- `%exp:` deixa de ser descrito como bind de parametro; entrada do usuario ou externa passa pelo `FWPreparedStatement`.
+- Descricoes curtas de skills e comandos para a listagem do Claude Code; agente `code-generator` enxuto.
+- Hook `session-start` sem efeitos colaterais; a conversao CP1252 do hook usa o script avulso (sem `iconv`).
+- Caminhos de arquivos do plugin nos comandos ancorados em `${CLAUDE_PLUGIN_ROOT}`; 16 comandos (eram 15) e 48 saidas multi-IA.
+
+### Corrigido
+
+- Templates e exemplos alinhados ao TDN: assinatura do `FWLogMsg`, nomes dos metodos REST do `oRest`, `EndSQL` na coluna 1 (regra ADV022), nomes de campos do SX6, campos SX3 ficticios trocados por reais e as APIs inexistentes `FwNoInjection` e `FWLogError` removidas; `CriaTrab` deixa de ser recomendado.
+- Notas para Windows (hooks precisam do Git Bash); pacote do Playwright MCP (`@playwright/mcp`); id de instalacao do superpowers (`superpowers@claude-plugins-official`); drift do site.
+
 ## [1.6.0] - 2026-09-14
 
 ### Adicionado
