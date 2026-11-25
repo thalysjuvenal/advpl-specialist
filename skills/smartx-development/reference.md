@@ -34,14 +34,16 @@ Os três artefatos usam este conjunto de includes:
 
 ```advpl
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
+#include "totvs.ch"
 #include "totvs.framework.structure.model.th"      // no Modelo
-#include "totvs.framework.structure.Interface.th"   // na Interface
+#include "totvs.framework.structure.interface.th"   // na Interface
 ```
 
 O Modelo é marcado com a annotation `@totvsFrameworkStructureModel(lookup=.F., country="ALL", description="...")` e estende `totvs.framework.structure.model.data`. A Interface é marcada com `@totvsFrameworkStructureInterface(lookup=.F., country="ALL", description="...")`. O Launcher não exige annotation — é uma função ADVPL/TLPP simples que instancia `totvs.framework.application.smartx.launcher()`.
 
-> **Nota de divergência:** o arquivo local de validação cruzada (`totvs/agent-skills/skills/advpl-tlpp/smartx-generator/SKILL.md`) descreve uma convenção alternativa — includes reduzidos a `totvs.ch`, `using namespace` para os pacotes `totvs.framework.structure.*`, nomes de classe fixos `Model`/`View`, função executora sempre chamada `executor()` com `launcher():show(cNamespace)`, e namespace de arquivo `totvs.protheus.{modulo}.smartx.{entidade}`. Essa fonte local diverge do TDN nos includes, no padrão de nomenclatura e na chamada do Launcher (`launcher():new():setInterface(cNamespace):open()`, conforme os exemplos reais `FINA050SM`/`MATA110SX`/`MATA120SX` do TDN). Como o TDN é a fonte primária, este documento segue os includes, a annotation e a chamada do Launcher exatamente como aparecem no TDN.
+> **Notas sobre includes:** o `totvs.ch` inclui o `protheus.ch`; o TDN ainda grafa `protheus.ch` nos exemplos de Smart X. O TDN também grafa `Interface.th` (maiúsculo); aqui o include vai em minúsculas (`totvs.framework.structure.interface.th`) e a diferenciação de caixa na compilação em Linux está a confirmar (TDN, item 13). O `fw-tlpp-core.th` é o include oficial dos fontes Smart X.
+>
+> A chamada do Launcher segue os exemplos reais `FINA050SM`/`MATA110SX`/`MATA120SX` do TDN: `launcher():new():setInterface(cNamespace):open()`.
 
 ## Exemplo Mínimo
 
@@ -51,7 +53,7 @@ Exemplo baseado no fonte real `backoffice.fin.fina050sm` (Contas a Pagar), fiel 
 
 ```advpl
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
+#include "totvs.ch"
 #include "totvs.framework.structure.model.th"
 
 namespace totvs.backoffice.fin.fina050sm
@@ -86,8 +88,8 @@ return
 
 ```advpl
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
-#include "totvs.framework.structure.Interface.th"
+#include "totvs.ch"
+#include "totvs.framework.structure.interface.th"
 
 namespace totvs.backoffice.fin.fina050sm
 
@@ -148,7 +150,7 @@ return ::oInterface:getContract()
 ### Launcher (função de menu)
 
 ```advpl
-#include "protheus.ch"
+#include "totvs.ch"
 
 // Função registrada no menu Protheus
 function FINA050SM()
@@ -182,4 +184,4 @@ A documentação oficial do Smart X no TDN é ativa e vem evoluindo — a própr
 - Validações e Regras de Negócio — SmartX
 - Eventos no Modelo SmartX
 
-A divergência encontrada entre o TDN e o material local de validação cruzada (includes, nomenclatura de namespace, forma de chamar o Launcher) reforça que a API do Smart X pode variar entre releases e entre fontes de referência. Antes de gerar código novo, confirme a versão do release-alvo e consulte as **Release Notes** do Protheus para eventuais mudanças na API `totvs.framework.structure.*` e `totvs.framework.application.smartx.*`.
+A API do Smart X pode variar entre releases. Antes de gerar código novo, confirme a versão do release-alvo e consulte as **Release Notes** do Protheus para eventuais mudanças na API `totvs.framework.structure.*` e `totvs.framework.application.smartx.*`.

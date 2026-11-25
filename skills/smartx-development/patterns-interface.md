@@ -26,8 +26,8 @@ Quando não há necessidade de modificações de eventos, a interface pode ser c
 
 ```advpl
 #include "fw-tlpp-core.th"
-#include "protheus.ch"
-#include "totvs.framework.structure.Interface.th"
+#include "totvs.ch"
+#include "totvs.framework.structure.interface.th"
 
 namespace totvs.faturamento.cliente.Interface
 
@@ -46,7 +46,7 @@ method setInterface() class crma980
 return
 ```
 
-> **Nota de grafia/divergência:** o raw do TDN grafa o método como `buildStardardView()` (sic) neste exemplo de interface simplificada; o material local de validação cruzada usa a grafia correta `buildStandardView()`. Como o TDN é a fonte primária, este trecho mantém a grafia exatamente como publicada (`buildStardardView`) — confirme a grafia vigente no ambiente-alvo (TDS/IDE) antes de usar em produção. Para divergências de includes/nomenclatura já mapeadas entre TDN e material local, ver `reference.md`.
+> **Nota de grafia/divergência:** o raw do TDN grafa o método como `buildStardardView()` (sic) neste exemplo de interface simplificada; a grafia correta em outros trechos é `buildStandardView()`. Como o TDN é a fonte primária, este trecho mantém a grafia exatamente como publicada (`buildStardardView`) — confirme a grafia vigente no ambiente-alvo (TDS/IDE) antes de usar em produção. Para as notas sobre includes, ver `reference.md`.
 
 ### Exemplo completo (cadastro de clientes, não oficial)
 
@@ -54,8 +54,8 @@ Quando a rotina exige dataView, dataNew, dataEdit e dataDetail configurados indi
 
 ```advpl
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
-#include "totvs.framework.structure.Interface.th"
+#include "totvs.ch"
+#include "totvs.framework.structure.interface.th"
 
 namespace totvs.faturamento.cliente.Interface
 

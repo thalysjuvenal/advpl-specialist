@@ -24,7 +24,7 @@ Arquivo de exemplo `compras.produto.model.mata010.tlpp`, namespace pela padroniz
 
 ```advpl
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
+#include "totvs.ch"
 #include "totvs.framework.structure.model.th"
 
 namespace totvs.compras.produto.model
@@ -92,7 +92,7 @@ Notas do TDN:
 
 3. **Eventos do dicionário carregados automaticamente, sem método.** Não é mais necessário chamar `self:setOnChange()`, `self:setOnBeforeInsert()`, `self:setOnLoad()` ou `self:loadEventsFromMetaData()` — triggers, valids e inicializadores do dicionário passam a ser carregados automaticamente pelo framework.
 
-> **Nota de divergência:** o material local de validação cruzada (`totvs/agent-skills/skills/advpl-tlpp/smartx-generator/references/smartx-model-reference.md`) ainda documenta uma chamada explícita `self:loadEventsFromMetadata()` (ou `loadEventsFromMetadata(lTriggers, lValidations, lInitializers)`) para carregar eventos do dicionário. Essa fonte diverge do breaking change #3 do TDN, que afirma que esse carregamento passou a ser automático e que nenhum método é mais necessário. Como o TDN é a fonte primária, este documento segue o TDN: **não é necessário chamar método algum** para carregar eventos do dicionário na versão descrita aqui.
+> Segundo o breaking change #3 do TDN, **não é necessário chamar método algum** (nem `loadEventsFromMetadata`) para carregar eventos do dicionário na versão descrita aqui.
 
 ### Eventos no Modelo
 
@@ -294,7 +294,7 @@ Preenchimento: campo **"Valid Smart X"** no ATUSX (grid de detalhes do campo), d
 A função de validação recebe `xValue` (valor), `cField` (nome do campo) e `aContextInfo` (array); retorna um JSON com `return` (lógico) e `notValidMessage`:
 
 ```advpl
-#include "protheus.ch"
+#include "totvs.ch"
 
 Function MyValidateFunction( xValue, cField, aContextInfo )
 Local jRet as json
@@ -345,7 +345,7 @@ A função de validação recebe `cIdentifier` (caractere) e `jFields` (json com
 
 ```advpl
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
+#include "totvs.ch"
 
 namespace totvs.framework.example.modelo.valids
 

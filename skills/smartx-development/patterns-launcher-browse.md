@@ -91,7 +91,7 @@ Avisos idênticos ao `mBrowse` (`DbSetFilter` ignorado; personalizações visuai
 Indica se o ambiente está pronto para rodar a rotina em Smart X. Requer o include `fwmbrowse.ch` atualizado.
 
 ```advpl
-#include 'protheus.ch'
+#include "totvs.ch"
 #include 'fwmbrowse.ch'
 
 User Function COMP002_SMX()
@@ -135,13 +135,13 @@ O comando `PAGEACTION` exige os `.ch` de framework atualizados (disponíveis a p
 Informa se a pilha de chamadas se originou de uma rotina Smart X — útil em valids genéricos chamados tanto por MVC clássico quanto por Smart X:
 
 ```advpl
-#include "protheus.ch"
+#include "totvs.ch"
 
 user function vldSmrtX() as logical
 if totvs.framework.smartx.context.amIIn()
-   conout("Estou no SmartX")
+   FWLogMsg("INFO", , "SMARTX", , , , "Estou no SmartX")
 else
-   conout("Nao estou no SmartX")
+   FWLogMsg("INFO", , "SMARTX", , , , "Nao estou no SmartX")
 endif
 return .T.
 ```
