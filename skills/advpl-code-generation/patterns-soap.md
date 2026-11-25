@@ -11,8 +11,8 @@ The `WsService` approach defines SOAP services with typed attributes and methods
 ### 1.1 Includes
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "APWebSrv.ch"
+#include "totvs.ch"
+#include "apwebsrv.ch"
 ```
 
 **Both includes are required** for exposing SOAP services.
@@ -20,8 +20,8 @@ The `WsService` approach defines SOAP services with typed attributes and methods
 ### 1.2 Service Declaration
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "APWebSrv.ch"
+#include "totvs.ch"
+#include "apwebsrv.ch"
 
 /*/{Protheus.doc} zWSClientes
 Web Service SOAP para operacoes com clientes
@@ -209,7 +209,7 @@ WsMethod NewCli WsReceive cNewRece WsSend cNewSend WsService zWSClientes
             cErrorLog += aLogAuto[nLinha] + CRLF
         Next nLinha
 
-        Conout("zWSClientes:NewCli - Erro: " + cErrorLog)
+        FWLogMsg("ERROR", /*cTransactionId*/, "zWSClientes", "NewCli", /*cStep*/, /*cMsgId*/, "Erro na inclusao: " + cErrorLog)
 
         jResp["errorId"]  := "NEW003"
         jResp["error"]    := "Erro na inclusao do registro"
@@ -316,15 +316,15 @@ Use `TWsdlManager` to call external SOAP services from ADVPL.
 ### 2.1 Include
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 ```
 
-Only `TOTVS.CH` is needed — `TWsdlManager` is a native Protheus class.
+Only `totvs.ch` is needed — `TWsdlManager` is a native Protheus class.
 
 ### 2.2 Basic Flow: Load WSDL, Call Operation, Read Response
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} ConsumeWS
 Exemplo de consumo de Web Service SOAP via TWsdlManager
@@ -348,13 +348,13 @@ User Function ConsumeWS()
 
     // Carregar WSDL
     If !oWsdl:ParseURL(cUrl)
-        Conout("Erro ao carregar WSDL: " + oWsdl:cError)
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "ParseURL", /*cStep*/, /*cMsgId*/, "Erro ao carregar WSDL: " + oWsdl:cError)
         Return lRet
     EndIf
 
     // Selecionar operacao
     If !oWsdl:SetOperation("VIEWCLI")
-        Conout("Erro ao selecionar operacao: " + oWsdl:cError)
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "SetOperation", /*cStep*/, /*cMsgId*/, "Erro ao selecionar operacao: " + oWsdl:cError)
         Return lRet
     EndIf
 
@@ -373,13 +373,13 @@ User Function ConsumeWS()
         cResp := oWsdl:GetParsedResponse()
 
         If !Empty(cResp)
-            Conout("Resposta: " + cResp)
+            FWLogMsg("INFO", /*cTransactionId*/, "ConsumeWS", "Response", /*cStep*/, /*cMsgId*/, "Resposta: " + cResp)
             lRet := .T.
         Else
-            Conout("Resposta vazia")
+            FWLogMsg("WARN", /*cTransactionId*/, "ConsumeWS", "Response", /*cStep*/, /*cMsgId*/, "Resposta vazia")
         EndIf
     Else
-        Conout("Erro ao enviar SOAP: " + oWsdl:cError)
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "SendSoapMsg", /*cStep*/, /*cMsgId*/, "Erro ao enviar SOAP: " + oWsdl:cError)
     EndIf
 
 Return lRet
@@ -397,15 +397,15 @@ User Function ListOps()
     oWsdl:nTimeout := 60
 
     If !oWsdl:ParseURL(cUrl)
-        Conout("Erro: " + oWsdl:cError)
+        FWLogMsg("ERROR", /*cTransactionId*/, "ListOps", "ParseURL", /*cStep*/, /*cMsgId*/, "Erro: " + oWsdl:cError)
         Return
     EndIf
 
     // Listar operacoes do servico
-    Conout("Operacoes disponiveis:")
+    FWLogMsg("INFO", /*cTransactionId*/, "ListOps", "ListOperations", /*cStep*/, /*cMsgId*/, "Operacoes disponiveis:")
     aOps := oWsdl:ListOperations()
     For nI := 1 To Len(aOps)
-        Conout("  " + aOps[nI])
+        FWLogMsg("INFO", /*cTransactionId*/, "ListOps", "ListOperations", /*cStep*/, /*cMsgId*/, "  " + aOps[nI])
     Next nI
 
 Return
@@ -426,13 +426,13 @@ User Function ConsumeWSSafe()
 
     // Carregar WSDL com tratamento
     If !oWsdl:ParseURL(cUrl)
-        FWLogMsg("ERROR", , "ConsumeWS", "ParseURL", , , ;
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "ParseURL", /*cStep*/, /*cMsgId*/, ;
             "Falha ao carregar WSDL: " + cUrl + " - " + oWsdl:cError)
         Return .F.
     EndIf
 
     If !oWsdl:SetOperation("OPERACAO")
-        FWLogMsg("ERROR", , "ConsumeWS", "SetOperation", , , ;
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "SetOperation", /*cStep*/, /*cMsgId*/, ;
             "Operacao nao encontrada: OPERACAO")
         Return .F.
     EndIf
@@ -441,14 +441,14 @@ User Function ConsumeWSSafe()
     cMsgWs := fMontaEnvelope()
 
     If !oWsdl:SendSoapMsg(cMsgWs)
-        FWLogMsg("ERROR", , "ConsumeWS", "SendSoapMsg", , , ;
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "SendSoapMsg", /*cStep*/, /*cMsgId*/, ;
             "Falha no envio SOAP: " + oWsdl:cError)
         Return .F.
     EndIf
 
     // Verificar SOAP Fault via propriedades
     If !Empty(oWsdl:cFaultCode)
-        FWLogMsg("ERROR", , "ConsumeWS", "SoapFault", , , ;
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "SoapFault", /*cStep*/, /*cMsgId*/, ;
             "SOAP Fault: [" + oWsdl:cFaultCode + "] " + oWsdl:cFaultString)
         Return .F.
     EndIf
@@ -457,13 +457,13 @@ User Function ConsumeWSSafe()
     cResp := oWsdl:GetParsedResponse()
 
     If Empty(cResp)
-        FWLogMsg("WARN", , "ConsumeWS", "Response", , , ;
+        FWLogMsg("WARN", /*cTransactionId*/, "ConsumeWS", "Response", /*cStep*/, /*cMsgId*/, ;
             "Resposta vazia do servico")
         Return .F.
     EndIf
 
     // Processar resposta (pode ser XML ou texto)
-    Conout("Resposta: " + cResp)
+    FWLogMsg("INFO", /*cTransactionId*/, "ConsumeWS", "Response", /*cStep*/, /*cMsgId*/, "Resposta: " + cResp)
 
 Return .T.
 
@@ -562,7 +562,7 @@ oWsdl:bNoCheckPeerCert := .T.
 
 // Try loading from local file instead
 If !oWsdl:ParseURL(cUrl)
-    Conout("ParseURL failed: " + oWsdl:cError)
+    FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "ParseURL", /*cStep*/, /*cMsgId*/, "ParseURL failed: " + oWsdl:cError)
     // Save WSDL manually and use ParseFile
     // oWsdl:ParseFile("C:\temp\service.wsdl")
 EndIf
@@ -577,10 +577,9 @@ EndIf
 If oWsdl:SendSoapMsg(cMsgWs)
     // Check SOAP Fault via properties (NOT via GetSoapFault which does not exist)
     If !Empty(oWsdl:cFaultCode)
-        Conout("SOAP Fault Code: " + oWsdl:cFaultCode)
-        Conout("SOAP Fault Msg:  " + oWsdl:cFaultString)
-        // Also check the raw response for details
-        Conout("Raw XML: " + oWsdl:GetSoapResponse())
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConsumeWS", "SoapFault", /*cStep*/, /*cMsgId*/, "SOAP Fault: [" + oWsdl:cFaultCode + "] " + oWsdl:cFaultString)
+        // Also check the raw response for details (DEBUG only shows with FWLOGMSG_DEBUG=1)
+        FWLogMsg("DEBUG", /*cTransactionId*/, "ConsumeWS", "SoapFault", /*cStep*/, /*cMsgId*/, "Raw XML: " + oWsdl:GetSoapResponse())
     Else
         cResp := oWsdl:GetParsedResponse()
     EndIf
@@ -598,9 +597,9 @@ EndIf
 
 **Solution:**
 ```advpl
-// Check the raw SOAP response
-Local cRawXml := oWsdl:GetSoapMsg()
-Conout("Raw response: " + cRawXml)
+// Check the raw SOAP response (GetSoapMsg() returns the message sent, not the response)
+Local cRawXml := oWsdl:GetSoapResponse()
+FWLogMsg("DEBUG", /*cTransactionId*/, "ConsumeWS", "Response", /*cStep*/, /*cMsgId*/, "Raw response: " + cRawXml)
 
 // Verify operation name matches exactly (case-sensitive)
 // Verify namespace in envelope matches the WSDL target namespace
@@ -630,10 +629,10 @@ oWsdl:bNoCheckPeerCert := .T.
 | Always use `FWGetArea()` / `FWRestArea()` | Preserve work area state in every WsMethod |
 | Validate input before processing | Check required fields and data format |
 | Return structured responses | Use JSON via `JsonObject` for consistent output |
-| Log errors with context | Use `FWLogMsg` or `Conout` with service/method name |
+| Log errors with context | Use `FWLogMsg` (never `ConOut`) with the service/method name as group/category and severity `ERROR`/`WARN` on failure paths |
 | Set appropriate timeout | Default 120s may be too long or short — adjust per service |
 | Handle SOAP Faults explicitly | Always check `cFaultCode`/`cFaultString` properties after `SendSoapMsg()` |
-| Use `MsExecAuto` for data operations | Triggers standard Protheus validations and workflows |
+| Use `MsExecAuto` for data operations | Triggers standard Protheus validations and workflows — copy the block signature and arrays from the routine's documented ExecAuto example on TDN (when an MVC routine documents the model API instead, follow it — `patterns-mvc.md` section 6; never `FWMVCRotAuto`, which is restricted) |
 | Do NOT use `Private` variables in new code | Exception: `lMsHelpAuto`, `lAutoErrNoFile`, `lMsErroAuto` required by `MsExecAuto` |
 | Name services with `z` prefix | Convention for custom services: `zWSClientes`, `zWSPedidos` |
 | Keep methods focused | One operation per method — avoid methods that do multiple things |

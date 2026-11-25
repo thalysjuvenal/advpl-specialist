@@ -13,15 +13,15 @@ The MVC pattern in Protheus is **not** the same as web-based MVC (such as Larave
 - **MenuDef**: Defines the browsable interface and the available operations (include, edit, delete, view, print, copy).
 
 Key characteristics:
-- The Model is completely independent of the View. You can execute the Model programmatically without any screen (via `FWMVCRotAuto`).
+- The Model is completely independent of the View. You can execute the Model programmatically without any screen through the model API (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`, see section 6). `FWMVCRotAuto` is restricted and is not taught here.
 - The View always references a Model. It never contains business logic.
 - Protheus MVC enforces data integrity through pre/post validation blocks, triggers, and commit/cancel blocks.
 - All three definitions (`MenuDef`, `ModelDef`, `ViewDef`) are exported as `Static Function` and discovered by the framework at runtime.
 
 Required includes:
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 ```
 
 ---
@@ -51,7 +51,7 @@ Static Function MenuDef()
 Return aRotina
 ```
 
-**Operation constants** (from `FWMVCDef.ch`):
+**Operation constants** (from `fwmvcdef.ch`):
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `MODEL_OPERATION_VIEW` | 1 | View record (read-only) |
@@ -388,8 +388,8 @@ Return oView
 Full working MVC for a custom orders (ZA1) and order items (ZA2) structure.
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
 /*/{Protheus.doc} FATA090
 Cadastro de Pedidos customizado com MVC
@@ -509,12 +509,13 @@ Return lRet
 
 // Commit customizado
 Static Function CommitPed(oModel)
+    Local oMaster := oModel:GetModel("ZA1MASTER")
+    Local cNumPed := oMaster:GetValue("ZA1_NUM")
+
     FWFormCommit(oModel)
 
     // Logica adicional apos gravacao
-    Local oMaster := oModel:GetModel("ZA1MASTER")
-    Local cNumPed := oMaster:GetValue("ZA1_NUM")
-    Conout("Pedido gravado: " + cNumPed)
+    FWLogMsg("INFO", /*cTransactionId*/, "FATA090", "CommitPed", /*cStep*/, /*cMsgId*/, "Pedido gravado: " + cNumPed)
 
 Return Nil
 
@@ -575,155 +576,185 @@ Return oView
 
 ---
 
-## 6. FWMVCRotAuto - Batch/Programmatic Execution
+## 6. Programmatic Execution via the Model API (execução programática)
 
-`FWMVCRotAuto` allows you to execute MVC operations programmatically, without user interface. This is essential for integrations, batch processing, and automated data entry.
+The Model can run without any screen (integrations, jobs, batch processing). Load the model of the source that holds the `ModelDef`, fill it through the model API and commit, following the routine's documented example. This is the same flow as `patterns-workflow.md` section 3 (the TDN ExecAuto pages of MVC routines, e.g. MATA094, use it). Validation of the examples in TDS is pending.
 
-### 6.1 Include Operation
+> **FWMVCRotAuto (restricted) — not taught.** TOTVS lists `FWMVCRotAuto` among the internal-property resources without support, and since 2019 it is for TOTVS internal use only: customer code must not use it (TOTVS Help Center, "Funções, classes e variáveis de propriedade interna" and "Problemas em rotina automática (EXECAUTO)"). `FWExecView()` opens the interface, so it is not an automation alternative. For non-MVC standard routines use `MsExecAuto` following the routine's documented ExecAuto example (`patterns-workflow.md` section 2).
+
+### 6.1 Flow
+
+| Step | Call |
+|------|------|
+| Load the model of the source that holds the `ModelDef` | `oModel := FWLoadModel("FATA090")` |
+| Set the operation (`fwmvcdef.ch`) | `oModel:SetOperation(MODEL_OPERATION_INSERT)` (`MODEL_OPERATION_UPDATE`/`MODEL_OPERATION_DELETE` with the record positioned) |
+| Activate and check the return | `If oModel:Activate()` — `.F.` means the model was not activated |
+| Fill fields | `oModel:SetValue("ZA1MASTER", "ZA1_CLIENT", xValor)` — for a grid, the current line; the grid starts with one line and `oModel:GetModel("ZA2DETAIL"):AddLine()` adds (and positions on) the next one |
+| Validate and save | `oModel:VldData()`, then `oModel:CommitData()` |
+| On failure | `aErro := oModel:GetErrorMessage()` — `aErro[6]` error message, `aErro[7]` suggested solution |
+| Release | `oModel:DeActivate()` and `oModel:Destroy()` |
+
+### 6.2 Include Operation
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
+/*/{Protheus.doc} IncPedAuto
+Inclusao de pedido (ZA1/ZA2) via API do modelo MVC, sem interface
+@type User Function
+@author Autor
+@since 01/01/2026
+@version 1.0
+@return logical, .T. se o pedido foi gravado
+/*/
 User Function IncPedAuto()
-    Local aHeader  := {}
-    Local aItems   := {}
-    Local aLine    := {}
-    Local oModel   := Nil
-    Local lRet     := .F.
+    Local oModel := Nil
+    Local lRet   := .F.
 
-    // Cabecalho (master fields)
-    aAdd(aHeader, {"ZA1_NUM",    "000001",          Nil})
-    aAdd(aHeader, {"ZA1_CLIENT", "000001",          Nil})
-    aAdd(aHeader, {"ZA1_LOJA",   "01",              Nil})
-    aAdd(aHeader, {"ZA1_EMISSA", Date(),            Nil})
+    oModel := FWLoadModel("FATA090") // Fonte que contem o ModelDef de ZA1/ZA2 (secao 5)
+    oModel:SetOperation(MODEL_OPERATION_INSERT)
 
-    // Item 1
-    aLine := {}
-    aAdd(aLine, {"ZA2_ITEM",   "01",    Nil})
-    aAdd(aLine, {"ZA2_PROD",   "000001", Nil})
-    aAdd(aLine, {"ZA2_QUANT",  10,       Nil})
-    aAdd(aLine, {"ZA2_PRCUNI", 25.50,    Nil})
-    aAdd(aItems, aLine)
+    If oModel:Activate()
+        // Cabecalho (master)
+        oModel:SetValue("ZA1MASTER", "ZA1_NUM",    "000001")
+        oModel:SetValue("ZA1MASTER", "ZA1_CLIENT", "000001")
+        oModel:SetValue("ZA1MASTER", "ZA1_LOJA",   "01")
+        oModel:SetValue("ZA1MASTER", "ZA1_EMISSA", Date())
 
-    // Item 2
-    aLine := {}
-    aAdd(aLine, {"ZA2_ITEM",   "02",    Nil})
-    aAdd(aLine, {"ZA2_PROD",   "000002", Nil})
-    aAdd(aLine, {"ZA2_QUANT",  5,        Nil})
-    aAdd(aLine, {"ZA2_PRCUNI", 100.00,   Nil})
-    aAdd(aItems, aLine)
+        // Item 1 (o grid ja nasce com uma linha)
+        oModel:SetValue("ZA2DETAIL", "ZA2_ITEM",   "01")
+        oModel:SetValue("ZA2DETAIL", "ZA2_PROD",   "000001")
+        oModel:SetValue("ZA2DETAIL", "ZA2_QUANT",  10)
+        oModel:SetValue("ZA2DETAIL", "ZA2_PRCUNI", 25.50)
 
-    // Executa inclusao
-    lRet := FWMVCRotAuto(oModel, "FATA090", MODEL_OPERATION_INSERT, {;
-        {"ZA1MASTER", aHeader}, ;
-        {"ZA2DETAIL", aItems}   ;
-    })
+        // Item 2: AddLine() inclui a linha e posiciona nela
+        oModel:GetModel("ZA2DETAIL"):AddLine()
+        oModel:SetValue("ZA2DETAIL", "ZA2_ITEM",   "02")
+        oModel:SetValue("ZA2DETAIL", "ZA2_PROD",   "000002")
+        oModel:SetValue("ZA2DETAIL", "ZA2_QUANT",  5)
+        oModel:SetValue("ZA2DETAIL", "ZA2_PRCUNI", 100.00)
+
+        If oModel:VldData()
+            lRet := oModel:CommitData()
+        EndIf
+    EndIf
 
     If lRet
-        Conout("Pedido incluido com sucesso!")
+        FWLogMsg("INFO", /*cTransactionId*/, "IncPedAuto", "ModelAPI", /*cStep*/, /*cMsgId*/, "Pedido incluido com sucesso!")
     Else
-        Conout("Erro na inclusao do pedido.")
-        // Recuperar mensagens de erro
-        AutoGrLog("Erro na inclusao automatica")
-        MostraErro()
+        LogErroMdl(oModel, "IncPedAuto", "Erro na inclusao do pedido") // secao 6.5
     EndIf
+
+    oModel:DeActivate()
+    oModel:Destroy()
 
 Return lRet
 ```
 
-### 6.2 Update Operation
+### 6.3 Update Operation
 
 ```advpl
 User Function AltPedAuto()
-    Local aHeader := {}
-    Local lRet    := .F.
-    Local oModel  := Nil
+    Local aArea  := GetArea()
+    Local oModel := Nil
+    Local lRet   := .F.
 
-    // Posiciona no registro a ser alterado
+    // Posiciona no registro a ser alterado (indice 1: ZA1_FILIAL + ZA1_NUM)
     DbSelectArea("ZA1")
-    DbSetOrder(1)
-    DbSeek(xFilial("ZA1") + "000001")
+    ZA1->(DbSetOrder(1))
 
-    // Campos a alterar
-    aAdd(aHeader, {"ZA1_CLIENT", "000002", Nil})
-    aAdd(aHeader, {"ZA1_LOJA",   "01",     Nil})
+    If ZA1->(DbSeek(xFilial("ZA1") + "000001"))
+        oModel := FWLoadModel("FATA090")
+        oModel:SetOperation(MODEL_OPERATION_UPDATE)
 
-    lRet := FWMVCRotAuto(oModel, "FATA090", MODEL_OPERATION_UPDATE, {;
-        {"ZA1MASTER", aHeader} ;
-    })
+        If oModel:Activate()
+            // Campos a alterar
+            oModel:SetValue("ZA1MASTER", "ZA1_CLIENT", "000002")
+            oModel:SetValue("ZA1MASTER", "ZA1_LOJA",   "01")
 
-    If lRet
-        Conout("Pedido alterado com sucesso!")
+            If oModel:VldData()
+                lRet := oModel:CommitData()
+            EndIf
+        EndIf
+
+        If lRet
+            FWLogMsg("INFO", /*cTransactionId*/, "AltPedAuto", "ModelAPI", /*cStep*/, /*cMsgId*/, "Pedido alterado com sucesso!")
+        Else
+            LogErroMdl(oModel, "AltPedAuto", "Erro na alteracao do pedido") // secao 6.5
+        EndIf
+
+        oModel:DeActivate()
+        oModel:Destroy()
     Else
-        Conout("Erro na alteracao.")
-        MostraErro()
+        FWLogMsg("WARN", /*cTransactionId*/, "AltPedAuto", "ModelAPI", /*cStep*/, /*cMsgId*/, "Pedido 000001 nao encontrado.")
     EndIf
+
+    RestArea(aArea)
 
 Return lRet
 ```
 
-### 6.3 Delete Operation
+### 6.4 Delete Operation
 
 ```advpl
 User Function DelPedAuto()
-    Local lRet   := .F.
+    Local aArea  := GetArea()
     Local oModel := Nil
+    Local lRet   := .F.
 
-    // Posiciona no registro a ser excluido
+    // Posiciona no registro a ser excluido (indice 1: ZA1_FILIAL + ZA1_NUM)
     DbSelectArea("ZA1")
-    DbSetOrder(1)
-    DbSeek(xFilial("ZA1") + "000001")
+    ZA1->(DbSetOrder(1))
 
-    lRet := FWMVCRotAuto(oModel, "FATA090", MODEL_OPERATION_DELETE)
+    If ZA1->(DbSeek(xFilial("ZA1") + "000001"))
+        oModel := FWLoadModel("FATA090")
+        oModel:SetOperation(MODEL_OPERATION_DELETE)
 
-    If lRet
-        Conout("Pedido excluido com sucesso!")
+        If oModel:Activate()
+            If oModel:VldData()
+                lRet := oModel:CommitData()
+            EndIf
+        EndIf
+
+        If lRet
+            FWLogMsg("INFO", /*cTransactionId*/, "DelPedAuto", "ModelAPI", /*cStep*/, /*cMsgId*/, "Pedido excluido com sucesso!")
+        Else
+            LogErroMdl(oModel, "DelPedAuto", "Erro na exclusao do pedido") // secao 6.5
+        EndIf
+
+        oModel:DeActivate()
+        oModel:Destroy()
     Else
-        Conout("Erro na exclusao.")
-        MostraErro()
+        FWLogMsg("WARN", /*cTransactionId*/, "DelPedAuto", "ModelAPI", /*cStep*/, /*cMsgId*/, "Pedido 000001 nao encontrado.")
     EndIf
+
+    RestArea(aArea)
 
 Return lRet
 ```
 
-### 6.4 Parameter Array Structure
+### 6.5 Error Handling
 
-The parameter array for `FWMVCRotAuto` follows this structure:
-
-```
-{
-    { cModelId, aFieldValues },  // Master
-    { cGridId,  aGridLines   }   // Detail (optional)
-}
-```
-
-Where each field value is:
-```
-{ cFieldName, xValue, cLookupKey }
-```
-
-| Element | Type | Description |
-|---------|------|-------------|
-| `cFieldName` | Character | SX3 field name |
-| `xValue` | Any | Value to set |
-| `cLookupKey` | Character/Nil | Nil for direct value, or lookup key |
-
-### 6.5 Error Handling in RotAuto
+The model API does not use the `MsExecAuto` control variables (`lMsErroAuto`, `lMsHelpAuto`, `lAutoErrNoFile`) nor `MostraErro()` (which shows a dialog and is not usable in jobs/REST). The error comes from the model itself through `GetErrorMessage()`. Helper used by the examples above:
 
 ```advpl
-Private lMsErroAuto    := .F.
-Private lMsHelpAuto    := .T.
-Private lAutoErrNoFile := .T.
+Static Function LogErroMdl(oModel, cGrupo, cContexto)
+    Local aErro := oModel:GetErrorMessage() // aErro[6] = mensagem, aErro[7] = solucao
 
-lRet := FWMVCRotAuto(oModel, "FATA090", MODEL_OPERATION_INSERT, aParams)
+    FWLogMsg("ERROR", /*cTransactionId*/, cGrupo, "ModelAPI", /*cStep*/, /*cMsgId*/, cContexto + ": " + AllToChar(aErro[6]) + " | Solucao: " + AllToChar(aErro[7]))
 
-If lMsErroAuto
-    // Erros ocorreram
-    Local cErro := MostraErro(.F.) // .F. para retornar string em vez de exibir dialog
-    Conout("Erros: " + cErro)
-EndIf
+Return Nil
 ```
+
+How the form IDs and fields map to `SetValue`:
+
+| Element | Description |
+|---------|-------------|
+| Form ID (`"ZA1MASTER"`, `"ZA2DETAIL"`) | ID declared in `AddFields`/`AddGrid` of the `ModelDef` |
+| Field (`"ZA1_CLIENT"`) | SX3 field of the form structure |
+| Value | Value of the field type (character, numeric, date, logical) |
+| Grid line | `SetValue` acts on the current line; `GetModel("ZA2DETAIL"):AddLine()` adds and positions on a new line |
 
 ---
 
@@ -735,7 +766,7 @@ Before MVC, Protheus used `AxCadastro` (also known as Modelo1, Modelo2, Modelo3)
 |---------|-------------------|-------------------------------|
 | Architecture | Model + View separated | All-in-one function |
 | Testability | Model can run without UI | Requires screen interaction |
-| Batch execution | FWMVCRotAuto | MsExecAuto / ExecAuto |
+| Batch execution | Model API (`FWLoadModel` + `SetValue` + `VldData` + `CommitData`); `FWMVCRotAuto` is restricted | MsExecAuto (routine's documented ExecAuto example) |
 | Master-detail | Built-in with AddGrid | MSGetDados / GetDados arrays |
 | Validation | Pre/Post blocks in Model | aRotina + validations mixed |
 | Complexity | Higher initial setup | Simpler for basic CRUD |

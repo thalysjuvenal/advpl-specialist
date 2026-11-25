@@ -17,9 +17,9 @@ Key classes and functions:
 
 Required includes:
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
-#Include "FWBROWSE.CH"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
+#include "fwbrowse.ch"
 ```
 
 ---
@@ -31,8 +31,8 @@ Required includes:
 The simplest way to create a browse grid for an MVC routine:
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
 /*/{Protheus.doc} zCadCli
 Cadastro de Clientes com MVC
@@ -95,8 +95,8 @@ Return Nil
 FWFormBrowse provides a more flexible browse that supports custom buttons, form integration, and additional column configurations.
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWBROWSE.CH"
+#include "totvs.ch"
+#include "fwbrowse.ch"
 
 User Function zFormBrw()
     Local oBrowse := Nil
@@ -262,7 +262,7 @@ oStruct := FWFormStruct(nType, cAlias)
 | `AddField(cFieldName, ...)` | Adds a new field to the structure |
 | `AddTrigger(cOrigin, cDest, bWhen, bExec)` | Adds a field trigger |
 
-### 5.3 SetProperty Constants (from FWMVCDef.ch)
+### 5.3 SetProperty Constants (from fwmvcdef.ch)
 
 | Constant | Description |
 |----------|-------------|
@@ -309,8 +309,8 @@ Return oModel
 Full working example of a custom CRUD for a product catalog using FWMBrowse with MVC.
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWMVCDef.ch"
+#include "totvs.ch"
+#include "fwmvcdef.ch"
 
 /*/{Protheus.doc} zProdMVC
 Cadastro de Produtos customizado com MVC
@@ -448,38 +448,44 @@ FWExecView("Detalhes do Produto", "ZPRODMVC", MODEL_OPERATION_VIEW, ;
 
 ## 8. Programmatic Access via FWLoadModel
 
-You can load and manipulate a model programmatically without any UI:
+You can load and manipulate a model programmatically without any UI through the model API — the same flow as `patterns-mvc.md` section 6 (`FWMVCRotAuto` is restricted and is not used):
 
 ```advpl
 User Function zLoadProd()
     Local oModel  := Nil
     Local oMaster := Nil
+    Local aErro   := {}
     Local lRet    := .F.
 
-    // Carrega o modelo
+    // Carrega o modelo (MODEL_OPERATION_* vem do fwmvcdef.ch)
     oModel := FWLoadModel("ZPRODMVC")
     oModel:SetOperation(MODEL_OPERATION_INSERT)
-    oModel:Activate()
 
-    // Acessa o submodelo master
-    oMaster := oModel:GetModel("SB1MASTER")
+    If oModel:Activate()
+        // Acessa o submodelo master
+        oMaster := oModel:GetModel("SB1MASTER")
 
-    // Define valores
-    oMaster:SetValue("B1_COD",  "TST001")
-    oMaster:SetValue("B1_DESC", "Produto Teste Programatico")
-    oMaster:SetValue("B1_TIPO", "PA")
-    oMaster:SetValue("B1_UM",   "UN")
+        // Define valores
+        oMaster:SetValue("B1_COD",  "TST001")
+        oMaster:SetValue("B1_DESC", "Produto Teste Programatico")
+        oMaster:SetValue("B1_TIPO", "PA")
+        oMaster:SetValue("B1_UM",   "UN")
 
-    // Valida e grava
-    If oModel:VldData()
-        oModel:CommitData()
-        lRet := .T.
-        Conout("Produto incluido com sucesso!")
+        // Valida e grava
+        If oModel:VldData()
+            lRet := oModel:CommitData()
+        EndIf
+    EndIf
+
+    If lRet
+        FWLogMsg("INFO", /*cTransactionId*/, "zLoadProd", "ModelAPI", /*cStep*/, /*cMsgId*/, "Produto incluido com sucesso!")
     Else
-        Conout("Erro na validacao do produto.")
+        aErro := oModel:GetErrorMessage() // aErro[6] = mensagem, aErro[7] = solucao
+        FWLogMsg("ERROR", /*cTransactionId*/, "zLoadProd", "ModelAPI", /*cStep*/, /*cMsgId*/, "Erro na inclusao do produto: " + AllToChar(aErro[6]) + " | Solucao: " + AllToChar(aErro[7]))
     EndIf
 
     oModel:DeActivate()
+    oModel:Destroy()
 
 Return lRet
 ```

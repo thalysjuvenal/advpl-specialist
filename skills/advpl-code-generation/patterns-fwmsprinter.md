@@ -30,14 +30,14 @@ All rules and signatures documented here were **verified against a running Proth
 ### Required includes
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "FWPrintSetup.CH"   // IMP_PDF, DMPAPER_A4 constants
+#include "totvs.ch"
+#include "fwprintsetup.ch"   // IMP_PDF, DMPAPER_A4 constants
 ```
 
 ### Alignment constants (must be declared explicitly — not in standard includes)
 
 ```advpl
-// CRITICAL: these constants are NOT defined in FWPrintSetup.CH or TOTVS.CH.
+// CRITICAL: these constants are NOT defined in fwprintsetup.ch or totvs.ch.
 // Always declare them in every file that uses FWMSPrinter:SayAlign().
 #Define PAD_LEFT    0
 #Define PAD_RIGHT   1   // WARNING: NOT 2. Confirmed value.
@@ -403,9 +403,8 @@ At 7pt Arial, approximately 4–4.5px per character.
 ## 8. Complete Example — Landscape Report with Header and Totals
 
 ```advpl
-#Include "TOTVS.CH"
-#Include "TBICONN.CH"      // required for BeginSQL/EndSQL
-#Include "FWPrintSetup.CH"
+#include "totvs.ch"          // BeginSQL/EndSQL: plugin templates rely on totvs.ch (exact include: a confirmar no TDS)
+#include "fwprintsetup.ch"
 
 #Define PAD_LEFT    0
 #Define PAD_RIGHT   1
@@ -464,7 +463,10 @@ Static Function fPrintRpt()
     Local cAlias    := GetNextAlias()
 
     // Column definitions
-    Local aCol := {}
+    Local aCol      := {}
+    Local nAcum     := 0
+    Local bOldError := Nil
+
     Aadd(aCol, {"B1_COD" , "Codigo"   , 0, 60 , PAD_LEFT })
     Aadd(aCol, {"B1_DESC", "Descricao", 0, 200, PAD_LEFT })
     Aadd(aCol, {"B1_TIPO", "Tipo"     , 0, 40 , PAD_LEFT })
@@ -472,11 +474,14 @@ Static Function fPrintRpt()
     Aadd(aCol, {"B1_PRV1", "Preco"    , 0, 65 , PAD_RIGHT})
 
     // Calculate column X positions
-    Local nAcum := nColIni
+    nAcum := nColIni
     For nI := 1 To Len(aCol)
         aCol[nI][3] := nAcum
         nAcum += aCol[nI][4] + 2
     Next nI
+
+    // Runtime errors become Break(e), so Recover Using oError receives them
+    bOldError := ErrorBlock({|e| Break(e)})
 
     Begin Sequence
 
@@ -551,8 +556,11 @@ Static Function fPrintRpt()
         oPrint:Preview()
 
     Recover Using oError
-        ConOut("[fPrintRpt] Erro: " + oError:Description)
+        FWLogMsg("ERROR", /*cTransactionId*/, "zFwRpt", "fPrintRpt", /*cStep*/, /*cMsgId*/, "Erro: " + oError:Description)
     End Sequence
+
+    // Restore the previous error handler
+    ErrorBlock(bOldError)
 
     If Select(cAlias) > 0
         (cAlias)->(DbCloseArea())

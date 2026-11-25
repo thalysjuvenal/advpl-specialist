@@ -61,8 +61,10 @@ Return lRet
 Always check the number of elements in `PARAMIXB` before accessing positions to avoid array-out-of-bounds errors:
 
 ```advpl
+Local xParam2 := Nil // Local declarado no topo da funcao, antes de qualquer instrucao
+
 If Len(PARAMIXB) >= 2
-    Local xParam2 := PARAMIXB[2]
+    xParam2 := PARAMIXB[2]
 EndIf
 ```
 
@@ -73,7 +75,7 @@ EndIf
 Standard template for any entry point:
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} ENTRY_POINT_NAME
 Descricao do ponto de entrada
@@ -111,7 +113,7 @@ Return lRet
 **Return:** Logical - `.T.` allows the operation, `.F.` blocks it.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} MT120LOK
 Validacao do pedido de compra
@@ -149,7 +151,7 @@ Return lRet
 **Return:** Logical - `.T.` allows cancellation, `.F.` blocks it.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} MT120CAN
 Tratamento no cancelamento do pedido de compra
@@ -188,7 +190,7 @@ Return lRet
 **Return:** Nil (no return value expected).
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} A120GRVC
 Pos-gravacao do pedido de compra
@@ -204,7 +206,7 @@ User Function A120GRVC()
 
     If cOper == "I"
         // Enviar notificacao de novo pedido
-        Conout("Novo pedido de compra incluido: " + cNumPC)
+        FWLogMsg("INFO", /*cTransactionId*/, "A120GRVC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Novo pedido de compra incluido: " + cNumPC)
     EndIf
 
     RestArea(aArea)
@@ -228,7 +230,7 @@ Return Nil
 **Return:** Logical - `.T.` allows, `.F.` blocks.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} MT100LOK
 Validacao da nota fiscal de saida
@@ -270,7 +272,7 @@ Return lRet
 **Return:** Nil.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} SF2100I
 Pos-inclusao da nota fiscal de saida
@@ -287,7 +289,7 @@ User Function SF2100I()
     Local aArea    := GetArea()
 
     // Exemplo: registrar log de faturamento
-    Conout("NF Saida incluida: " + cNota + "/" + cSerie + " - Cliente: " + cCliente + "/" + cLoja)
+    FWLogMsg("INFO", /*cTransactionId*/, "SF2100I", /*cCategory*/, /*cStep*/, /*cMsgId*/, "NF Saida incluida: " + cNota + "/" + cSerie + " - Cliente: " + cCliente + "/" + cLoja)
 
     // Exemplo: disparar integracao
     // u_IntegracaoNF(cNota, cSerie)
@@ -307,7 +309,7 @@ Return Nil
 **Return:** Array of menu options `{cTitle, cFunction, nReserved, nOperation}`.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} A103MENU
 Adiciona opcoes de menu no faturamento
@@ -336,7 +338,7 @@ Return aMenu
 **Return:** Array of button definitions `{nType, {bAction}, cTooltip, cBitmap}`.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} MA410BUT
 Botoes adicionais no pedido de venda
@@ -368,7 +370,7 @@ Return aButtons
 **Return:** Logical - `.T.` allows, `.F.` blocks.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} MA410LOK
 Validacao do pedido de venda
@@ -410,7 +412,7 @@ Return lRet
 **Return:** Array of button definitions.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} FA080BUT
 Botoes adicionais no contas a pagar
@@ -444,7 +446,7 @@ Return aButtons
 **Return:** Nil.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} FA080INC
 Pos-inclusao de titulo no contas a pagar
@@ -460,7 +462,7 @@ User Function FA080INC()
     Local cTipo    := PARAMIXB[4]
     Local aArea    := GetArea()
 
-    Conout("Titulo incluido no CP: " + cPrefixo + "/" + cNum + "-" + cParcela + " Tipo: " + cTipo)
+    FWLogMsg("INFO", /*cTransactionId*/, "FA080INC", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Titulo incluido no CP: " + cPrefixo + "/" + cNum + "-" + cParcela + " Tipo: " + cTipo)
 
     // Logica customizada pos-inclusao
     // Exemplo: criar aprovacao automatica
@@ -481,7 +483,7 @@ Return Nil
 **Return:** Array of button definitions.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} FA050BUT
 Botoes adicionais no contas a receber
@@ -516,7 +518,7 @@ Return aButtons
 **Return:** Logical - `.T.` allows, `.F.` blocks.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} MT250LOK
 Validacao da movimentacao de estoque
@@ -560,7 +562,7 @@ Return lRet
 **Return:** Nil.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} A650GRVS
 Pos-gravacao da solicitacao de compra
@@ -576,7 +578,7 @@ User Function A650GRVS()
 
     If cOper == "I"
         // Nova solicitacao - enviar para aprovacao
-        Conout("Solicitacao de compra incluida: " + cNumSC)
+        FWLogMsg("INFO", /*cTransactionId*/, "A650GRVS", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Solicitacao de compra incluida: " + cNumSC)
         // u_EnviaAprov(cNumSC)
     EndIf
 
@@ -602,7 +604,7 @@ Return Nil
 **Return:** Character - Modified record line, or empty string to remove the record.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} SPEDCONTRIB
 Customizacao do SPED Contribuicoes
@@ -640,7 +642,7 @@ Return cLinha
 **Return:** Logical - `.T.` allows, `.F.` blocks.
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} MT930LOK
 Validacao do livro fiscal
@@ -712,6 +714,6 @@ Search the standard RPO source for `ExistBlock` or `ExecBlock` calls:
 2. **Check PARAMIXB length** before accessing positions - parameters may vary by operation.
 3. **Save and restore areas** (`GetArea`/`RestArea`) - entry points run in the caller's context.
 4. **Avoid heavy processing** - entry points run synchronously and impact user experience.
-5. **Log extensively** - use `Conout` or custom logging for debugging.
+5. **Log extensively** - use `FWLogMsg` (never `ConOut`) for debugging.
 6. **Document PARAMIXB** - always document which parameters you receive and use.
 7. **Return the expected type** - returning the wrong type can crash the standard routine.
