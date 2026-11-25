@@ -9,7 +9,7 @@ Systematic approach for converting legacy ADVPL procedural code to modern TLPP w
 - Converting procedural ADVPL functions to TLPP classes
 - Refactoring User Functions into object-oriented service classes
 - Replacing Private/Public variable scoping with class properties
-- Modernizing multiple `#Include` directives to TLPP `.th` includes (`tlpp-core.th`, `tlpp-rest.th`, etc.) and adding proper `namespace` declarations
+- Adding the TLPP `.th` includes (`tlpp-core.th`, `tlpp-rest.th`, etc.) and proper `namespace` declarations, keeping `totvs.ch` where the framework is used
 - Migrating Static Functions to private class methods
 - Wrapping legacy function calls for backward compatibility during gradual migration
 - Any `.prw` to `.tlpp` file conversion
@@ -51,9 +51,9 @@ digraph migration {
 
 | ADVPL Construct | TLPP Equivalent | Notes |
 |----------------|-----------------|-------|
-| `#Include "TOTVS.CH"` | `#Include "tlpp-core.th"` | Use the TLPP-specific includes (`.th` files); `Protheus.ch` is obsolete. Do NOT add `using namespace tlpp.core`, `tlpp.rest`, or `tlpp.log` -- use the `.th` includes instead |
-| `User Function Name()` | `namespace custom.module.service; class NameService; method execute()` | Main entry point becomes the primary public method. See namespace conventions below |
-| `Static Function Helper()` | `method helper() as private` | Internal functions become private methods |
+| `#include "totvs.ch"` | Add `#include "tlpp-core.th"` and keep `#include "totvs.ch"` when the code depends on the framework (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...) | `tlpp-core.th` is recommended, though optional for classes migrated from ADVPL (TDN, "Estrutura"); the official `custom.*` entry points include both `totvs.ch` and `tlpp-core.th`. `protheus.ch` is obsolete. Do NOT add `using namespace tlpp.core`, `tlpp.rest`, or `tlpp.log` -- use the `.th` includes instead |
+| `User Function Name()` | A `namespace custom.module.service` declaration and a class `NameService` with a method `execute()` | Main entry point becomes the primary public method. See namespace conventions below |
+| `Static Function Helper(cParam)` | `private method helper(cParam as character) as <type>` | Internal functions become private methods; the prototype in the class declaration carries the parameters and types, repeated in the implementation (TDN, "Tipando Métodos") |
 | `Private cVar := "x"` | `data cVar as character` (class property) | Private variables become class-level data declarations |
 | `Public nGlobal` | Remove -- pass via constructor/parameters | Public variables must be eliminated entirely |
 | `Local aArray := {}` | Unchanged inside methods | Local variables remain as-is within method bodies |
@@ -121,11 +121,12 @@ If the user does not specify, default to `custom.<module>.<service>` pattern.
 
 ## Before/After Example
 
-### Before (ADVPL Procedural) -- `CalcPed.prw`
+### Before (ADVPL Procedural, legacy code to be migrated) -- `CalcPed.prw`
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
-#Include "TOTVS.CH"
-#Include "TopConn.ch"
+#include "totvs.ch"
+#include "topconn.ch"
 
 /*/{Protheus.doc} CalcPed
 Calcula o total de um pedido de venda
@@ -137,10 +138,10 @@ Calcula o total de um pedido de venda
 /*/
 User Function CalcPed(cPedido)
     Local nTotal := 0
+    Local aArea  := GetArea()
+
     Private cAliasPed := "SC5"
     Private cAliasItens := "SC6"
-
-    Local aArea := GetArea()
 
     Begin Sequence
 
@@ -180,7 +181,8 @@ Return nSoma
 ### After (TLPP Object-Oriented) -- `custom.faturamento.pedido.tlpp`
 
 ```tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
+#include "totvs.ch"
 
 namespace custom.faturamento.pedido
 
@@ -192,6 +194,38 @@ class PedidoService
     public method new() as object
     public method calcTotal(cPedido as character) as numeric
     private method somaItens(cPedido as character) as numeric
+
+endclass
+
+method new() as object class PedidoService
+    ::cAliasPed   := "SC5"
+    ::cAliasItens := "SC6"
+return self
+
+method calcTotal(cPedido as character) as numeric class PedidoService
+    local nTotal := 0
+    local aArea  := GetArea()
+
+    try
+
+        DbSelectArea(::cAliasPed)
+        DbSetOrder(1)
+
+        if DbSeek(xFilial(::cAliasPed) + cPedido)
+            nTotal := ::somaItens(cPedido)
+        else
+            FWLogMsg("WARN", /*cTransactionId*/, "PedidoService", "calcTotal", /*cStep*/, /*cMsgId*/, "Pedido nao encontrado: " + cPedido)
+        endif
+
+    catch oError
+        FWLogMsg("ERROR", /*cTransactionId*/, "PedidoService", "calcTotal", /*cStep*/, /*cMsgId*/, "Erro: " + oError:Description)
+        nTotal := 0
+    endtry
+
+    RestArea(aArea)
+return nTotal
+
+method somaItens(cPedido as character) as numeric
 
 endclass
 
@@ -226,7 +260,7 @@ method calcTotal(cPedido as character) class PedidoService
     RestArea(aArea)
 return nTotal
 
-method somaItens(cPedido as character) class PedidoService
+method somaItens(cPedido as character) as numeric class PedidoService
     local nSoma := 0
 
     DbSelectArea(::cAliasItens)
@@ -244,7 +278,7 @@ return nSoma
 ### Backward Compatibility Wrapper -- `CalcPed.prw` (preserved)
 
 ```advpl
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 /*/{Protheus.doc} CalcPed
 Wrapper de compatibilidade - delega para PedidoService (TLPP)
@@ -268,7 +302,7 @@ Return oService:calcTotal(cPedido)
 | User Function preserved as wrapper | Keep the original `.prw` User Function as a thin wrapper that delegates to the new class |
 | Gradual migration | Migrate one function group at a time; wrappers ensure existing callers are not broken |
 | Constructor for shared state | Values that were previously `Private`/`Public` variables shared across functions should be passed through the constructor or set as class properties |
-| Logging over Conout | Prefer `FWLogMsg()` or `FWLogError()` over raw `Conout()` in TLPP classes |
+| Logging over Conout | Prefer `FWLogMsg()` over raw `Conout()` in TLPP classes |
 
 ## Common Mistakes
 

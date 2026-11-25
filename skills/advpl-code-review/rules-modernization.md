@@ -16,7 +16,7 @@ Rules for identifying modernization opportunities in ADVPL/TLPP code. Each rule 
 
 ```advpl
 // File: OrderService.prw
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 Class OrderService
 
@@ -49,7 +49,7 @@ Return .T.
 
 ```tlpp
 // File: OrderService.tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
 
 Namespace custom.vendas
 
@@ -65,17 +65,17 @@ Class OrderService
 
 EndClass
 
-Method New(cId) Class OrderService
+Method New(cId As Character) As Object Class OrderService
     ::cOrderId   := cId
     ::nTotal     := 0
     ::lProcessed := .F.
 Return Self
 
-Method Process() Class OrderService
+Method Process() As Logical Class OrderService
     // Processing logic
 Return .T.
 
-Method Validate() Class OrderService
+Method Validate() As Logical Class OrderService
     // Validation logic
 Return .T.
 ```
@@ -94,6 +94,7 @@ Return .T.
 
 **Violation:**
 
+<!-- advpl-lint: anti-exemplo -->
 ```tlpp
 // File: ClientAPI.tlpp
 using namespace tlpp.core
@@ -114,8 +115,8 @@ EndClass
 
 ```tlpp
 // File: ClientAPI.tlpp
-#Include "tlpp-core.th"
-#Include "tlpp-rest.th"
+#include "tlpp-core.th"
+#include "tlpp-rest.th"
 
 Namespace custom.cadastro
 
@@ -173,7 +174,8 @@ Return
 
 ```tlpp
 // File: PedidoService.tlpp
-#Include "tlpp-core.th"
+#include "tlpp-core.th"
+#include "totvs.ch"
 
 Namespace custom.vendas
 
@@ -191,24 +193,24 @@ Class PedidoService
 
 EndClass
 
-Method New(cCodCli, cCondPag) Class PedidoService
+Method New(cCodCli As Character, cCondPag As Character) As Object Class PedidoService
     ::cCodCli  := cCodCli
     ::cCondPag := cCondPag
     ::cPedNum  := GetSXENum("SC5", "C5_NUM")
     ::aItems   := {}
 Return Self
 
-Method Validate() Class PedidoService
+Method Validate() As Logical Class PedidoService
     // Validation using instance data - no parameter passing needed
 Return .T.
 
-Method Save() Class PedidoService
+Method Save() As Logical Class PedidoService
     If ::Validate()
         // Save using instance data
     EndIf
 Return .T.
 
-Method Delete() Class PedidoService
+Method Delete() As Logical Class PedidoService
     // Delete using ::cPedNum
 Return .T.
 ```
@@ -253,7 +255,7 @@ Return
 
 ```advpl
 // MVC approach
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function XPED001()
 
@@ -285,6 +287,16 @@ Static Function ViewDef()
     oView:SetOwnerView("VIEW_SC5", "SUPERIOR")
 
 Return oView
+
+Static Function MenuDef()
+    Local aRotina := {}
+
+    ADD OPTION aRotina TITLE "Visualizar" ACTION "VIEWDEF.XPED001" OPERATION MODEL_OPERATION_VIEW   ACCESS 0
+    ADD OPTION aRotina TITLE "Incluir"    ACTION "VIEWDEF.XPED001" OPERATION MODEL_OPERATION_INSERT ACCESS 0
+    ADD OPTION aRotina TITLE "Alterar"    ACTION "VIEWDEF.XPED001" OPERATION MODEL_OPERATION_UPDATE ACCESS 0
+    ADD OPTION aRotina TITLE "Excluir"    ACTION "VIEWDEF.XPED001" OPERATION MODEL_OPERATION_DELETE ACCESS 0
+
+Return aRotina
 ```
 
 **Why it matters:** Legacy UI patterns like `AxCadastro` do not support modern features such as field validation callbacks, automatic audit logging, REST API exposure, and standardized CRUD operations. The MVC framework provides a consistent architecture, reduces boilerplate code, and integrates with Protheus features like workflow approval and data auditing out of the box.

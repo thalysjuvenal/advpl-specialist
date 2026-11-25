@@ -4,16 +4,17 @@ Rules for detecting security vulnerabilities in ADVPL/TLPP code. Each rule inclu
 
 ---
 
-## [SEC-001] SQL built by string concatenation without %exp: macro (SQL injection risk)
+## [SEC-001] SQL built by string concatenation with external input (SQL injection risk)
 
 **Severity:** CRITICAL
 
 **Description:** Building SQL queries by concatenating user-supplied or external variables directly into the query string allows SQL injection attacks. Attackers can manipulate input to execute arbitrary SQL commands, potentially reading, modifying, or deleting data.
 
-**What to look for:** `TCQuery` or string-based SQL construction where variables are concatenated with `+` instead of using BeginSQL with `%exp:variable%` macro substitution.
+**What to look for:** `TCQuery` or string-based SQL construction where variables are concatenated with `+`, and `BeginSQL` blocks where a user-supplied or external value is inserted with `%exp:variable%`. The `%exp:` macro is **not** a bind parameter: it inserts the value into the SQL text (TDN, "Embedded SQL"), so it does not prevent injection for external input.
 
 **Violation:**
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 User Function SearchClient(cSearch)
     Local cQuery := ""
@@ -34,22 +35,34 @@ Return
 **Correct:**
 
 ```advpl
-User Function SearchClient(cSearch)
-    Local cAlias  := GetNextAlias()
-    Local cFilter := "%" + cSearch + "%"
+#include "totvs.ch"
+#include "topconn.ch"
 
-    BeginSQL Alias cAlias
-        SELECT SA1.A1_COD, SA1.A1_NOME
-        FROM %table:SA1% SA1
-        WHERE SA1.%notDel%
-        AND SA1.A1_FILIAL = %xfilial:SA1%
-        AND SA1.A1_NOME LIKE %exp:cFilter%
-    EndSQL
+User Function SearchClient(cSearch)
+    Local cAlias := GetNextAlias()
+    Local oStmt  := FWPreparedStatement():New()
+    Local cQuery := ""
+
+    cQuery := "SELECT A1_COD, A1_NOME FROM " + RetSqlName("SA1") + " SA1 "
+    cQuery += "WHERE SA1.D_E_L_E_T_ = ' ' "
+    cQuery +=   "AND SA1.A1_FILIAL = ? "
+    cQuery +=   "AND SA1.A1_NOME LIKE ? "
+
+    oStmt:SetQuery(cQuery)
+    oStmt:SetString(1, xFilial("SA1"))
+    oStmt:SetString(2, "%" + cSearch + "%")
+
+    DBUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+
+    // ... read the result ...
+
+    (cAlias)->(DBCloseArea())
+    oStmt:Destroy()
 
 Return
 ```
 
-**Why it matters:** SQL injection is one of the most exploited vulnerabilities in web applications and internal systems alike. In Protheus, an injected query could bypass access controls, extract sensitive financial data, or corrupt critical business tables. The `%exp:` macro safely parameterizes values, preventing injection.
+**Why it matters:** SQL injection is one of the most exploited vulnerabilities in web applications and internal systems alike. In Protheus, an injected query could bypass access controls, extract sensitive financial data, or corrupt critical business tables. `FWPreparedStatement` treats the value of each `?` as data (a `'` inside the value stays part of it, not a delimiter), which is what prevents injection; use it for every value that comes from outside the function. `BeginSQL` with `%exp:` is adequate only for values internal to the routine (see the `embedded-sql` and `query-builder` skills).
 
 ---
 
@@ -57,12 +70,13 @@ Return
 
 **Severity:** CRITICAL
 
-**Description:** REST API endpoints that read request body content via `SELF:GetContent()` (or `oRest:GetBody()`) and use the data directly without validation expose the system to injection attacks, type errors, and business logic bypass.
+**Description:** REST API endpoints that read request body content via `SELF:GetContent()` (or `oRest:getBodyRequest()`) and use the data directly without validation expose the system to injection attacks, type errors, and business logic bypass.
 
-**What to look for:** `SELF:GetContent()`, `oRest:GetBody()`, or similar request body reading methods where the returned content is used directly in SQL queries, database operations, or business logic without validation or sanitization.
+**What to look for:** `SELF:GetContent()`, `oRest:getBodyRequest()`, or similar request body reading methods where the returned content is used directly in SQL queries, database operations, or business logic without validation or sanitization.
 
 **Violation:**
 
+<!-- advpl-lint: anti-exemplo -->
 ```tlpp
 @Get("/api/v1/clients")
 Method GetClient() Class ClientService
@@ -87,25 +101,34 @@ Return
 **Correct:**
 
 ```tlpp
-@Get("/api/v1/clients")
-Method GetClient() Class ClientService
-    Local cBody   := SELF:GetContent()
+#include "tlpp-core.th"
+#include "tlpp-rest.th"
+#include "totvs.ch"
+
+namespace custom.cadastro
+
+@Post("/api/v1/clients/search")
+user function getClient()
+    Local cBody   := oRest:getBodyRequest()
     Local jBody   := JsonObject():New()
     Local cCodCli := ""
-    Local nRet    := jBody:FromJson(cBody)
+    Local cErro   := jBody:FromJson(cBody)
+    Local aArea   := GetArea()
 
-    // Validate JSON parsing
-    If nRet <> 0
-        SELF:SetResponse('{"error": "Invalid JSON body"}')
-        SELF:SetStatus(400)
-        Return
+    // Validate JSON parsing (FromJson returns NIL on success)
+    If cErro <> Nil
+        oRest:setStatusCode(400)
+        oRest:setResponse(errorBody("JSON_INVALIDO", "Invalid JSON body", cErro))
+        RestArea(aArea)
+        Return .T.
     EndIf
 
     // Validate required field existence and type
     If ValType(jBody["code"]) <> "C" .Or. Empty(jBody["code"])
-        SELF:SetResponse('{"error": "Field code is required and must be a string"}')
-        SELF:SetStatus(400)
-        Return
+        oRest:setStatusCode(400)
+        oRest:setResponse(errorBody("CAMPO_OBRIGATORIO", "Field code is required and must be a string", "code"))
+        RestArea(aArea)
+        Return .T.
     EndIf
 
     // Validate field length and content
@@ -115,40 +138,54 @@ Method GetClient() Class ClientService
     DbSetOrder(1)
     If DbSeek(xFilial("SA1") + cCodCli)
         // Process valid client
+        oRest:setStatusCode(200)
+        oRest:setResponse('{"code": "' + AllTrim(SA1->A1_COD) + '"}')
     Else
-        SELF:SetResponse('{"error": "Client not found"}')
-        SELF:SetStatus(404)
+        oRest:setStatusCode(404)
+        oRest:setResponse(errorBody("CLIENTE_NAO_ENCONTRADO", "Client not found", "A1_COD: " + cCodCli))
     EndIf
 
-Return
+    RestArea(aArea)
+
+Return .T.
+
+// Error body: {code, message, detailedMessage}
+static function errorBody(cCode, cMessage, cDetail)
+    Local jErr := JsonObject():New()
+
+    jErr["code"]            := cCode
+    jErr["message"]         := cMessage
+    jErr["detailedMessage"] := cDetail
+
+Return jErr:toJson()
 ```
 
 **Why it matters:** REST endpoints are exposed to external consumers and potentially the public internet. Without input validation, attackers can send malformed payloads that cause runtime errors (crashing the thread), bypass business rules, or exploit downstream operations. Every input must be validated for type, length, format, and business constraints.
 
 ---
 
-## [SEC-003] Sensitive data in ConOut/FWLogMsg output
+## [SEC-003] Sensitive data in FWLogMsg/ConOut output
 
 **Severity:** WARNING
 
-**Description:** Logging sensitive information such as passwords, API tokens, CPF/CNPJ numbers, credit card numbers, or personal data in `ConOut` or `FWLogMsg` exposes it to anyone with access to the AppServer console or log files.
+**Description:** Logging sensitive information such as passwords, API tokens, CPF/CNPJ numbers, credit card numbers, or personal data in `FWLogMsg` (or the legacy `ConOut`) exposes it to anyone with access to the AppServer console or log files.
 
 **What to look for:** `ConOut` or `FWLogMsg` calls that output variables containing passwords, tokens, credentials, CPF, CNPJ, or any personally identifiable information (PII).
 
 **Violation:**
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 User Function AuthenticateUser(cUser, cPassword)
     Local lOk := .F.
 
     // DANGER: password logged in plain text!
-    ConOut("[Auth] Attempting login - User: " + cUser + " Password: " + cPassword)
+    FWLogMsg("INFO", /*cTransactionId*/, "AUTH", "Security", /*cStep*/, /*cMsgId*/, "Attempting login - User: " + cUser + " Password: " + cPassword)
 
     lOk := ValidateCredentials(cUser, cPassword)
 
     If !lOk
-        FWLogMsg("WARNING", , "AUTH", "Security", "", 01, ;
-            "Failed login for user: " + cUser + " with password: " + cPassword)
+        FWLogMsg("WARN", /*cTransactionId*/, "AUTH", "Security", /*cStep*/, /*cMsgId*/, "Failed login for user: " + cUser + " with password: " + cPassword)
     EndIf
 
 Return lOk
@@ -160,13 +197,12 @@ Return lOk
 User Function AuthenticateUser(cUser, cPassword)
     Local lOk := .F.
 
-    ConOut("[Auth] Attempting login - User: " + cUser)
+    FWLogMsg("INFO", /*cTransactionId*/, "AUTH", "Security", /*cStep*/, /*cMsgId*/, "Attempting login - User: " + cUser)
 
     lOk := ValidateCredentials(cUser, cPassword)
 
     If !lOk
-        FWLogMsg("WARNING", , "AUTH", "Security", "", 01, ;
-            "Failed login attempt for user: " + cUser)
+        FWLogMsg("WARN", /*cTransactionId*/, "AUTH", "Security", /*cStep*/, /*cMsgId*/, "Failed login attempt for user: " + cUser)
     EndIf
 
 Return lOk
@@ -186,12 +222,14 @@ Return lOk
 
 **Violation:**
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 User Function ConnectAPI()
     Local cUrl    := "https://api.example.com/v1"
     Local cApiKey := "sk-abc123def456ghi789jkl012mno345"
     Local cPass   := "P@ssw0rd!2025"
     Local aHeaders := {}
+    Local cResponse := ""
 
     aAdd(aHeaders, "Authorization: Bearer " + cApiKey)
     aAdd(aHeaders, "Content-Type: application/json")
@@ -208,9 +246,10 @@ User Function ConnectAPI()
     Local cUrl     := "https://api.example.com/v1"
     Local cApiKey  := GetAPICredential("EXAMPLE_API_KEY")
     Local aHeaders := {}
+    Local cResponse := ""
 
     If Empty(cApiKey)
-        ConOut("[ConnectAPI] API key not configured. Check SX6 parameter EXAMPLE_API_KEY.")
+        FWLogMsg("ERROR", /*cTransactionId*/, "ConnectAPI", "Config", /*cStep*/, /*cMsgId*/, "API key not configured. Check SX6 parameter EXAMPLE_API_KEY.")
         Return ""
     EndIf
 
@@ -224,7 +263,7 @@ Return cResponse
 // Store credentials in SX6 parameters, environment variables,
 // or a secure vault - never in source code
 Static Function GetAPICredential(cParamName)
-    Local cValue := AllTrim(GetMV(cParamName))
+    Local cValue := AllTrim(SuperGetMV(cParamName, .F., ""))
 Return cValue
 ```
 
@@ -255,7 +294,7 @@ Return cValue
 | `LASTKEY` | Use specific navigation control logic |
 | `SetPrvt` | Declare variables explicitly with `Private` |
 | `MontaBlock` | Build code blocks directly with `{|| ... }` |
-| `FWMVCROTAUTO` | Use `FWExecView()` for MVC automation |
+| `FWMVCROTAUTO` | Use `MsExecAuto` per the routine's documented example or, for MVC routines, the model API (`FWLoadModel` + `SetOperation` + `Activate` + `SetValue` + `VldData` + `CommitData` + `DeActivate`); `FWExecView()` opens the UI and is not automation |
 | `FWLOOKUP` | Use `FWInputDialog()` or standard F3 lookups |
 | `OPENSXS` | Tables are opened automatically by the framework |
 | `APPEND FROM` | Use `RecLock` + field-by-field copy |
@@ -269,6 +308,7 @@ Return cValue
 
 **Violation:**
 
+<!-- advpl-lint: anti-exemplo -->
 ```advpl
 User Function MyReport()
     // WRONG: StaticCall is BLOCKED since 12.1.33
@@ -286,14 +326,17 @@ Return
 
 ```advpl
 User Function MyReport()
-    // CORRECT: Call public function directly
-    Local aMenu := U_MenuDef()
+    Local aMenu := {}
+    Local xVal  := Nil
+
+    // CORRECT: load the menu through the framework
+    aMenu := FWLoadMenuDef("MATA030")
 
     // CORRECT: Use Pergunte() with SX1 configuration
     Pergunte("MYREPORT", .F.)
 
     // CORRECT: Use FWCriaVar
-    Local xVal := FWCriaVar("A1_COD")
+    xVal := FWCriaVar("A1_COD")
 Return
 ```
 

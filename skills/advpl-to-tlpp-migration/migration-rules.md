@@ -6,20 +6,20 @@ Complete mapping reference for converting ADVPL procedural constructs to their T
 
 | ADVPL | TLPP | Notes |
 |-------|------|-------|
-| `#Include "TOTVS.CH"` | `#Include "tlpp-core.th"` | Main TLPP include; `Protheus.ch` is obsolete, use `TOTVS.CH` for `.prw` files. Do NOT add `using namespace tlpp.core`, `tlpp.rest`, `tlpp.log` -- use the `.th` includes instead |
-| `#Include "TopConn.ch"` | `#Include "tlpp-core.th"` | Database connectivity is available via tlpp-core.th |
-| `#Include "RestFul.ch"` | `#Include "tlpp-rest.th"` | For REST with TLPP annotations (`@RestService`, `@Get`, `@Post`) |
-| `#Include "FWMVCDef.ch"` | `#Include "tlpp-core.th"` | MVC framework functions available via tlpp-core.th |
+| `#include "totvs.ch"` | Add `#include "tlpp-core.th"` and keep `#include "totvs.ch"` when the code depends on the framework (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...) | `tlpp-core.th` is recommended, though optional for classes migrated from ADVPL (TDN, "Estrutura"); the official `custom.*` entry points include both `totvs.ch` and `tlpp-core.th`. `protheus.ch` is obsolete (`totvs.ch` includes it). Do NOT add `using namespace tlpp.core`, `tlpp.rest`, `tlpp.log` -- use the `.th` includes instead |
+| `#include "topconn.ch"` | Keep `#include "topconn.ch"` | The `.th` includes do not replace the framework `.ch` files; keep the ones the code needs (a confirmar no TDS) |
+| `#include "restful.ch"` | `#include "tlpp-rest.th"` | For REST with TLPP annotations (`@RestService`, `@Get`, `@Post`) |
+| `#include "fwmvcdef.ch"` | Keep `#include "fwmvcdef.ch"` | MVC constants still come from the framework include |
 | `#Define CONST_NAME value` | `static data CONST_NAME := value` | Define constants as static class data, or use `#define` if purely compile-time |
 | `#ifdef TOP_HAS_FEATURE` | Conditional compilation preserved | `#ifdef` / `#ifndef` blocks remain valid in `.tlpp` for compile-time branching |
 | `#ifndef` | Conditional compilation preserved | Same as `#ifdef` -- unchanged in TLPP |
 
 **Notes:**
-- In TLPP, use the specific `.th` includes instead of the `.ch` ADVPL includes:
-  - `#Include "tlpp-core.th"` -- main include for TLPP (replaces TOTVS.CH/Protheus.ch, TopConn.ch)
-  - `#Include "tlpp-rest.th"` -- for REST annotations (@RestService, @Get, @Post)
-  - `#Include "tlpp-object.th"` -- for advanced object features
-  - `#Include "tlpp-probat.th"` -- for automated testing (ProBat framework)
+- In TLPP, add the specific `.th` includes alongside the framework `.ch` includes the code needs:
+  - `#include "tlpp-core.th"` -- main include for TLPP (recommended; optional for classes migrated from ADVPL). It does not replace `totvs.ch`, which stays when the framework is used
+  - `#include "tlpp-rest.th"` -- for REST annotations (@RestService, @Get, @Post)
+  - `#include "tlpp-object.th"` -- for advanced object features
+  - `#include "tlpp-probat.th"` -- for automated testing (ProBat framework)
 - Do NOT use `using namespace tlpp.core`, `tlpp.rest`, `tlpp.log`, `tlpp.data`, etc. Those are NOT needed -- always use the `.th` includes instead.
 - Only add the project's own `namespace` declaration following the official TOTVS convention (see Namespace Conventions below).
 - `#Define` constants used only within a class can become `static data` properties. Constants shared across files should remain as `#define` in a shared `.ch` file.
@@ -81,7 +81,7 @@ Start with `custom.`, the rest is free. Examples: `custom.cadastros.cliente`, `c
 
 ```advpl
 // Original .prw file -- preserved as wrapper
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function OriginalName(cParam1, nParam2)
     Local oService := custom.mymodule.OriginalNameService():new()
@@ -105,6 +105,11 @@ Database operations remain functionally identical but are encapsulated within cl
 **Best practice:** Store alias names as class `data` properties so they can be easily changed or injected for testing.
 
 ```tlpp
+#include "tlpp-core.th"
+#include "totvs.ch"
+
+namespace custom.cadastros.cliente
+
 class ClienteRepository
     data cAlias as character
 
@@ -113,11 +118,15 @@ class ClienteRepository
 
 endclass
 
-method new(cAlias as character) class ClienteRepository
-    ::cAlias := iif(empty(cAlias), "SA1", cAlias)
+method new(cAlias as character) as object class ClienteRepository
+    if Empty(cAlias)
+        ::cAlias := "SA1"
+    else
+        ::cAlias := cAlias
+    endif
 return self
 
-method findByCod(cCod as character) class ClienteRepository
+method findByCod(cCod as character) as logical class ClienteRepository
     local aArea := GetArea()
     local lFound := .F.
 
@@ -133,31 +142,27 @@ return lFound
 
 | ADVPL | TLPP | Notes |
 |-------|------|-------|
-| `Begin Sequence` | `begin sequence` | Preserved -- same syntax |
-| `Recover Using oError` | `recover using oError` | Preserved -- same syntax |
-| `End Sequence` | `end sequence` | Preserved -- same syntax |
+| `Begin Sequence` / `Recover Using oError` / `End Sequence` | `try` / `catch oError` / `endtry` | `Begin Sequence` remains valid in `.tlpp`; prefer `Try`/`Catch` in new TLPP code |
 | `ErrorBlock({...})` | `ErrorBlock({...})` | Preserved -- optionally enhanced |
-| `Conout("Erro: " + ...)` | `FWLogMsg("ERROR", ...)` or `FWLogError(...)` | Prefer structured logging in TLPP |
-| `Break` | `break` | Preserved |
+| `Conout("Erro: " + ...)` | `FWLogMsg("ERROR", ...)` | Structured logging; `FWLogMsg(cSeverity, [cTransactionId], cGroup, [cCategory], [cStep], [cMsgId], [cMessage], ...)` |
+| `Break` | `break` | Preserved in `Begin Sequence`; in `Try`/`Catch`, restructure the flow with `If`/`Else` |
 
 **Enhanced error handling in TLPP:**
 
 ```tlpp
-method processOrder(cOrder as character) class OrderService
+method processOrder(cOrder as character) as logical class OrderService
     local lRet := .T.
-    local oError
 
-    begin sequence
+    try
 
         // Business logic here
         ::validateOrder(cOrder)
         ::saveOrder(cOrder)
 
-    recover using oError
+    catch oError
         lRet := .F.
-        FWLogMsg("ERROR", , "OrderService", "processOrder", , , ;
-            "Erro ao processar pedido " + cOrder + ": " + oError:Description)
-    end sequence
+        FWLogMsg("ERROR", /*cTransactionId*/, "OrderService", "processOrder", /*cStep*/, /*cMsgId*/, "Erro ao processar pedido " + cOrder + ": " + oError:Description)
+    endtry
 
 return lRet
 ```
@@ -225,17 +230,17 @@ class ClienteView
 
 endclass
 
-method new() class ClienteView
+method new() as object class ClienteView
     ::cCodigo := Space(6)
     ::cNome   := Space(40)
 return self
 
-method show() class ClienteView
+method show() as logical class ClienteView
     ::buildDialog()
     ACTIVATE MSDIALOG ::oDlg CENTERED
 return ::onConfirm()
 
-method buildDialog() class ClienteView
+method buildDialog() as object class ClienteView
     DEFINE MSDIALOG ::oDlg TITLE "Cadastro de Cliente" FROM 0,0 TO 300,500
 
     @ 10, 10 MSGET ::cCodigo SIZE 100, 20 OF ::oDlg
@@ -246,7 +251,7 @@ method buildDialog() class ClienteView
 
 return ::oDlg
 
-method onConfirm() class ClienteView
+method onConfirm() as logical class ClienteView
     if Empty(::cCodigo) .Or. Empty(::cNome)
         MsgAlert("Preencha todos os campos")
         return .F.
@@ -260,6 +265,6 @@ The fundamental principle of ADVPL-to-TLPP migration is **structure changes, syn
 
 1. **Organization** -- functions become methods on classes
 2. **Scope** -- Private/Public variables become class properties
-3. **Imports** -- ADVPL `.ch` includes are replaced by TLPP `.th` includes (`tlpp-core.th`, `tlpp-rest.th`, etc.); add your own `namespace` declaration following TOTVS convention (`custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product)
+3. **Imports** -- add the TLPP `.th` includes (`tlpp-core.th`, `tlpp-rest.th`, etc.) and keep `totvs.ch` where the framework is used; add your own `namespace` declaration following TOTVS convention (`custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product)
 4. **Naming** -- files follow `<namespace>.<funcionalidade>.tlpp` convention, classes use PascalCase, methods use camelCase, no underscores
 5. **Encapsulation** -- internal helpers become private methods instead of Static Functions

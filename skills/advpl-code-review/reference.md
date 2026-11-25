@@ -43,11 +43,11 @@ Each finding must include:
 
 ## Review Process
 
-1. **Scan includes and headers** - Check for obsolete includes (`Protheus.ch` vs `TOTVS.CH`), missing documentation headers
+1. **Scan includes and headers** - Check for obsolete includes (`protheus.ch` is obsolete; use `#include "totvs.ch"`, directive and file name in lowercase), missing documentation headers
 2. **Analyze variable declarations** - Verify scope (`Local` preferred), naming conventions (Hungarian notation)
 3. **Check database operations** - Validate `RecLock`/`MsUnlock` pairing, `GetArea`/`RestArea` usage, error handling around DB ops
 4. **Evaluate queries** - Review Embedded SQL for `SELECT *`, proper macro usage (`%exp:`, `%table:`, `%notDel%`), index alignment
-5. **Inspect security surface** - Look for SQL injection vectors, hardcoded credentials, sensitive data in logs, unvalidated REST input
+5. **Inspect security surface** - Look for SQL injection vectors (`%exp:` inserts the value into the SQL text and is not a bind; external input goes through `FWPreparedStatement`), hardcoded credentials, sensitive data in logs, unvalidated REST input
 6. **Assess modernization** - Identify candidates for TLPP migration, OOP refactoring, modern UI patterns
 
 ## Rule ID Format
