@@ -56,7 +56,7 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 ### Implementation Phase (only after approval)
 12. **Execute migration** - Generate .tlpp file(s) following the approved plan and `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/reference.md`
 13. **Generate wrapper** - Create backward compatibility .prw wrapper if --wrapper
-14. **Run checklist** - Validate against migration-checklist.md
+14. **Run checklist** - Validate against `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/migration-checklist.md`
 15. **Report** - Show summary of changes
 
 ## Examples

@@ -47,7 +47,7 @@ ProBat only works with TLPP (`.tlpp` files). If a `.prw` file is passed:
 1. **Parse arguments** - Extract target file/function, type, and flags
 2. **Read target source** - Analyze the file or function to understand what to test
 3. **Load reference** - Read `${CLAUDE_PLUGIN_ROOT}/skills/probat-testing/reference.md`
-4. **Load patterns** - Read `patterns-unit-tests.md` for the appropriate template
+4. **Load patterns** - Read `${CLAUDE_PLUGIN_ROOT}/skills/probat-testing/patterns-unit-tests.md` for the appropriate template
 5. **Identify test cases** - Determine:
    - Functions/methods to test
    - Input parameters and expected outputs

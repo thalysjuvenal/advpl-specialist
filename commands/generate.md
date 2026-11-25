@@ -55,7 +55,7 @@ Generate new ADVPL or TLPP code following Protheus conventions and best practice
 - The caller already provides everything the generator needs: `type`, `name`, `--module`, business requirements
 
 **Allowed uses of `Read` / `Glob` / `Grep`:**
-- Reading files **inside the plugin itself** — `${CLAUDE_PLUGIN_ROOT}/skills/*`, `templates-*.md`, `patterns-*.md`, `${CLAUDE_PLUGIN_ROOT}/agents/code-generator.md`, `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/critical-rules.md`
+- Reading files **inside the plugin itself** — `${CLAUDE_PLUGIN_ROOT}/skills/*`, `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/templates-*.md`, `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/patterns-*.md`, `${CLAUDE_PLUGIN_ROOT}/agents/code-generator.md`, `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/critical-rules.md`
 - Reading the project's `.protheus-version` file (single file in the project root, see the release check in the Planning Phase)
 - `Write` the final generated `.prw` / `.tlpp` file to disk
 - `Read` a **specific file** the user explicitly referenced in their request (single file, exact path the user provided)

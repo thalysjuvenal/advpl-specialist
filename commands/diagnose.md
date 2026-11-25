@@ -37,7 +37,7 @@ Diagnose and resolve ADVPL/TLPP errors and problems.
 2. **Load debugging reference** - Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-debugging/reference.md`
 3. **Analyze input:**
    - **File:** Read code and scan for anti-patterns, missing error handling, lock issues
-   - **Error:** Match against common-errors.md, then search TDN if not found
+   - **Error:** Match against `${CLAUDE_PLUGIN_ROOT}/skills/advpl-debugging/common-errors.md`, then search TDN if not found
    - **Log:** Parse for ERROR/WARNING patterns, extract stack traces
 4. **Report findings** - Clear explanation with severity levels
 5. **Suggest fixes** - Specific code changes with examples

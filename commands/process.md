@@ -32,7 +32,7 @@ Consult Protheus ERP business processes, module workflows, routines, and integra
    - Contains two module names or keywords like "integracao" / "integration" -> integration
    - Otherwise -> process
 4. **Delegate to process-consultant agent** - Pass the query and its type to the process-consultant agent for the local and TDN searches (steps 5-6); the Playwright fallback (step 7) runs in this command, which holds the Playwright tools
-5. **Search local reference** - Check `${CLAUDE_PLUGIN_ROOT}/skills/protheus-business/` module files (modulo-compras.md, modulo-estoque.md, etc.)
+5. **Search local reference** - Check `${CLAUDE_PLUGIN_ROOT}/skills/protheus-business/` module files (`${CLAUDE_PLUGIN_ROOT}/skills/protheus-business/modulo-compras.md`, `${CLAUDE_PLUGIN_ROOT}/skills/protheus-business/modulo-estoque.md`, etc.)
 6. **Search TDN** - If not found locally, search TDN online:
    - Process: `site:tdn.totvs.com "<process>" protheus fluxo`
    - Routine: `site:tdn.totvs.com "<ROUTINE_CODE>" rotina`

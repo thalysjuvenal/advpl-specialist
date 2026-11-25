@@ -29,26 +29,26 @@ Descreva em linguagem natural a rotina que deseja testar após o comando. O agen
 
 1. **Detectar tipo** — Identificar o `--type` informado ou inferir automaticamente a partir da descrição da rotina (ex.: menção a MVC, ExecAuto, relatório TReport, REST/webservice, Smart View, TOTVS Message, SmartLink ou preparação de rotina)
 2. **Carregar referência base** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/reference.md` e `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/best-practices.md`
-3. **Carregar padrão correspondente** — Ler o arquivo `patterns-*` mapeado ao tipo detectado (ver tabela abaixo) e também `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/api-fwtesthelper.md`
+3. **Carregar padrão correspondente** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/<arquivo>` mapeado ao tipo detectado (ver tabela abaixo) e também `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/api-fwtesthelper.md`
 4. **Delegar ao agent `code-generator`** — Gerar os fontes TestSuite/TestGroup/TestCase respeitando:
    - Limite de 25 caracteres no nome da classe (sem sufixo `.prw`); o nome do arquivo `.prw` deve ser idêntico ao nome da classe
    - Proibições de boas práticas: sem `Sleep`, sem acesso direto a tabelas do Protheus via alias dentro do TestCase, sem asserts dentro de Setup/TearDown, sem dependência de ordem entre TestCases
-   - Uso correto dos métodos `FWTestHelper` conforme `api-fwtesthelper.md`
+   - Uso correto dos métodos `FWTestHelper` conforme `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/api-fwtesthelper.md`
    - Estrutura hierárquica obrigatória: TestSuite > TestGroup > TestCase
 
 ## Mapeamento --type → arquivo de padrão
 
 | Tipo | Arquivo de padrão |
 |------|-------------------|
-| `mvc` | `patterns-mvc.md` |
-| `execauto` | `patterns-execauto.md` |
-| `routine-prep` | `patterns-routine-prep.md` |
-| `report` | `patterns-reports.md` |
-| `processing` | `patterns-processing.md` |
-| `message` | `patterns-totvs-message.md` |
-| `webservice` | `patterns-webservice.md` |
-| `smartlink` | `patterns-smartlink.md` |
-| `smartview` | `patterns-smartview.md` |
+| `mvc` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-mvc.md` |
+| `execauto` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-execauto.md` |
+| `routine-prep` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-routine-prep.md` |
+| `report` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-reports.md` |
+| `processing` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-processing.md` |
+| `message` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-totvs-message.md` |
+| `webservice` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-webservice.md` |
+| `smartlink` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-smartlink.md` |
+| `smartview` | `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/patterns-smartview.md` |
 
 ## Exemplos
 
