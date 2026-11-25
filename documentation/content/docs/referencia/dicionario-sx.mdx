@@ -96,7 +96,7 @@ Return
 {/* advpl-lint: anti-exemplo */}
 ```c
 // Reading SX1 directly to check what questions exist in a group
-// DEPRECATED - Use FWSX1Util():GetGroup() instead
+// DEPRECATED - Use FWSX1Util():New() and oSX1:GetGroup() instead
 User Function ListQuestions(cGroup)
     Local aArea := GetArea()
 
@@ -449,10 +449,19 @@ SX6 stores all system parameters (also called MV parameters) that control the be
 | X6_VAR | C | 10 | Parameter name (e.g., "MV_ESTADO", "MV_1DUP") |
 | X6_TIPO | C | 1 | Value type: "C" (Char), "N" (Numeric), "D" (Date), "L" (Logical) |
 | X6_CONTEUD | C | 250 | Parameter value (stored as character regardless of type) |
-| X6_DESCRIC | C | 60 | Description in Portuguese |
-| X6_DESCSPA | C | 60 | Description in Spanish |
-| X6_DESCENG | C | 60 | Description in English |
-| X6_PROPRI | C | 1 | Proprietary module flag |
+| X6_DESCRIC | C | 60 | Description in Portuguese (continued in `X6_DESC1` and `X6_DESC2`) |
+| X6_DSCSPA | C | 60 | Description in Spanish (continued in `X6_DSCSPA1` and `X6_DSCSPA2`) |
+| X6_DSCENG | C | 60 | Description in English (continued in `X6_DSCENG1` and `X6_DSCENG2`) |
+| X6_CONTSPA | C | 250 | Parameter value in Spanish |
+| X6_CONTENG | C | 250 | Parameter value in English |
+| X6_VALID | C | - | Validation expression for the parameter value |
+| X6_PYME | C | 1 | Small/medium company (PYME) flag |
+| X6_DEFPOR / X6_DEFSPA / X6_DEFENG | C | - | Default value in Portuguese/Spanish/English (standard parameters only) |
+| X6_ACTIVE | C | 1 | Active flag (standard parameters only) |
+| X6_EXPDEST | C | - | Destination expression (available from release 12.1.025) |
+| X6_PROPRI | C | 1 | Owner: "S" (System) or "U" (User) |
+
+> **Note (TDN)**: `X6_FIL` + `X6_VAR` form the key, and `X6_VAR` must be unique. The SX6 page of the TDN names the owner field `X6_PRIORI`, while the more recent UPDDISTR page names it `X6_PROPRI` (internal divergence in the TDN; confirm in your environment). The TDN does not mark fields as mandatory. A practical minimum for a custom parameter is `X6_FIL`, `X6_VAR`, `X6_TIPO`, `X6_DESCRIC`, `X6_CONTEUD` and `X6_PROPRI = "U"` (a practical minimum, not a TDN requirement). Custom parameter names usually follow `MV_` + prefix of the customer (the TDN mentions the `ES` prefix).
 
 ### Programmatic Access
 
@@ -551,7 +560,7 @@ SX7 defines automatic field triggers. A trigger fires when a source field change
 
 ### Programmatic Access
 
-> **Warning**: no framework class is documented for SX7, the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SX7 through the Configurador (SIGACFG) or the UPDDISTR update process. No documented API was found for SX7 (the SonarQube rules CA2005/CA2008 only mention "standard APIs (indirect)").
+> **Warning**: no framework class is documented for SX7, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SX7 through the Configurador (SIGACFG) or the UPDDISTR update process. No documented API was found for SX7 (the SonarQube rules CA2005/CA2008 only mention "standard APIs (indirect)").
 
 {/* advpl-lint: anti-exemplo */}
 ```c
@@ -628,6 +637,15 @@ SX9 defines relationships between tables, similar to foreign key constraints in 
 
 > **Warning**: the only documented API for SX9 is `FWSX9Util():SearchX9Paths(cParentAlias, cChildAlias, @aRelations)` (see `native-functions.md`), which finds the relationship paths between a parent and a child table, up to 3 levels deep. It is not a generic SX9 field reader, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`) as a structure illustration only. This is the discouraged direct-access pattern (see the note at the top of this file).
 
+The documented way to find the relationship paths between two tables:
+
+```c
+Local aRelations := {}
+Local lFound := FWSX9Util():SearchX9Paths("SA1", "SC5", @aRelations)
+```
+
+The structure illustration below reads the dictionary table directly and is not the recommended pattern:
+
 {/* advpl-lint: anti-exemplo */}
 ```c
 // List relationships for a specific table
@@ -699,7 +717,7 @@ SXB defines the standard queries (Consultas Padrao) used for F3 lookups. When a 
 
 ### Programmatic Access
 
-> **Warning**: no framework class is documented for SXB, the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SXB through the Configurador (SIGACFG) or the UPDDISTR update process. No documented API was found for SXB (the SonarQube rules CA2005/CA2008 only mention "standard APIs (indirect)").
+> **Warning**: no framework class is documented for SXB, so the example below reads the dictionary table directly (`DbSelectArea`/`DbSeek`). This is the discouraged direct-access pattern (see the note at the top of this file); it is shown only to explain the structure. Prefer managing SXB through the Configurador (SIGACFG) or the UPDDISTR update process. No documented API was found for SXB (the SonarQube rules CA2005/CA2008 only mention "standard APIs (indirect)").
 
 {/* advpl-lint: anti-exemplo */}
 ```c

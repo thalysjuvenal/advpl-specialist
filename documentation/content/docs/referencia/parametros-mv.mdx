@@ -30,9 +30,12 @@ Parametros MV sao valores de configuracao do sistema que definem comportamentos 
 | X6_TIPO | C | 1 | Tipo do valor: "C", "N", "D", "L" |
 | X6_CONTEUD | C | 250 | Valor do parametro (armazenado como caractere) |
 | X6_DESCRIC | C | 60 | Descricao em portugues |
-| X6_DESCSPA | C | 60 | Descricao em espanhol |
-| X6_DESCENG | C | 60 | Descricao em ingles |
-| X6_PROPRI | C | 1 | Flag de modulo proprietario |
+| X6_DSCSPA | C | 60 | Descricao em espanhol |
+| X6_DSCENG | C | 60 | Descricao em ingles |
+| X6_CONTSPA / X6_CONTENG | C | 250 | Valor do parametro em espanhol / ingles |
+| X6_PROPRI | C | 1 | Proprietario: "S" (Sistema) ou "U" (Usuario) |
+
+A tabela completa (X6_VALID, X6_PYME, X6_DEFPOR/SPA/ENG, X6_ACTIVE, X6_EXPDEST) e a nota sobre `X6_PRIORI`/`X6_PROPRI` estao em Dicionario SX. A chave e `X6_FIL` + `X6_VAR`.
 
 ---
 
