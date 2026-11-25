@@ -47,28 +47,30 @@ No Claude Code, os hooks do plugin rodam o lint a cada gravacao e convertem o en
 
 | Etapa | Script bash | Script PowerShell |
 |---|---|---|
-| Encoding (UTF-8 para Windows-1252) | `skills/advpl-code-generation/scripts/convert-encoding.sh` | `skills/advpl-code-generation/scripts/convert-encoding.ps1` |
 | Lint (regras ADV001 a ADV022) | `skills/advpl-code-review/scripts/advpl-lint.sh` | `skills/advpl-code-review/scripts/advpl-lint.ps1` |
+| Encoding (UTF-8 para Windows-1252), por ultimo | `skills/advpl-code-generation/scripts/convert-encoding.sh` | `skills/advpl-code-generation/scripts/convert-encoding.ps1` |
 
 ```bash
-# 1. Converter para Windows-1252 (estrito por padrao; --translit troca caracteres incompativeis por ?)
+# 1. Lint do arquivo inteiro; saida 1 significa erros a corrigir
+bash skills/advpl-code-review/scripts/advpl-lint.sh --scope all src/FATA001.prw
+
+# 2. Corrija os erros e rode o lint de novo ate nao haver erros
+
+# 3. Por ultimo, converter para Windows-1252 (estrito por padrao; --translit troca caracteres incompativeis por ?)
 bash skills/advpl-code-generation/scripts/convert-encoding.sh src/FATA001.prw
 
-# Para editar um fonte CP1252 em uma ferramenta que recusa arquivo nao UTF-8:
-# --to-utf8 converte para UTF-8; depois, o comando acima devolve o Windows-1252
+# Depois de converter, nao edite o fonte com ferramenta que assume UTF-8 (os acentos se corrompem).
+# Para editar de novo: --to-utf8 volta o fonte para UTF-8; depois, repita os passos 1 a 3
 bash skills/advpl-code-generation/scripts/convert-encoding.sh --to-utf8 src/FATA001.prw
-
-# 2. Lint do arquivo inteiro; saida 1 significa erros a corrigir
-bash skills/advpl-code-review/scripts/advpl-lint.sh --scope all src/FATA001.prw
 ```
 
 ```powershell
-# Windows sem bash
-pwsh -NoProfile -ExecutionPolicy Bypass -File skills/advpl-code-generation/scripts/convert-encoding.ps1 .\src\FATA001.prw
+# Windows sem bash: lint primeiro, conversao por ultimo
 pwsh -NoProfile -ExecutionPolicy Bypass -File skills/advpl-code-review/scripts/advpl-lint.ps1 --scope all .\src\FATA001.prw
+pwsh -NoProfile -ExecutionPolicy Bypass -File skills/advpl-code-generation/scripts/convert-encoding.ps1 .\src\FATA001.prw
 ```
 
-As skills `advpl-code-generation`, `advpl-refactoring`, `advpl-to-tlpp-migration`, `smartx-development` e `smartview-development` trazem a secao "After writing the source" com esse roteiro: converter o encoding, rodar o lint, corrigir os erros ate zerar, avaliar os avisos, e nunca dizer que o codigo compilou, porque a compilacao e a validacao no TDS / extensao TOTVS do VS Code continuam pendentes. Falsos positivos podem ser suprimidos no `.advpl-specialist-ignore`. Detalhes das regras, das diretivas e do encoding em [Validacao](/docs/referencia/validacao).
+As skills `advpl-code-generation`, `advpl-refactoring`, `advpl-to-tlpp-migration`, `smartx-development` e `smartview-development` trazem a secao "After writing the source" com esse roteiro: rodar o lint, corrigir os erros ate zerar, avaliar os avisos, converter o encoding como ultimo passo, e nunca dizer que o codigo compilou, porque a compilacao e a validacao no TDS / extensao TOTVS do VS Code continuam pendentes. Falsos positivos podem ser suprimidos no `.advpl-specialist-ignore`. Detalhes das regras, das diretivas e do encoding em [Validacao](/docs/referencia/validacao).
 
 O comando `/validate` tambem existe nas outras plataformas: ele e compilado a partir de `ai-commands/src/validate.md` e distribuido como `.github/prompts/validate.prompt.md`, `.cursor/commands/validate.md` e `.gemini/commands/validate.toml`. Ele roda o lint no arquivo inteiro e faz a passada semantica S1 a S6.
 

@@ -156,7 +156,7 @@ Um arquivo-fonte completo e compilavel salvo no diretorio do projeto com:
 
 ### Autoverificacao apos gravar
 
-No Claude Code, os hooks do plugin convertem o arquivo para Windows-1252 (decodificador proprio, sem `iconv`) e rodam o lint nas linhas introduzidas a cada gravacao. Para lintar o arquivo inteiro sob demanda, use `/advpl-specialist:validate`. A compilacao e a validacao continuam pendentes no TDS / extensao TOTVS do VS Code.
+No Claude Code, os hooks do plugin rodam o lint nas linhas introduzidas a cada gravacao e convertem o arquivo para Windows-1252 (decodificador proprio, sem `iconv`) no fim do turno. Para lintar o arquivo inteiro sob demanda, use `/advpl-specialist:validate`. A compilacao e a validacao continuam pendentes no TDS / extensao TOTVS do VS Code.
 
 ## Cache local de pontos de entrada
 

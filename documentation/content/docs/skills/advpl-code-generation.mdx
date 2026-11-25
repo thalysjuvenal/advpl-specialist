@@ -276,11 +276,12 @@ ADVPL herda um **limite de 10 caracteres** em identificadores (funcoes, metodos,
 
 IAs sem hooks (Copilot, Cursor, Gemini CLI e outras) devem verificar o arquivo elas mesmas, nesta ordem, antes de entregar:
 
-1. Converter para Windows-1252 com `scripts/convert-encoding.sh <arquivo>` desta skill (modo estrito). Em `failed: ... (incompatible char)`, remova ou troque o caractere, ou rode de novo com `--translit` e informe ao usuario quais caracteres viraram `?`.
-2. Rodar o lint no arquivo inteiro com `scripts/advpl-lint.sh --scope all <arquivo>` da skill `advpl-code-review`. Saida 1 significa erros: corrija e rode de novo ate zerar. Avalie os avisos e mencione os que mantiver.
-3. No Windows sem bash, usar os equivalentes `.ps1` com `pwsh -File` ou `powershell -File`.
-4. No Claude Code, os hooks do plugin fazem isso automaticamente a cada gravacao (lint nas linhas introduzidas e conversao de encoding sem `iconv`); use `/advpl-specialist:validate` para lintar arquivos inteiros sob demanda.
-5. Nunca diga que o codigo compilou: a compilacao e a validacao no TDS / extensao TOTVS do VS Code continuam pendentes.
+1. Rodar o lint no arquivo inteiro com `scripts/advpl-lint.sh --scope all <arquivo>` da skill `advpl-code-review`. Saida 1 significa erros.
+2. Corrigir os erros e rodar o lint de novo ate nao haver erros. Avalie os avisos e mencione os que mantiver.
+3. Por ultimo, converter para Windows-1252 com `scripts/convert-encoding.sh <arquivo>` desta skill (modo estrito). Em `failed: ... (incompatible char)`, remova ou troque o caractere, ou rode de novo com `--translit` e informe ao usuario quais caracteres viraram `?`. Depois de converter, nao edite o fonte com ferramenta que assume UTF-8; para editar de novo, volte com `--to-utf8` e repita os passos 1 a 3.
+4. No Windows sem bash, usar os equivalentes `.ps1` com `pwsh -NoProfile -ExecutionPolicy Bypass -File` (ou `powershell -NoProfile -ExecutionPolicy Bypass -File` no Windows PowerShell 5.1).
+5. No Claude Code, os hooks do plugin fazem o lint das linhas introduzidas a cada gravacao e convertem o encoding (sem `iconv`) no fim do turno; use `/advpl-specialist:validate` para lintar arquivos inteiros sob demanda.
+6. Nunca diga que o codigo compilou: a compilacao e a validacao no TDS / extensao TOTVS do VS Code continuam pendentes.
 
 ## Arquivos de Suporte
 

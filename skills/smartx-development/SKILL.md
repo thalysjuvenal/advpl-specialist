@@ -25,8 +25,9 @@ The referenced files are written in Brazilian Portuguese.
 
 AIs without hooks (Copilot, Cursor, Gemini CLI and others) must verify the file themselves, in this order, before delivering. Paths are relative to this skill folder; the scripts belong to the named skills.
 
-1. Convert to Windows-1252 with the `advpl-code-generation` skill's `scripts/convert-encoding.sh` (`../advpl-code-generation/scripts/convert-encoding.sh <file>`, strict). On `failed: ... (incompatible char)`, remove or replace the character; or re-run with `--translit` and tell the user which characters became `?`.
-2. Lint the whole file with the `advpl-code-review` skill's `scripts/advpl-lint.sh` (`../advpl-code-review/scripts/advpl-lint.sh --scope all <file>`). Exit 1 means errors: fix them and re-run until there are none. Evaluate warnings and mention any you keep. A false positive can be suppressed in the project's `.advpl-specialist-ignore` (`rule <ID>`, `path <glob>`, `field <FIELD>`, `function <NAME>`).
-3. On Windows without bash, run the `.ps1` twins with `pwsh -File` or `powershell -File`.
-4. In Claude Code the plugin hooks do this automatically on every write; use `/advpl-specialist:validate` to lint whole files on demand.
-5. Never say the code compiled: compilation and validation in TDS / the VS Code TOTVS extension remain pending.
+1. Lint the whole file with the `advpl-code-review` skill's `scripts/advpl-lint.sh` (`../advpl-code-review/scripts/advpl-lint.sh --scope all <file>`). Exit 1 means errors.
+2. Fix the errors and re-run the lint until there are none. Evaluate warnings and mention any you keep. A false positive can be suppressed in the project's `.advpl-specialist-ignore` (`rule <ID>`, `path <glob>`, `field <FIELD>`, `function <NAME>`).
+3. As the last step, convert to Windows-1252 with the `advpl-code-generation` skill's `scripts/convert-encoding.sh` (`../advpl-code-generation/scripts/convert-encoding.sh <file>`, strict). On `failed: ... (incompatible char)`, remove or replace the character; or re-run with `--translit` and tell the user which characters became `?`. Do not edit the file after converting: a tool that assumes UTF-8 corrupts the accents. If it needs another edit, convert it back with `--to-utf8` first and repeat steps 1 to 3.
+4. On Windows without bash, run the `.ps1` twins with `pwsh -NoProfile -ExecutionPolicy Bypass -File` (or `powershell -NoProfile -ExecutionPolicy Bypass -File` on Windows PowerShell 5.1).
+5. In Claude Code, the plugin hooks lint on every write and convert at the end of the turn; use `/advpl-specialist:validate` to lint whole files on demand.
+6. Never say the code compiled: compilation and validation in TDS / the VS Code TOTVS extension remain pending.
