@@ -140,7 +140,7 @@ See [`patterns-fwpreparedstatement.md`](patterns-fwpreparedstatement.md) for ful
 | Macro execution `&cExpr` in SQL | SQL injection | Never use `&` to build SQL |
 | `IIF()` inside SQL string | Banned by SonarQube ADVPL ruleset | Use SQL `CASE WHEN` or AdvPL `If/Else` |
 | `D_E_L_E_T_` filter missing on JOINed table | Returns deleted joined rows | Add `D_E_L_E_T_ = ' '` to every JOIN |
-| Missing `%nolock%` on read queries (SQL Server) | Lock contention, slow | Add `WITH (%nolock%)` — safe cross-DB (PG/Oracle ignore it) |
+| Hard-coded `WITH (NOLOCK)` hint | DB-specific; no documented portable `%nolock%` macro (TDN) | Do not hard-code locking hints; keep queries selective and write transactions short |
 | Forgetting `(cAlias)->(DBCloseArea())` | Alias leak (limited pool) | Always close, even on error paths |
 | `GetMV()` / `ExistBlock()` inside loops | Re-evaluated every iteration | Cache to a local before the loop |
 | `CREATE PROCEDURE` in source | Banned by TOTVS standards | Use SPManager for procedures |
@@ -165,7 +165,7 @@ See [`patterns-fwpreparedstatement.md`](patterns-fwpreparedstatement.md) for ful
 ### Performance
 - [ ] Only required fields in `SELECT` (no `SELECT *`)
 - [ ] WHERE clause column order matches the SIX index key expression — see [`index-awareness.md`](index-awareness.md)
-- [ ] `WITH (%nolock%)` on read-only queries (cross-DB safe)
+- [ ] No hard-coded locking hints (`WITH (NOLOCK)`) — not portable across databases
 - [ ] `JOIN` columns are indexed
 - [ ] Pagination (`FETCH FIRST` / `LIMIT`) for large result sets
 - [ ] `GetMV()` / `ExistBlock()` cached before loops
@@ -202,7 +202,7 @@ For Embedded SQL queries that don't open a workarea on a Protheus table (only on
 | `Object Not Found` on `(cAlias)->FIELD` | Alias not opened or already closed | Check `DBUseArea` return; verify ordering |
 | Wrong physical table in another env | Hardcoded name like `SA1010` | Replace with `RetSqlName("SA1")` |
 | Query slow on SD1/SD2 | Full table scan, no index match | Reorder WHERE to match SIX key — see `index-awareness.md` |
-| Deadlocks on read queries (MSSQL) | Missing NOLOCK | Add `WITH (%nolock%)` |
+| Deadlocks on read queries (MSSQL) | Long writer transactions / lock ordering | Shorten transactions and fix lock order; do not hard-code `NOLOCK` (see `protheus-locks-deadlocks`) |
 | `Invalid column name` on PostgreSQL/Oracle | MSSQL-specific function | Use ANSI alternative or `ChangeQuery()` |
 | `Cannot open more files` | Alias leak (forgot `DBCloseArea`) | Audit all error paths |
 

@@ -79,26 +79,9 @@ SE1->(DbSeek( ;
 - **Date fields**: `DtoS(dValue)` produces `YYYYMMDD`.
 - **Always use `TamSx3(field)[1]`** to read the field length from the dictionary — never hardcode.
 
-## %nolock% — Read Optimization
+## Locking Hints — Do Not Hard-Code
 
-For SQL Server, add `WITH (%nolock%)` to read-only queries to prevent lock contention. The `%nolock%` macro is silently ignored on PostgreSQL and Oracle (MVCC), so the same code is portable:
-
-```sql
-SELECT A1_COD, A1_NOME
-FROM SA1010 SA1 WITH (%nolock%)
-WHERE SA1.D_E_L_E_T_ = ' '
-  AND SA1.A1_FILIAL = '01'
-```
-
-Apply `%nolock%` to **every** table in the FROM/JOIN clause:
-
-```sql
-FROM SF2010 SF2 WITH (%nolock%)
-INNER JOIN SD2010 SD2 WITH (%nolock%) ON ...
-INNER JOIN SB1010 SB1 WITH (%nolock%) ON ...
-```
-
-> Never use `%nolock%` on writes (`UPDATE`/`DELETE`/`INSERT`).
+Read-consistency behavior differs per database (locking on SQL Server, MVCC on PostgreSQL/Oracle). Locking hints such as `WITH (NOLOCK)` are database-specific, so do not hard-code them in queries. The TDN documents no portable `%nolock%` macro for Embedded SQL (a confirmar no TDS), and `ChangeQuery()` removes `NOLOCK` hints from the query (TDN, `ChangeQuery`). To reduce lock contention on reads, keep the query selective (index-aligned `WHERE`) and keep write transactions short — see [`cross-database.md`](cross-database.md) and `protheus-locks-deadlocks`.
 
 ## Validating Index Use
 

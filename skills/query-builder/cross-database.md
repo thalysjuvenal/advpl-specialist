@@ -117,7 +117,7 @@ oTmp:SetFields( { ;
     { "X1_NAME", "C", 40, 0 } ;
 } )
 oTmp:Create()
-// ... INSERT/SELECT against RetSqlName(oTmp:GetRealName()) ...
+// ... INSERT/SELECT against oTmp:GetRealName() ...
 oTmp:Delete()
 ```
 
