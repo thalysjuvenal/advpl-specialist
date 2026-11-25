@@ -596,7 +596,8 @@ expect_that "output contract" wellformed undecl
 expect_that "finding counts differ (< expected, > actual)" same_file "$TMP_DIR/undecl.exp" "$TMP_DIR/undecl.got"
 end_case "ADV021: one finding per name per block (2 names on one line = 2), file-level Public/Private declare, Local does not, MsExecAuto lAutoErrNoFile is exempt"
 
-# arquivo-grande: ~5,000 generated lines with --scope all must take < 2 s.
+# arquivo-grande: ~5,000 generated lines with --scope all must take < 2 s
+# (30 s on Windows, see BIG_MAX).
 LC_ALL=C awk 'BEGIN {
   print "#include \"totvs.ch\""
   for (i = 1; i <= 250; i++) {
@@ -623,6 +624,11 @@ LC_ALL=C awk 'BEGIN {
     print "Return nOk"
   }
 }' >"$TMP_DIR/big.prw"
+# Only the bash engine is timed (the advpl-lint.ps1 parity run below is not).
+# On Windows (Git Bash) process start-up dominates and CI runners vary, so the
+# bound there only catches a pathological slowdown.
+BIG_MAX=2
+if [ "$PS_WIN" = 1 ]; then BIG_MAX=30; fi
 TIMEFORMAT='%R'
 NO_PARITY=1
 { time run_lint big --scope all "$TMP_DIR/big.prw"; } 2>"$TMP_DIR/big.time"
@@ -635,8 +641,8 @@ expect_that "ADV020 $(count_id big ADV020), want 50" [ "$(count_id big ADV020)" 
 expect_that "ADV021 $(count_id big ADV021), want 50" [ "$(count_id big ADV021)" = 50 ]
 expect_that "ADV009 $(count_id big ADV009), want 50" [ "$(count_id big ADV009)" = 50 ]
 expect_that "$(parse_findings big | wc -l | tr -d ' ') findings, want 150" [ "$(parse_findings big | wc -l | tr -d ' ')" = 150 ]
-expect_that "took ${secs}s, want < 2s" awk -v s="$secs" 'BEGIN { exit !(s + 0 < 2) }'
-end_case "arquivo-grande: 5001 lines, --scope all, ${secs}s (< 2 s)"
+expect_that "took ${secs}s, want < ${BIG_MAX}s" awk -v s="$secs" -v m="$BIG_MAX" 'BEGIN { exit !(s + 0 < m + 0) }'
+end_case "arquivo-grande: 5001 lines, --scope all, ${secs}s (< $BIG_MAX s)"
 parity_check "$RUN_DIR" big --scope all "$TMP_DIR/big.prw"
 
 echo "=== Parity matrix (every fixture and edge file, every mode) ==="

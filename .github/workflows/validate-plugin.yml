@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual run on any branch (e.g. a feature branch pushed without a PR yet).
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
@@ -125,7 +130,7 @@ jobs:
       - name: Validate shell scripts syntax
         run: |
           set -e
-          for f in hooks/session-start hooks/lib/*.sh; do
+          for f in hooks/session-start hooks/pre-tool-use hooks/post-tool-use hooks/lib/*.sh; do
             [ -f "$f" ] || continue
             bash -n "$f" || { echo "ERROR: $f has syntax errors"; exit 1; }
           done
@@ -151,7 +156,7 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          # 18 SKILL.md: frontmatter minimo, name == pasta, regex, limites
+          # SKILL.md (19 esperadas): frontmatter minimo, name == pasta, regex, limites
           count=0
           for d in skills/*/; do
             n=$(basename "$d"); f="${d}SKILL.md"; count=$((count+1))
@@ -175,10 +180,13 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          CMD=$(ls commands/*.md | wc -l | tr -d ' ')
-          AG=$(ls agents/*.md | wc -l | tr -d ' ')
-          SK=$(ls -d skills/*/ | wc -l | tr -d ' ')
-          SRC=$(ls ai-commands/src/*.md | wc -l | tr -d ' ')
+          # shellcheck disable=SC2012 # ls only counts plain repository file names
+          {
+            CMD=$(ls commands/*.md | wc -l | tr -d ' ')
+            AG=$(ls agents/*.md | wc -l | tr -d ' ')
+            SK=$(ls -d skills/*/ | wc -l | tr -d ' ')
+            SRC=$(ls ai-commands/src/*.md | wc -l | tr -d ' ')
+          }
           echo "reais: $CMD commands, $AG agents, $SK skills, $SRC fontes canonicas"
           # fonte canonica multi-IA acompanha commands/
           [ "$CMD" -eq "$SRC" ] || { echo "commands/ ($CMD) != ai-commands/src/ ($SRC)"; fail=1; }
@@ -199,5 +207,118 @@ jobs:
           grep -q "font-bold\">$SK<" documentation/app/page.tsx || { echo "page.tsx: card Skills != $SK"; fail=1; }
           exit $fail
 
+      - name: Lint rules in sync (advpl-lint.rules)
+        run: node scripts/sync-lint-rules.mjs --check
+
+      - name: Description limits (SKILL.md 250, commands 150)
+        run: node scripts/check-descriptions.mjs
+
+      - name: Cross references (paths, site pages, agent skills, session-start)
+        run: bash scripts/check-refs.sh
+
+      - name: Validate hooks.json
+        run: jq empty hooks/hooks.json
+
+      - name: ShellCheck (hooks, scripts, engines)
+        run: |
+          set -euo pipefail
+          command -v shellcheck >/dev/null || { sudo apt-get update && sudo apt-get install -y shellcheck; }
+          shellcheck --version | sed -n 2p
+          files=()
+          for f in hooks/* hooks/lib/*; do
+            [ -f "$f" ] || continue
+            # bash scripts only: *.sh or a shell shebang (not hooks.json)
+            case "$f" in
+              *.sh) ;;
+              *) case "$(head -n 1 "$f")" in '#!'*sh*) ;; *) continue ;; esac ;;
+            esac
+            files+=("$f")
+          done
+          files+=(scripts/*.sh
+                  skills/advpl-code-review/scripts/advpl-lint.sh
+                  skills/advpl-code-generation/scripts/convert-encoding.sh)
+          printf '  %s\n' "${files[@]}"
+          shellcheck "${files[@]}"
+
+      # README.md, examples and documentation/content still have findings; they
+      # are fixed in Phase 11 (Task 28), which adds them to this list.
+      - name: Dogfooding - ADVPL/TLPP blocks in the docs (lint-docs.sh)
+        run: bash scripts/lint-docs.sh skills commands agents AGENTS.md ai-commands .github/copilot-instructions.md
+
+      # Runs without authentication. The root CLAUDE.md is the maintainers' dev
+      # file (a known --strict warning), so a copy with only the plugin parts is
+      # validated.
+      - name: Plugin validate (claude plugin validate --strict)
+        run: |
+          set -euo pipefail
+          npm install -g @anthropic-ai/claude-code@2.1.332
+          dir="$RUNNER_TEMP/advpl-specialist"
+          rm -rf "$dir"
+          mkdir -p "$dir"
+          cp -R .claude-plugin agents skills commands hooks "$dir/"
+          claude plugin validate --strict "$dir"
+
       - name: Markdown lint (ruleset minimo)
         run: npx -y markdownlint-cli2@0.23.1 "**/*.md"
+
+  engines:
+    name: engines (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            ps: pwsh
+          - os: windows-latest
+            ps: powershell
+    env:
+      # The .ps1 twins are compared byte for byte with the bash engines: pwsh 7
+      # on Linux, Windows PowerShell 5.1 (the compatibility floor) on Windows.
+      LINT_PS: ${{ matrix.ps }}
+      ENC_PS: ${{ matrix.ps }}
+    defaults:
+      run:
+        shell: bash   # Git Bash on Windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tool versions
+        run: |
+          { bash --version | head -n 1; } || true
+          { awk -W version 2>/dev/null || awk --version 2>/dev/null; } | head -n 1 || true
+          # shellcheck disable=SC2016 # $PSVersionTable is PowerShell, not bash
+          "$LINT_PS" -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
+          command -v jq || echo "jq not found: the hooks suite runs only the builtin JSON parser"
+
+      - name: Lint engine (bash + PowerShell parity)
+        run: bash tests/lint/run-tests.sh
+
+      - name: Encoding converter (bash + PowerShell parity)
+        run: bash examples/encoding-tests/run-tests.sh
+
+      - name: Hooks
+        run: bash tests/hooks/run-tests.sh
+
+  site:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: documentation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: documentation/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build

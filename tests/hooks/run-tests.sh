@@ -292,7 +292,10 @@ big_ops() {
 }
 
 case_arquivo_grande() {
-  local d="$TMP_DIR/$MODE/grande" f elapsed
+  local d="$TMP_DIR/$MODE/grande" f elapsed max=2
+  # Windows (Git Bash): process start-up dominates and CI runners vary, so the
+  # bound there only catches a pathological slowdown.
+  case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) max=30 ;; esac
   mkdir -p "$d"; f="$d/FATA006.prw"
   LC_ALL=C awk 'BEGIN {
     print "#include \"totvs.ch\""
@@ -307,7 +310,7 @@ case_arquivo_grande() {
   check "arquivo-grande: exit 2" [ "$RC" = 2 ]
   check "arquivo-grande: acusa so a linha 2500" contains "$ERR" "FATA006.prw:2500: error ADV003"
   check "arquivo-grande: exatamente 1 achado" [ "$(finding_count "$ERR")" = 1 ]
-  check "arquivo-grande: < 2 s" awk -v t="$elapsed" 'BEGIN { exit !(t + 0 < 2) }'
+  check "arquivo-grande: < $max s" awk -v t="$elapsed" -v m="$max" 'BEGIN { exit !(t + 0 < m + 0) }'
 }
 
 valid_hook_json() { # strict shape check of the PostToolUse JSON on stdout

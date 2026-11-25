@@ -1,7 +1,11 @@
 #!/usr/bin/env node
-// Compiles the 14 canonical command sources in ai-commands/src/*.md into the
+// Compiles the canonical command sources in ai-commands/src/*.md into the
 // platform-specific formats consumed by GitHub Copilot, Cursor, and Gemini CLI.
 // Generated files — do not edit outputs by hand; edit ai-commands/src and re-run.
+// --check fails when an output differs from its source or when an output file
+// (*.prompt.md in .github/prompts, *.md in .cursor/commands, *.toml in
+// .gemini/commands) has no source in ai-commands/src (orphan: delete it).
+// Other files in those directories are not owned by this script and are ignored.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -106,6 +110,27 @@ function ensureDirs() {
   }
 }
 
+// Files in the output directories that follow the output naming of this
+// script (OUTPUT_SUFFIXES) but are not produced from any current source.
+const OUTPUT_SUFFIXES = [
+  [COPILOT_DIR, '.prompt.md'],
+  [CURSOR_DIR, '.md'],
+  [GEMINI_DIR, '.toml'],
+];
+
+function findOrphans(outputs) {
+  const orphans = [];
+  for (const [dir, suffix] of OUTPUT_SUFFIXES) {
+    if (!fs.existsSync(dir)) continue;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(suffix)) continue;
+      const filePath = path.join(dir, entry.name);
+      if (!outputs.has(filePath)) orphans.push(filePath);
+    }
+  }
+  return orphans.sort();
+}
+
 function check(outputs) {
   const diverging = [];
   for (const [filePath, expected] of outputs) {
@@ -118,12 +143,21 @@ function check(outputs) {
       diverging.push(filePath);
     }
   }
+  const orphans = findOrphans(outputs);
 
   if (diverging.length > 0) {
     console.log('ai-commands: out of sync, divergent files:');
     for (const filePath of diverging) {
       console.log(`  ${path.relative(ROOT, filePath)}`);
     }
+  }
+  if (orphans.length > 0) {
+    console.log('ai-commands: orphan outputs without a source in ai-commands/src (delete them):');
+    for (const filePath of orphans) {
+      console.log(`  ${path.relative(ROOT, filePath)}`);
+    }
+  }
+  if (diverging.length > 0 || orphans.length > 0) {
     process.exit(1);
   }
 

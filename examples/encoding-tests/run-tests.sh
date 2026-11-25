@@ -405,6 +405,12 @@ case_unreadable() {
     echo "  - unreadable / read-only files: skipped (running as root, which reads and writes any file)"
     return 0
   fi
+  if [ "$PS_WIN" = 1 ]; then
+    # Git Bash chmod on NTFS only toggles the read-only attribute: mode 000
+    # leaves the file readable, so the "read error" half cannot be staged.
+    echo "  - unreadable / read-only files: skipped (Windows: chmod cannot make a file unreadable)"
+    return 0
+  fi
   new_case unreadable
   set_mode 000 tree/sub/B.TLPP
   set_mode 444 "tree/x y.prw"
