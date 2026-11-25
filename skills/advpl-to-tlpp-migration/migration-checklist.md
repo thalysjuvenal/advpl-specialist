@@ -16,7 +16,7 @@ Perform this analysis before writing any TLPP code.
 - [ ] Identify `Static` file-level variables and their usage patterns
 - [ ] List all external callers of each `User Function` (other `.prw` files, menus, jobs, schedules)
 - [ ] Identify all database aliases used (`DbSelectArea`, `RecLock`, direct alias references)
-- [ ] Document all `#Include` directives (the `.tlpp` file gets the TLPP `.th` includes — `tlpp-core.th`, `tlpp-rest.th`, etc. — and keeps `totvs.ch` when framework features are used)
+- [ ] Document all `#include` directives (the `.tlpp` file gets the TLPP `.th` includes — `tlpp-core.th`, `tlpp-rest.th`, etc. — and keeps `totvs.ch` when framework features are used)
 - [ ] Identify any code blocks (`{|| ...}`) that reference `Private`/`Static` variables
 - [ ] Check for `MV_*` parameter usage (`GetMV`, `SuperGetMV`) that may need class-level access
 - [ ] Note any UI elements (dialogs, buttons, gets) that will need a separate View class
@@ -60,7 +60,7 @@ Create the TLPP class structure and convert all functions.
 
 ### Update Includes (in the `.tlpp` file)
 
-- [ ] Add the TLPP `.th` includes and keep `#include "totvs.ch"` when the code uses framework features (PARAMIXB, DEFAULT, MsExecAuto, BeginSQL, MVC): `#include "tlpp-core.th"` (main), `#Include "tlpp-rest.th"` (REST annotations), `#Include "tlpp-object.th"` (advanced objects)
+- [ ] Add the TLPP `.th` includes and keep `#include "totvs.ch"` when the code uses framework features (PARAMIXB, DEFAULT, MsExecAuto, BeginSQL, MVC): `#include "tlpp-core.th"` (main), `#include "tlpp-rest.th"` (REST annotations), `#include "tlpp-object.th"` (advanced objects)
 - [ ] Add the `namespace` declaration for the project (e.g., `namespace custom.faturamento.pedido`)
 - [ ] Do NOT add `using namespace tlpp.core`, `tlpp.log`, `tlpp.rest`, `tlpp.data`, etc. -- these are NOT needed; use the `.th` includes instead
 

@@ -109,7 +109,7 @@ TestSuite  →  agrupa um ou mais TestGroups
 | TestGroup | `FWDefaultTestSuite` | Agrupamento e ordenação dos TestCases |
 | TestCase | `FWDefaultTestCase` | Implementação de cada caso de teste conforme especificação |
 
-> **Nota sobre includes:** Os exemplos abaixo são verbatim do TDN e usam `#include "totvs.ch"`. Para código novo, use `#Include "TOTVS.CH"` (convenção atual do plugin).
+> **Nota sobre includes:** Os exemplos abaixo foram adaptados do TDN (o TDN grafa `protheus.ch`; o `totvs.ch` o inclui). Para código novo, use `#include "totvs.ch"` em minúsculas.
 
 ### TestSuite
 
