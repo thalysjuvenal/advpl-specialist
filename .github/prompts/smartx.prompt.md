@@ -19,6 +19,13 @@ Also consult `skills/advpl-code-generation/reference.md` for general naming, Hun
 
 ## Workflow
 
+### Release check (both modes)
+Before generating or planning, if a `.protheus-version` file exists in the project root, read it (one release string, e.g. `12.1.2410`), look up the minimum release of the feature in `skills/protheus-reference/releases.md` and compare the third component as an integer. If the declared release is below the minimum, warn the user and propose the alternative; continue only with the user's choice:
+- Native Smart X routine (`generate`): needs release 12.1.2510. Below it, propose keeping the routine in MVC/ADVPL.
+- Legacy browse conversion and the "Valid Smart X" field (`migrate`): need release 12.1.2610 in production (internal development: RPO D-1). Below it, propose keeping the legacy source.
+
+If the file does not exist, proceed as usual and add one line suggesting the user create `.protheus-version` with the Protheus release.
+
 ### Mode detection
 If `--mode` is not provided, infer it: mentions of an existing routine, mBrowse, AxCadastro, MVC, or "convert"/"migrate" imply `migrate`; otherwise `generate`.
 

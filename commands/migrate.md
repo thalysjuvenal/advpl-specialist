@@ -31,15 +31,16 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
 **MANDATORY: Always enter planning mode before migrating code. Never skip planning.**
 
 ### Analysis Phase
-1. **Read source file** - Read the .prw file completely
-2. **Analyze structure** - Identify functions, dependencies, shared variables
-3. **Search for callers** - Grep codebase for `u_FunctionName` references
+1. **Check the declared release** - If a `.protheus-version` file exists in the project root, read it (one release string, e.g. `12.1.2310`). Look up the minimum release of the target TLPP features in `skills/protheus-reference/releases.md` and compare the third component as an integer. If the declared release is below the minimum (e.g. TLPP with `namespace` or TLPP+MVC needs `12.1.2410`), warn the user and propose the alternative (e.g. keep the code in `.prw` ADVPL and apply only the safe cleanups). Continue only with the user's choice. If the file does not exist, proceed as usual and add one line suggesting the user create `.protheus-version` with the Protheus release.
+2. **Read source file** - Read the .prw file completely
+3. **Analyze structure** - Identify functions, dependencies, shared variables
+4. **Search for callers** - Grep codebase for `u_FunctionName` references
 
 ### Planning Phase (REQUIRED)
-4. **Load reference** - Read `skills/advpl-to-tlpp-migration/reference.md` for rules and checklist
-5. **Enter plan mode** - Use `EnterPlanMode` to create a structured migration plan
-6. **Design class structure** - Map functions to classes and methods
-7. **Present plan** - Show the user a detailed migration plan including:
+5. **Load reference** - Read `skills/advpl-to-tlpp-migration/reference.md` for rules and checklist
+6. **Enter plan mode** - Use `EnterPlanMode` to create a structured migration plan
+7. **Design class structure** - Map functions to classes and methods
+8. **Present plan** - Show the user a detailed migration plan including:
    - Source file analysis (functions found, dependencies, shared variables)
    - External callers that will be impacted
    - Target class structure (class name, namespace, properties, methods)
@@ -48,15 +49,15 @@ Convert ADVPL procedural code to TLPP with object-oriented patterns.
    - Includes to update (TOTVS.CH -> tlpp-core.th, etc.)
    - Whether a backward compatibility wrapper is needed
    - Any risks or breaking changes
-8. **Wait for approval** - The user must approve the plan before any code is written. If the user requests changes, revise the plan.
-9. **If --dry-run** - Stop here after showing the plan
-10. **Exit plan mode** - Use `ExitPlanMode` after approval
+9. **Wait for approval** - The user must approve the plan before any code is written. If the user requests changes, revise the plan.
+10. **If --dry-run** - Stop here after showing the plan
+11. **Exit plan mode** - Use `ExitPlanMode` after approval
 
 ### Implementation Phase (only after approval)
-11. **Execute migration** - Generate .tlpp file(s) following the approved plan and `skills/advpl-to-tlpp-migration/reference.md`
-12. **Generate wrapper** - Create backward compatibility .prw wrapper if --wrapper
-13. **Run checklist** - Validate against migration-checklist.md
-14. **Report** - Show summary of changes
+12. **Execute migration** - Generate .tlpp file(s) following the approved plan and `skills/advpl-to-tlpp-migration/reference.md`
+13. **Generate wrapper** - Create backward compatibility .prw wrapper if --wrapper
+14. **Run checklist** - Validate against migration-checklist.md
+15. **Report** - Show summary of changes
 
 ## Examples
 

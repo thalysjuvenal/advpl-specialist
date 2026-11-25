@@ -50,7 +50,7 @@ digraph lookup {
 
 **Before recommending any function, ALWAYS check if it appears in `restricted-functions.md`.** TOTVS maintains a list of 195+ functions/classes that are internal property and MUST NOT be used in custom code. Some have their compilation blocked since release 12.1.33.
 
-See `restricted-functions.md` for the complete list and supported alternatives.
+See `restricted-functions.md` for the complete list and supported alternatives. For the minimum release of each feature (TLPP+MVC, Smart X, StaticCall block, etc.), see `releases.md`.
 
 ## Function Categories
 

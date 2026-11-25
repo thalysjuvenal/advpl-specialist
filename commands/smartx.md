@@ -27,6 +27,15 @@ Descreva em linguagem natural a rotina Smart X desejada (nova ou existente para 
 
 ## Fluxo
 
+### Passo inicial (ambos os modos) — release declarada
+
+Antes de gerar ou planejar, se existir um arquivo `.protheus-version` na raiz do projeto, leia-o (uma release por arquivo, ex.: `12.1.2410`). Consulte o mínimo do recurso em `skills/protheus-reference/releases.md` e compare o terceiro componente como inteiro. Se a release declarada for menor que o mínimo, avise o usuário e proponha a alternativa; continue apenas com a escolha dele:
+
+- Rotina Smart X nativa (`generate`): exige a release 12.1.2510. Abaixo dela, avise e proponha manter a rotina em MVC/ADVPL.
+- Conversão de browse legado e campo "Valid Smart X" (`migrate`): exigem a release 12.1.2610 em ambiente produtivo (desenvolvimento interno: RPO D-1). Abaixo dela, avise e proponha manter o fonte legado.
+
+Se o arquivo não existir, siga normalmente e acrescente uma linha sugerindo criar `.protheus-version` com a release do Protheus.
+
 ### Modo `generate`
 
 1. **Carregar referência base** — Ler `skills/smartx-development/reference.md`, `skills/smartx-development/patterns-model.md`, `skills/smartx-development/patterns-interface.md` e `skills/smartx-development/patterns-launcher-browse.md`
