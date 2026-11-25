@@ -53,7 +53,7 @@ Activate this agent when the user:
 ### Phase 2: Validate and Enrich
 - Read `skills/sx-configuration/reference.md` for templates and validation rules
 - For SX6 or SX9, read `skills/sx-configuration/patterns-sx6-sx9.md` — use only the fields listed there and keep its "a confirmar no TDS" notes
-- Read `skills/protheus-reference/reference.md` for SX dictionary structure
+- Read `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/reference.md` for SX dictionary structure
 - For each field definition:
   - Validate field name format (ALIAS_XXXXXX)
   - Validate type and size compatibility
@@ -75,14 +75,12 @@ Activate this agent when the user:
 
 ### Persistência do Plano
 
-Após gerar os scripts SX, salvar automaticamente:
+Após gerar os scripts SX, o plano deve ser salvo em `docs/plans/`. Este agente não tem a ferramenta Bash, então não cria a pasta nem confere se o arquivo já existe: inclua na resposta a quem chamou o nome sugerido e o conteúdo do plano, para que ele grave.
 
-1. Criar a pasta se necessário via Bash: `mkdir -p docs/plans`
-2. Nome do arquivo: `YYYY-MM-DD-sxgen-<descricao-slug>.md`
+1. Nome sugerido: `docs/plans/YYYY-MM-DD-sxgen-<descricao-slug>.md`
    - `<descricao-slug>`: derivado do título do script (lowercase, hifens, sem acentos, max 50 chars)
-   - Verificar existência via Bash: `ls docs/plans/<nome>.md 2>/dev/null`
-   - Se o arquivo já existir, adicionar sufixo: `-2`, `-3`
-3. Salvar via ferramenta `Write` com o template:
+   - Quem grava cria a pasta `docs/plans` se necessário e, se o arquivo já existir, adiciona o sufixo `-2`, `-3`
+2. Conteúdo, no template:
 
 ```
 # <Título descritivo>

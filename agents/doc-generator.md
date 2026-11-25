@@ -42,9 +42,9 @@ Activate this agent when the user:
 - Check git log for author and history (if available via Bash: `git log --follow <file>`)
 
 ### Phase 2: Enrich
-- Read `skills/protheus-reference/reference.md` to look up detected native functions
-- Read `skills/protheus-business/reference.md` if module context is needed
-- Read `skills/embedded-sql/reference.md` if SQL queries are present
+- Read `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/reference.md` to look up detected native functions
+- Read `${CLAUDE_PLUGIN_ROOT}/skills/protheus-business/reference.md` if module context is needed
+- Read `${CLAUDE_PLUGIN_ROOT}/skills/embedded-sql/reference.md` if SQL queries are present
 - Cross-reference tables with known SX dictionary entries
 
 ### Phase 3: Generate
@@ -57,14 +57,12 @@ Activate this agent when the user:
 
 ### Persistência do Plano
 
-Após gerar a documentação, salvar automaticamente:
+Após gerar a documentação, o plano deve ser salvo em `docs/plans/`. Este agente não tem a ferramenta Bash, então não cria a pasta nem confere se o arquivo já existe: inclua na resposta a quem chamou o nome sugerido e o conteúdo do plano, para que ele grave.
 
-1. Criar a pasta se necessário via Bash: `mkdir -p docs/plans`
-2. Nome do arquivo: `YYYY-MM-DD-document-<descricao-slug>.md`
+1. Nome sugerido: `docs/plans/YYYY-MM-DD-document-<descricao-slug>.md`
    - `<descricao-slug>`: derivado do título da documentação (lowercase, hifens, sem acentos, max 50 chars)
-   - Verificar existência via Bash: `ls docs/plans/<nome>.md 2>/dev/null`
-   - Se o arquivo já existir, adicionar sufixo: `-2`, `-3`
-3. Salvar via ferramenta `Write` com o template:
+   - Quem grava cria a pasta `docs/plans` se necessário e, se o arquivo já existir, adiciona o sufixo `-2`, `-3`
+2. Conteúdo, no template:
 
 ```
 # <Título descritivo>
@@ -88,4 +86,4 @@ Após gerar a documentação, salvar automaticamente:
 
 #### TDN Lookup (se precisar de referência de funções nativas ou tabelas)
 
-Read `skills/tdn-lookup/reference.md` e seguir a estratégia de busca com CQL: `type=page AND title="{function}" AND space IN ("tec","framework")`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/tdn-lookup/reference.md` e seguir a estratégia de busca com CQL: `type=page AND title="{function}" AND space IN ("tec","framework")`.

@@ -72,14 +72,12 @@ Activate this agent when the user:
 
 ### Persistência do Plano
 
-Imediatamente após a aprovação (após `ExitPlanMode`), salvar o plano automaticamente:
+Imediatamente após a aprovação (após `ExitPlanMode`), o plano deve ser salvo em `docs/plans/`. Este agente não tem as ferramentas Bash e Write, então não cria a pasta nem grava o arquivo: inclua na resposta a quem chamou o nome sugerido e o conteúdo do plano, para que ele grave.
 
-1. Criar a pasta se necessário via Bash: `mkdir -p docs/plans`
-2. Nome do arquivo: `YYYY-MM-DD-refactor-<descricao-slug>.md`
+1. Nome sugerido: `docs/plans/YYYY-MM-DD-refactor-<descricao-slug>.md`
    - `<descricao-slug>`: derivado do título do plano (lowercase, hifens, sem acentos, max 50 chars)
-   - Verificar existência via Bash: `ls docs/plans/<nome>.md 2>/dev/null`
-   - Se o arquivo já existir, adicionar sufixo: `-2`, `-3`
-3. Salvar via ferramenta `Write` com o template:
+   - Quem grava cria a pasta `docs/plans` se necessário e, se o arquivo já existir, adiciona o sufixo `-2`, `-3`
+2. Conteúdo, no template:
 
 ```
 # <Título descritivo do plano>
@@ -109,4 +107,4 @@ Imediatamente após a aprovação (após `ExitPlanMode`), salvar o plano automat
 
 #### TDN Lookup (se precisar verificar funções externas ou padrões)
 
-Read `skills/tdn-lookup/reference.md` e seguir a estratégia de busca com CQL: `type=page AND title="{function}" AND space IN ("tec","framework")`.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/tdn-lookup/reference.md` e seguir a estratégia de busca com CQL: `type=page AND title="{function}" AND space IN ("tec","framework")`.

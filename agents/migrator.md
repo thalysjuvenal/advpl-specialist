@@ -63,14 +63,12 @@ Activate this agent when the user:
 
 ### Persistência do Plano
 
-Imediatamente após a aprovação (após `ExitPlanMode`), salvar o plano automaticamente:
+Imediatamente após a aprovação (após `ExitPlanMode`), o plano deve ser salvo em `docs/plans/`. Este agente não tem a ferramenta Bash, então não cria a pasta nem confere se o arquivo já existe: inclua na resposta a quem chamou o nome sugerido e o conteúdo do plano, para que ele grave.
 
-1. Criar a pasta se necessário via Bash: `mkdir -p docs/plans`
-2. Nome do arquivo: `YYYY-MM-DD-migrate-<descricao-slug>.md`
+1. Nome sugerido: `docs/plans/YYYY-MM-DD-migrate-<descricao-slug>.md`
    - `<descricao-slug>`: derivado do título do plano (lowercase, hifens, sem acentos, max 50 chars)
-   - Verificar existência via Bash: `ls docs/plans/<nome>.md 2>/dev/null`
-   - Se o arquivo já existir, adicionar sufixo: `-2`, `-3`
-3. Salvar via ferramenta `Write` com o template:
+   - Quem grava cria a pasta `docs/plans` se necessário e, se o arquivo já existir, adiciona o sufixo `-2`, `-3`
+2. Conteúdo, no template:
 
 ```
 # <Título descritivo do plano>

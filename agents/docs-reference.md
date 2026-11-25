@@ -44,7 +44,7 @@ Activate this agent when the user:
   - SX tables -> sx-dictionary.md
   - REST APIs -> rest-api-reference.md
   - MV parameters -> native-functions.md (system functions section)
-  - Embedded SQL -> `skills/embedded-sql/reference.md` (BeginSQL/EndSQL, macros)
+  - Embedded SQL -> `${CLAUDE_PLUGIN_ROOT}/skills/embedded-sql/reference.md` (BeginSQL/EndSQL, macros)
 
 ### Phase 3: TDN Lookup (se não encontrado localmente)
 

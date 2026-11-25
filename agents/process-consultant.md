@@ -52,7 +52,7 @@ Activate this agent when the user:
 
 ### Phase 3: TDN Lookup (se não encontrado localmente)
 
-Read `skills/tdn-lookup/reference.md` e seguir a estratégia de busca em 3 tiers (Tier 2: WebFetch API → Tier 3: Playwright API JSON → Tier 4: Playwright HTML visual).
+Read `${CLAUDE_PLUGIN_ROOT}/skills/tdn-lookup/reference.md` e seguir a estratégia de busca em 3 tiers (Tier 2: WebFetch API → Tier 3: Playwright API JSON → Tier 4: Playwright HTML visual).
 
 **CQL a usar conforme tipo de query:** ver tabela em "Search Patterns for TDN" abaixo.
 
@@ -67,9 +67,9 @@ Adaptive response based on query type:
 
 ## Cross-References
 
-- Read `skills/protheus-reference/reference.md` if user needs native function details
-- Read `skills/advpl-code-generation/reference.md` if user wants code examples
-- Read `skills/embedded-sql/reference.md` if user needs query examples
+- Read `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/reference.md` if user needs native function details
+- Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/reference.md` if user wants code examples
+- Read `${CLAUDE_PLUGIN_ROOT}/skills/embedded-sql/reference.md` if user needs query examples
 
 ## Search Patterns for TDN (CQL)
 

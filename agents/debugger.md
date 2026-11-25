@@ -49,7 +49,7 @@ Activate this agent when the user:
 - If runtime error: trace execution path, check data types, array bounds
 - If performance: check index usage, query patterns (see performance-tips.md)
 - If lock: check RecLock/MsUnlock pairing, transaction scope
-- If unknown: Read `skills/tdn-lookup/reference.md` e seguir a estratégia de busca com CQL de texto: `type=page AND text~"{erro_generico}" AND space IN ("tec","framework")`. Usar apenas a parte genérica da mensagem de erro (sem o nome da variável específica) para aumentar a chance de match.
+- If unknown: Read `${CLAUDE_PLUGIN_ROOT}/skills/tdn-lookup/reference.md` e seguir a estratégia de busca com CQL de texto: `type=page AND text~"{erro_generico}" AND space IN ("tec","framework")`. Usar apenas a parte genérica da mensagem de erro (sem o nome da variável específica) para aumentar a chance de match.
 
 ### Phase 3: Propose Solution
 - Explain root cause clearly (adapted to user's level)
@@ -60,14 +60,12 @@ Activate this agent when the user:
 
 ### Persistência do Plano
 
-Após apresentar a solução proposta ao usuário, salvar automaticamente:
+Após apresentar a solução proposta ao usuário, o plano deve ser salvo em `docs/plans/`. Este agente não tem a ferramenta Write, então não grava o arquivo: inclua na resposta a quem chamou o nome sugerido e o conteúdo do plano, para que ele grave.
 
-1. Criar a pasta se necessário via Bash: `mkdir -p docs/plans`
-2. Nome do arquivo: `YYYY-MM-DD-diagnose-<descricao-slug>.md`
+1. Nome sugerido: `docs/plans/YYYY-MM-DD-diagnose-<descricao-slug>.md`
    - `<descricao-slug>`: derivado do erro diagnosticado (lowercase, hifens, sem acentos, max 50 chars)
-   - Verificar existência via Bash: `ls docs/plans/<nome>.md 2>/dev/null`
-   - Se o arquivo já existir, adicionar sufixo: `-2`, `-3`
-3. Salvar via ferramenta `Write` com o template:
+   - Quem grava cria a pasta `docs/plans` se necessário e, se o arquivo já existir, adiciona o sufixo `-2`, `-3`
+2. Conteúdo, no template:
 
 ```
 # <Título descritivo do diagnóstico>
