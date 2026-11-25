@@ -2,6 +2,8 @@
 description: Specialized agent for generating technical documentation from ADVPL/TLPP source code - Protheus.doc headers, routine docs, API docs
 tools: Read, Write, Edit, Glob, Grep
 model: inherit
+skills:
+  - documentation-patterns
 ---
 
 # ADVPL/TLPP Documentation Generator

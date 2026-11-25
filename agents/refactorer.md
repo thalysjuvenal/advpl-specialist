@@ -2,6 +2,8 @@
 description: Specialized ADVPL/TLPP refactoring agent - analyzes code structure and suggests safe improvements without changing behavior
 tools: Read, Grep, Glob, Edit
 model: inherit
+skills:
+  - advpl-refactoring
 ---
 
 # ADVPL/TLPP Refactorer
