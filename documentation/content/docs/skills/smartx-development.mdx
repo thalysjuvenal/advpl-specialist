@@ -7,7 +7,7 @@ description: "Desenvolvimento Smart X - telas web modernas geradas automaticamen
 
 Smart X e um framework TOTVS que gera telas com interface web moderna automaticamente a partir de metadados. O desenvolvedor descreve a estrutura de dados, as regras de negocio e o layout, e o framework gera e renderiza a interface (PO-UI), eliminando a necessidade de construir componentes visuais manualmente.
 
-> O comando `/advpl-specialist:smartx` gera e migra rotinas Smart X seguindo os padroes desta skill automaticamente.
+> O comando `/advpl-specialist:smartx` gera e migra rotinas Smart X seguindo os padroes desta skill automaticamente. Se existir um arquivo `.protheus-version` na raiz do projeto, o comando o le e avisa quando a release declarada esta abaixo do minimo do recurso: 12.1.2510 para rotinas nativas (modelo, interface, launcher) e 12.1.2610 para conversao de browse legado e o campo "Valid Smart X" (minimos em `skills/protheus-reference/releases.md`).
 
 ## Arquitetura (Objeto, Modelo, Interface e Launcher)
 
@@ -20,7 +20,9 @@ Toda rotina Smart X e composta por tres artefatos, mais o launcher que a registr
 | Interface | Classe TLPP que define o contrato de UI (browse, formularios de inclusao/edicao/visualizacao) | `namespace.interface.tlpp` |
 | Launcher | Funcao ADVPL/TLPP registrada no menu que instancia `totvs.framework.application.smartx.launcher()` e abre a rotina apontando para a Interface | funcao de menu (ex.: `FINA050SM()`) |
 
-Os tres artefatos usam includes proprios (`fw-tlpp-core.th`, `protheus.ch`, `totvs.framework.structure.model.th` no Modelo, `totvs.framework.structure.Interface.th` na Interface). O Modelo leva a annotation `@totvsFrameworkStructureModel(...)` e estende `totvs.framework.structure.model.data`; a Interface leva `@totvsFrameworkStructureInterface(...)`.
+Os tres artefatos usam includes proprios (`fw-tlpp-core.th`, `totvs.ch`, `totvs.framework.structure.model.th` no Modelo, `totvs.framework.structure.interface.th` na Interface). O Modelo leva a annotation `@totvsFrameworkStructureModel(...)` e estende `totvs.framework.structure.model.data`; a Interface leva `@totvsFrameworkStructureInterface(...)`.
+
+> Sobre os includes: o `totvs.ch` inclui o `protheus.ch`; o TDN ainda grafa `protheus.ch` nos exemplos de Smart X. O TDN tambem grafa `Interface.th` (maiusculo); aqui o include vai em minusculas e a diferenciacao de caixa na compilacao em Linux esta a confirmar no TDS.
 
 ## Exemplo Minimo
 
@@ -28,7 +30,7 @@ Modelo (`model.tlpp`) — cria o objeto principal a partir do dicionario de dado
 
 ```c
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
+#include "totvs.ch"
 #include "totvs.framework.structure.model.th"
 
 namespace totvs.backoffice.fin.fina050sm
@@ -52,8 +54,8 @@ Interface (`interface.tlpp`) — declara o contrato de UI referenciando o Modelo
 
 ```c
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
-#include "totvs.framework.structure.Interface.th"
+#include "totvs.ch"
+#include "totvs.framework.structure.interface.th"
 
 namespace totvs.backoffice.fin.fina050sm
 
@@ -125,6 +127,10 @@ A migracao para Smart X e uma mudanca de paradigma **Stateful -> Stateless**: o 
 Ha dois caminhos: **A — incremental** (apenas o browse via `setSmartX()`, preservando ModelDef/ViewDef/MenuDef) e **B — reescrita completa** (novo Modelo + Interface + Launcher nativos, mantendo o fonte legado para compatibilidade com ExecAuto/Rotina Automatica).
 
 Recursos que **nao migram** na Release 2610: `AxCadastro`, Tree (`FWTree`/`TreeModel`), Papel de Trabalho (SIGACFG), `MarkBrowse` em grid interno, `aHeader`/`aCols`, tabelas temporarias, `X3_WHEN`, `ViewDef` manual (`CreateHorizontalBox`/`CreateVerticalBox`), `AddOtherObject`, array `aFixe` e Painel Mestre/Detalhe na mesma tela.
+
+### Relatorio de lacunas (obrigatorio)
+
+Toda migracao para Smart X e entregue com o relatorio de lacunas no formato do `gap-report.md` da skill `advpl-to-tlpp-migration`: tabela `Item | Situacao | Motivo | Acao`, com situacao `migrado`, `nao migravel` ou `mantido no legado`, uma linha por ocorrencia. Ele cobre o checklist geral (`VerifyAccess`, `SuperGetMV`/`MV_`, `FwAliasInDic`, `cPaisLoc`, pontos de entrada, `ExistBlock`, gatilhos SX7, filtros, legendas, permissoes), os recursos que nao migram e, no Caminho B, o `ModelDef`/`ViewDef`/`MenuDef` e o handler de ExecAuto preservados como `mantido no legado`. Sem o relatorio, a migracao nao esta concluida. O Passo 9 de `patterns-migration.md` detalha o formato.
 
 ## Troubleshooting
 

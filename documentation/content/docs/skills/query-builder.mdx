@@ -33,7 +33,7 @@ Workarea e o padrao correto quando:
 Evite Workarea quando a query exige agregacao (SUM/COUNT/AVG), JOINs de tres ou mais tabelas, ou quando nao existe indice adequado para o caminho de acesso.
 
 ```c
-#Include "TOTVS.CH"
+#include "totvs.ch"
 
 User Function GetCustomerName(cCustCode, cLoja)
     Local cName    := ""
@@ -66,18 +66,31 @@ Return cName
 
 **Use-a sempre que qualquer valor na query vier de fora da funcao:** campos de formulario, payloads REST, parametros `MV_*`, ou valores lidos de outras tabelas em tempo de execucao. Nunca concatene entrada do usuario diretamente em strings SQL.
 
+{/* advpl-lint: anti-exemplo */}
 ```c
 // PERIGOSO — vulneravel a SQL injection
 cQuery += "AND A1_COD = '" + cUserInput + "'"
+```
 
+```c
 // SEGURO — parametrizado
 Local oStmt := FWPreparedStatement():New()
-oStmt:SetQuery("SELECT A1_COD, A1_NOME FROM " + RetSqlName("SA1") + " " + ;
-               "WHERE D_E_L_E_T_ = ' ' AND A1_FILIAL = ? AND A1_COD = ?")
+Local cQuery := ""
+cQuery := "SELECT A1_COD, A1_NOME "
+cQuery += "FROM " + RetSqlName("SA1") + " SA1 "
+cQuery += "WHERE SA1.D_E_L_E_T_ = ' ' "
+cQuery +=   "AND SA1.A1_FILIAL = ? "
+cQuery +=   "AND SA1.A1_COD = ? "
+oStmt:SetQuery(cQuery)
 oStmt:SetString(1, xFilial("SA1"))
 oStmt:SetString(2, cUserInput)
 DBUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+// ... uso do alias ...
+(cAlias)->(DBCloseArea())
+oStmt:Destroy()
 ```
+
+Em `BeginSQL`/`EndSQL`, o `%exp:` insere o valor no texto do SQL; ele **nao** e vinculo de parametro. Valores vindos do usuario ou de fora da rotina passam sempre pelo `FWPreparedStatement`.
 
 **Referencia rapida da API:**
 
@@ -128,7 +141,7 @@ WHERE SE1.D_E_L_E_T_ = ' '
 - Omitir `XX_FILIAL` no WHERE — o otimizador nao consegue usar o indice primario.
 - `OR` entre colunas de indices diferentes — frequentemente leva a scan; reescreva como `UNION ALL`.
 
-Para leitura em SQL Server, adicione `WITH (%nolock%)` a cada tabela no FROM/JOIN de queries somente leitura. O macro `%nolock%` e silenciosamente ignorado no PostgreSQL e Oracle (MVCC), entao o codigo permanece portatil. Nunca use em escritas.
+Nao fixe dicas de bloqueio como `WITH (NOLOCK)` nas queries: elas dependem do banco, e o TDN nao documenta nenhum macro `%nolock%` para Embedded SQL (a confirmar no TDS). O `ChangeQuery()` remove a dica `NOLOCK` da query (TDN). Para reduzir contencao em leituras, mantenha a query seletiva (WHERE alinhado ao indice) e as transacoes de escrita curtas; veja a skill `protheus-locks-deadlocks`.
 
 Para Workarea, a chave de busca deve corresponder literalmente a expressao do indice. Use `TamSx3("CAMPO")[1]` para ler o tamanho do campo do dicionario — nunca hardcode o tamanho.
 
@@ -175,7 +188,7 @@ Prefira alternativas ANSI quando existirem — `COALESCE` funciona nos tres banc
 |---|---|---|
 | `GETDATE()` no SQL | Quebra no PG/Oracle | `CURRENT_DATE` ou branch em `TCGetDB()` |
 | `+` para concat de strings no SQL | Quebra no PG/Oracle | Use `CONCAT()` ou monte no lado AdvPL |
-| `WITH (NOLOCK)` hardcoded | Erro de parse no PG/Oracle | Use o macro `%nolock%` |
+| `WITH (NOLOCK)` hardcoded | Dica so de SQL Server: quebra no PG/Oracle se a query nao passar por `ChangeQuery()`, e permite leitura suja | Nao fixe dicas de bloqueio; `ChangeQuery()` remove o `NOLOCK` e o TDN nao documenta `%nolock%` |
 | `ISNULL` fora de branch MSSQL | Quebra no PG/Oracle | Use `COALESCE` |
 | `LIMIT n` sem `ChangeQuery()` | Quebra no MSSQL | `ChangeQuery()` ou use `FETCH FIRST` |
 
@@ -209,7 +222,7 @@ Prefira alternativas ANSI quando existirem — `COALESCE` funciona nos tres banc
 ### Performance
 - Apenas campos necessarios no `SELECT` (sem `SELECT *`)
 - Ordem das colunas no WHERE alinhada a expressao do indice SIX
-- `WITH (%nolock%)` em queries somente leitura
+- Sem dicas de bloqueio fixas (`WITH (NOLOCK)`) — nao sao portaveis entre bancos
 - Cache de `GetMV()` / `ExistBlock()` fora de loops
 
 ### Cross-Database
@@ -224,5 +237,5 @@ Prefira alternativas ANSI quando existirem — `COALESCE` funciona nos tres banc
 | `skills/query-builder/reference.md` | Convencoes de banco Protheus, matriz de decisao, anti-padroes e checklist completo |
 | `skills/query-builder/patterns-workarea.md` | Padroes `DbSelectArea`, `DbSeek`, `RecLock`, save/restore de area |
 | `skills/query-builder/patterns-fwpreparedstatement.md` | SELECT, JOIN, UPDATE/DELETE/INSERT, LIKE, IN-list com `FWPreparedStatement` |
-| `skills/query-builder/index-awareness.md` | Indices SIX por tabela, ordenacao de WHERE, `%nolock%`, validacao de plano de execucao |
+| `skills/query-builder/index-awareness.md` | Indices SIX por tabela, ordenacao de WHERE, leitura e bloqueios por banco, validacao de plano de execucao |
 | `skills/query-builder/cross-database.md` | `ChangeQuery()`, `TCGetDB()`, macros DBAccess, equivalencias PG/MSSQL/Oracle, paginacao, tabelas temporarias |

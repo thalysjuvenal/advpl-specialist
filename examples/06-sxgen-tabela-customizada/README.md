@@ -50,56 +50,44 @@ Tabela generica (SX5 - tabela ZB):
 
 1. **Valida os campos:**
    - Convenção de nome (prefixo `ZB1_`, tipo apropriado, tamanho condizente)
-   - Campos chave marcados como `Obrigatorio = .T.`
-   - Campos com `pipe` para outras tabelas geram validação `F3` automática
-2. **Plan mode** — apresenta:
-   - Nome do arquivo gerado (`dicZB1.prw` ou formato de import preferido)
-   - Cada registro SX3 com `PutSx3()` + help via `HlpByReg()`
-   - Cada índice SIX com `PutSix()`
-   - Perguntas SX1 com `PutSx1()`
-   - SX5 com `PutSx5()`
-3. **Aprovação** → gera o arquivo único com todas as seções separadas por comentário de bloco
+   - Campos chave com `NaoVazio()` e campos com combo com `Pertence()`
+   - Campos com pipe para outras tabelas geram `ExistCpo()` e o gatilho SX7 correspondente
+2. **Delega ao agent `sx-configurator`**, que lê `skills/sx-configuration/reference.md` e gera, por tipo (`--type sx2|sx3|six|sxg|sxa|sx1|sx5|sxb|sx7|sx6|sx9`), blocos formatados de chave e valor com todos os atributos (SX3 com os três idiomas pt-BR, es e en)
+3. **Entrega** o script no chat, ou no arquivo indicado em `--output`
+
+O resultado é um roteiro para digitação no Configurador ou referência para importação (APSDU/UPDDISTR); o plugin não gera um `.prw` que grava o dicionário por código.
 
 ## Output esperado
 
-Arquivo `dicZB1.prw` com estrutura:
+Exemplo (trecho) do bloco SX3 e SIX:
 
-```advpl
-#Include "TOTVS.CH"
+```text
+=== SX3 - ZB1 - Controle de Visitas Tecnicas ===
+X3_ARQUIVO : ZB1
+X3_CAMPO   : ZB1_NUMVIS
+X3_TIPO    : C
+X3_TAMANHO : 6
+X3_VALID   : NaoVazio()
+X3_TITULO  : Num. Visita
 
-User Function DicZB1()
-    // === SX3 - Estrutura de Campos ===
-    U_AtuSX3()
-
-    // === SIX - Indices ===
-    U_AtuSIX()
-
-    // === SX1 - Perguntas ===
-    U_AtuSX1()
-
-    // === SX5 - Tabela Generica ===
-    U_AtuSX5()
-
-    MsgInfo("Dicionario ZB1 atualizado")
-Return Nil
-
-Static Function U_AtuSX3()
-    // PutSx3() para cada campo com todos os atributos
-    // ...
-Return Nil
-
-// ... e assim por diante para SIX, SX1, SX5
+=== SIX - ZB1 ===
+INDICE : ZB1
+ORDEM  : 1
+CHAVE  : ZB1_FILIAL+ZB1_NUMVIS
 ```
+
+Os demais campos, índices, as perguntas SX1 (grupo `ZBR001`) e as entradas SX5 (tabela `ZB`) seguem o mesmo formato. Os nomes exatos dos atributos seguem `skills/sx-configuration/reference.md`.
 
 ## Variações
 
-- `--format excel` — exporta CSV para importar via SXImport (mais seguro em produção)
-- `--format apo` — gera .prw executável (formato antigo, ainda suportado)
-- `--include sx7` — adiciona gatilhos (SX7) para consistência entre campos
-- Sem especificar tudo no prompt: plugin pergunta campo a campo em modo interativo
+- `--type sx3` (ou `six`, `sx1`, `sx5`...) — gera apenas o tipo pedido
+- `--output config/ZB1-campos.txt` — grava o script em arquivo
+- `--type sx7` — adiciona gatilhos explícitos (para campos com F3, o SX3 já os gera)
+- `--type sx6` — parâmetro `MV_*` da rotina (ex.: dias de validade); `--type sx9` — relacionamento SA1 para ZB1 (`A1_COD+A1_LOJA` com `ZB1_CLIENT+ZB1_LOJA`). Os campos SX6/SX9 seguem o TDN e mantêm as notas "a confirmar no TDS"
+- Sem especificar tudo no prompt: o plugin pergunta campo a campo
 
 ## Próximos passos sugeridos
 
 1. `/advpl-specialist:generate mvc CadVisitasTec` — gerar o CRUD TLPP para a nova tabela
-2. `/advpl-specialist:document dicZB1.prw` — documentar o script de dicionário
+2. `/advpl-specialist:document` — documentar a rotina que usa a tabela
 3. Testar a importação em ambiente de desenvolvimento antes de subir para homologação
