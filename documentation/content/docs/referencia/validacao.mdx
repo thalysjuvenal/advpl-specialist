@@ -85,12 +85,37 @@ Se o conteudo for invalido (vazio, varias linhas, `12.1` sem numero final, nao n
 
 ## Hook de encoding
 
-O Protheus compila fontes em Windows-1252, enquanto as IAs gravam UTF-8. Depois de cada gravacao, o hook PostToolUse converte o arquivo com `skills/advpl-code-generation/scripts/convert-encoding.sh --translit`. A conversao usa um decodificador proprio, sem `iconv`.
+O Protheus compila fontes em Windows-1252, enquanto as IAs gravam UTF-8. No Claude Code, o plugin devolve o fonte para Windows-1252 no **fim do turno**, com `skills/advpl-code-generation/scripts/convert-encoding.sh --translit`. A conversao usa um decodificador proprio, sem `iconv`.
 
-- Um caractere sem equivalente em Windows-1252 (emoji, kanji, setas) vira `?`, e uma nota visivel e nao bloqueante avisa quais arquivos tiveram essa troca.
-- Se o arquivo ja contem U+FFFD, a conversao nao roda, para nao esconder a corrupcao; o ADV014 acusa a linha.
+- Cada `Write`, `Edit` ou `MultiEdit` de um fonte registra o arquivo em uma lista da sessao, faz o lint das linhas introduzidas e avisa na hora sobre caracteres sem equivalente em Windows-1252. O hook `Stop` converte os arquivos da lista; o `SessionEnd` tambem converte.
+- O `Stop` so converte quando nao ha trabalho de agente em segundo plano em andamento. Se houver, ele espera um proximo `Stop` e mostra um aviso curto.
+- Um caractere sem equivalente em Windows-1252 (emoji, kanji, setas) vira `?`, e uma nota visivel e nao bloqueante avisa quais arquivos tiveram essa troca. Falhas e transliteracoes tambem aparecem como mensagem do sistema.
+- Se o arquivo ja contem U+FFFD, a conversao e pulada, com aviso, para nao esconder a corrupcao; o ADV014 acusa a linha.
 - Extensoes convertidas: `.prw`, `.tlpp`, `.prx`, `.ch`, `.th`, `.prg`, `.apw`, `.aph` e `.tlh`.
 - O script avulso e **estrito por padrao**: com caractere incompativel, o arquivo falha sem ser alterado, a menos que voce passe `--translit`.
+
+### Editar um fonte legado em CP1252
+
+O Claude Code (2.1.332) recusa `Edit` e `Write` em arquivo que nao e UTF-8, e essa recusa acontece antes de qualquer hook. Um fonte em CP1252 com acento nao pode ser editado direto. O fluxo do plugin:
+
+1. Quando o Claude le um fonte `.prw`, `.prx`, `.tlpp` ou `.th` em CP1252, um hook PostToolUse(Read) manda rodar `convert-encoding.sh --to-utf8 <arquivo>` e depois editar, e registra o arquivo.
+2. O Claude roda o conversor e pode editar o arquivo varias vezes. O arquivo fica em UTF-8 durante o turno.
+3. Um hook PostToolUse(Bash) tambem registra os alvos de comandos `--to-utf8`, com analise conservadora do comando.
+4. No fim do turno, o `Stop` devolve o arquivo para Windows-1252, como descrito acima.
+
+Se o turno terminar de forma anormal (Ctrl+C, erro de API), o arquivo continua em UTF-8 ate o proximo `Stop` ou `SessionEnd` da mesma sessao; a lista deixada por outra sessao nao e retomada. Nesse caso, rode o conversor sem `--to-utf8` ou `/advpl-specialist:validate`. O mesmo vale para desistir da edicao.
+
+Os comandos `/document`, `/refactor` e `/migrate` convertem antes os alvos CP1252 existentes, porque seus agentes nao tem Bash. `/refactor` e `/migrate` fazem isso logo antes das edicoes, depois da aprovacao.
+
+Rodar o conversor exige permissao de Bash, que pode ser concedida uma vez com uma regra de permissao (confira a sintaxe na documentacao de permissoes do Claude Code). Editar por `sed` ou outro shell pula o lint: rode `/advpl-specialist:validate` depois.
+
+Limites do `--to-utf8`:
+
+- os 5 bytes indefinidos no CP1252 (0x81, 0x8D, 0x8F, 0x90 e 0x9D) fazem o arquivo falhar, sem alteracao;
+- um arquivo CP1252 cujos bytes altos formam UTF-8 valido e tratado como `already-utf8`;
+- BOM antes de texto CP1252 vira `ï»¿` visivel;
+- arquivos so com ASCII nao sao afetados;
+- a ida e volta preserva os bytes fora das linhas editadas.
 
 ## Windows
 

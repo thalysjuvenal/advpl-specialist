@@ -23,6 +23,7 @@ Nota: Exemplos ADVPL/TLPP nao compilados; validacao no TDS pendente. A suite loc
 - CI ampliado: motores em Linux e Windows, testes de hooks e encoding, ShellCheck, `scripts/check-refs.sh`, saidas multi-IA orfas, limites de descricao, build do site, `claude plugin validate --strict` e dogfooding dos blocos ADVPL/TLPP em skills, comandos, agentes, site, exemplos e README.
 - Suite local de evals em `evals/` (15 casos) mais `evals/lint-outputs.sh`; criada, ainda nao executada.
 - Novas paginas: [validate](/docs/comandos/validate), [Validacao](/docs/referencia/validacao) e [smartview-development](/docs/skills/smartview-development), alem dos scripts na pagina [Outras IAs](/docs/outras-ias); 6 novos exemplos (`examples/07` a `examples/12`).
+- Fluxo de edicao de fontes CP1252 no Claude Code, que recusa `Edit` e `Write` em arquivo que nao e UTF-8 (antes de qualquer hook): `convert-encoding.sh --to-utf8` reescreve fontes Windows-1252 como UTF-8; um hook `PostToolUse(Read)` manda o Claude rodar o conversor ao ler um `.prw`, `.prx`, `.tlpp` ou `.th` em CP1252 e registra o arquivo; um hook `PostToolUse(Bash)` registra os alvos de comandos `--to-utf8`; `/document`, `/refactor` e `/migrate` pre-convertem os alvos CP1252 existentes antes de seus agentes sem Bash editarem.
 
 ### Alterado
 
@@ -31,6 +32,7 @@ Nota: Exemplos ADVPL/TLPP nao compilados; validacao no TDS pendente. A suite loc
 - Descricoes curtas de skills e comandos para a listagem do Claude Code; agente `code-generator` enxuto.
 - Hook `session-start` sem efeitos colaterais; a conversao CP1252 do hook usa o script avulso (sem `iconv`).
 - Caminhos de arquivos do plugin nos comandos ancorados em `${CLAUDE_PLUGIN_ROOT}`; 16 comandos (eram 15) e 48 saidas multi-IA.
+- A conversao CP1252 do hook deixa de rodar apos cada edicao: `Edit` e `Write` registram o arquivo, fazem o lint so das linhas introduzidas e avisam na hora sobre caracteres sem equivalente em Windows-1252 (viram `?`); o hook `Stop` converte os arquivos de volta para Windows-1252 no fim do turno, so quando nao ha trabalho de agente em segundo plano em andamento, e o `SessionEnd` tambem converte. Varias edicoes no mesmo arquivo funcionam. Arquivos com U+FFFD sao pulados, com aviso. Se o turno terminar de forma anormal (Ctrl+C, erro de API), o arquivo continua em UTF-8 ate o proximo `Stop` ou `SessionEnd` da mesma sessao: rode o conversor sem `--to-utf8` ou `/advpl-specialist:validate`. Editar por `sed` ou outro shell pula o lint. Limites do `--to-utf8`: os 5 bytes indefinidos no Windows-1252 fazem o arquivo falhar, sem alteracao; um arquivo CP1252 cujos bytes altos formam UTF-8 valido e reportado `already-utf8`; BOM antes de texto CP1252 vira `ï»¿` visivel; arquivos so com ASCII nao sao afetados. Detalhes em [Validacao](/docs/referencia/validacao).
 
 ### Corrigido
 

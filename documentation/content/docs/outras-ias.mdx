@@ -43,7 +43,7 @@ Os comandos distribuidos em `.github/prompts/`, `.cursor/commands/` e `.gemini/c
 
 ## Verificacao do fonte sem hooks
 
-No Claude Code, os hooks do plugin convertem o encoding e rodam o lint a cada gravacao. As outras IAs nao tem hooks, entao as skills trazem scripts avulsos que o agente (ou voce) executa depois de gravar o fonte:
+No Claude Code, os hooks do plugin rodam o lint a cada gravacao e convertem o encoding no fim do turno. As outras IAs nao tem hooks, entao as skills trazem scripts avulsos que o agente (ou voce) executa depois de gravar o fonte:
 
 | Etapa | Script bash | Script PowerShell |
 |---|---|---|
@@ -53,6 +53,10 @@ No Claude Code, os hooks do plugin convertem o encoding e rodam o lint a cada gr
 ```bash
 # 1. Converter para Windows-1252 (estrito por padrao; --translit troca caracteres incompativeis por ?)
 bash skills/advpl-code-generation/scripts/convert-encoding.sh src/FATA001.prw
+
+# Para editar um fonte CP1252 em uma ferramenta que recusa arquivo nao UTF-8:
+# --to-utf8 converte para UTF-8; depois, o comando acima devolve o Windows-1252
+bash skills/advpl-code-generation/scripts/convert-encoding.sh --to-utf8 src/FATA001.prw
 
 # 2. Lint do arquivo inteiro; saida 1 significa erros a corrigir
 bash skills/advpl-code-review/scripts/advpl-lint.sh --scope all src/FATA001.prw
