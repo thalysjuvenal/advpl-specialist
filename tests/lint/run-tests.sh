@@ -825,12 +825,12 @@ sum_rows() {   # data rows of the per-file section: "ERRORS WARNINGS FILE"
 begin_case
 expect_that "exit $(rc_of docs-sum), want 1" [ "$(rc_of docs-sum)" = 1 ]
 expect_that "row 1 is not '8 0 docs-sample.md'" [ "$(sum_rows docs-sum | sed -n 1p)" = "8 0 $DOC_MD" ]
-expect_that "row 2 is not '1 1 docs-sample.mdx'" [ "$(sum_rows docs-sum | sed -n 2p)" = "1 1 $DOC_MDX" ]
+expect_that "row 2 is not '2 2 docs-sample.mdx'" [ "$(sum_rows docs-sum | sed -n 2p)" = "2 2 $DOC_MDX" ]
 expect_that "more than 2 rows" [ "$(sum_rows docs-sum | wc -l | tr -d ' ')" = 2 ]
-expect_that "per-rule ADV003 row" grep -qx 'ADV003 error 7' "$TMP_DIR/docs-sum.out"
-expect_that "per-rule ADV009 row" grep -qx 'ADV009 warning 1' "$TMP_DIR/docs-sum.out"
+expect_that "per-rule ADV003 row" grep -qx 'ADV003 error 8' "$TMP_DIR/docs-sum.out"
+expect_that "per-rule ADV009 row" grep -qx 'ADV009 warning 2' "$TMP_DIR/docs-sum.out"
 expect_that "no finding lines" [ -z "$(parse_findings docs-sum)" ]
-expect_that "bad last line" [ "$(tail -n 1 "$TMP_DIR/docs-sum.out")" = "advpl-lint: 9 error(s), 1 warning(s), 0 suppressed" ]
+expect_that "bad last line" [ "$(tail -n 1 "$TMP_DIR/docs-sum.out")" = "advpl-lint: 10 error(s), 2 warning(s), 0 suppressed" ]
 expect_that "no stderr" no_stderr docs-sum
 end_case "lint-docs --summary: per file (descending), per rule, total"
 

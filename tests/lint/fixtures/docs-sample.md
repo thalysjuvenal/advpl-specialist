@@ -97,3 +97,12 @@ Linguagens prw e xbase; fechamento com mais crases que a abertura:
 ```xbase
 ? "acusado" // expect: ADV003
 ```
+
+Bloco sem linguagem com saida de revisao que cita ADVPL (ignorado; ":=" nao
+e marcador forte, e a linha do ConOut acusaria ADV003 se fosse extraida):
+
+```
+[MEDIUM] RP-003 Concatenacao de string em loop - linha 62
+  cLog := cLog + cLinha repete alocacao a cada iteracao.
+  Fix sugerido: trocar ConOut(cLog) por FWLogMsg().
+```

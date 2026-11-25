@@ -16,10 +16,22 @@
 # runs to the end of the file; a ``` line whose info contains a backtick is
 # inline code, not a fence). A block is linted when its language (first word
 # of the info string, any case) is advpl, tlpp, prw or xbase, or when it is c
-# or empty and some line starts (after blanks, any case) with a strong marker:
-# "user function", "static function", "#include" of a .ch/.th file,
-# "beginsql", "endif", "return" on a line without ";", or "local ". The .ch/.th
-# and ";" conditions keep real C (#include <stdio.h>, return 0;) out.
+# or empty and some line starts (after blanks, any case unless noted) with a
+# strong marker:
+#   - the word "user function", "static function", "begin sequence", "end
+#     sequence", "beginsql", "endsql", "endif", "enddo", "endclass",
+#     "wsrestful", "wsmethod", "skipassert", "@testfixture", or "return" on a
+#     line without ";";
+#   - "local " or "method " (also after public/private/protected and a blank);
+#   - "#include" of a .ch/.th file;
+#   - a call "NAME(" of dbselectarea, dbusearea, reclock, msunlock, conout,
+#     fwlogmsg, msginfo, msgalert or msgstop;
+#   - "NAME():New(", "using namespace" of a dotted name, "/*/{Protheus.doc}";
+#   - case-sensitive, a method call on a Hungarian object: "oName:Method(".
+# The .ch/.th, ";" and dotted-name conditions keep real C/C++ out (#include
+# <stdio.h>, return 0;, using namespace std;); "local" and "return" also open
+# shell lines, so shell goes in a bash/sh fence. ":=" is not a marker: prose
+# and review output quote ADVPL assignments.
 # A block is skipped when the last non-blank line before its opening fence is
 # the anti-example marker (blanks ignored): <!-- advpl-lint: anti-exemplo -->
 # in Markdown, {/* advpl-lint: anti-exemplo */} in .mdx files.
@@ -93,10 +105,14 @@ LC_ALL=C awk -v tmp="$TMP" '
       l = substr(l, 2)
     buf[++n] = l
     ll = tolower(l)
-    if (ll ~ /^[ \t]*((user|static)[ \t]+function|beginsql|endif|return)([^a-z0-9_]|$)/ &&
-        !(ll ~ /^[ \t]*return/ && index(ll, ";") > 0)) strong = 1
-    else if (ll ~ /^[ \t]*local[ \t]/) strong = 1
+    if (ll ~ /^[ \t]*((user|static)[ \t]+function|begin[ \t]+sequence|end[ \t]+sequence)([^a-z0-9_]|$)/) strong = 1
+    else if (ll ~ /^[ \t]*(beginsql|endsql|endif|enddo|endclass|wsrestful|wsmethod|skipassert|@testfixture)([^a-z0-9_]|$)/) strong = 1
+    else if (ll ~ /^[ \t]*return([^a-z0-9_]|$)/ && index(ll, ";") == 0) strong = 1
+    else if (ll ~ /^[ \t]*(local|((public|private|protected)[ \t]+)?method)[ \t]/) strong = 1
     else if (ll ~ /^[ \t]*#[ \t]*include.*\.(ch|th)([^a-z0-9_]|$)/) strong = 1
+    else if (ll ~ /^[ \t]*(dbselectarea|dbusearea|reclock|msunlock|conout|fwlogmsg|msginfo|msgalert|msgstop)[ \t]*[(]/) strong = 1
+    else if (ll ~ /^[ \t]*([a-z_][a-z0-9_.]*[(][)]:new[ \t]*[(]|using[ \t]+namespace[ \t]+[a-z_][a-z0-9_]*[.]|\/[*]\/[{]protheus[.]doc[}])/) strong = 1
+    else if (l ~ /^[ \t]*o[A-Z][A-Za-z0-9_]*:[A-Za-z_][A-Za-z0-9_]*[ \t]*[(]/) strong = 1
     if (ll ~ /(^|[^a-z0-9_])namespace[ \t]/) ns = 1
   }
   function flush(   i, name) {

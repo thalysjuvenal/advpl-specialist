@@ -33,3 +33,33 @@ User Function DocD()
     ConOut("ignorado")
 Return
 ```
+
+Bloco c aberto por DbSelectArea, sem os marcadores antigos (acusado):
+
+```c
+DbSelectArea("SA1")
+DbGoTop()
+ConOut("Total: " + Str(LastRec())) // expect: ADV003
+```
+
+Bloco c so com chamada de metodo em objeto de notacao hungara (acusado):
+
+```c
+oView:SetDescription(IIf(lNovo, "Novo", "Alterar")) // expect: ADV009
+```
+
+Bloco c com C/C++ de verdade perto dos marcadores novos (ignorado; acusaria ADV003 na linha do ? se fosse ADVPL):
+
+```c
+#include <cstdio>
+using namespace std;
+
+static int pick(int ok)
+{
+    int n = ok
+        ? 1
+        : 2;
+    printf("%d\n", n);
+    return n;
+}
+```
