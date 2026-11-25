@@ -42,6 +42,8 @@ advpl_hook_file_path() {
         exit
       }')
   fi
+  # jq.exe on Windows writes CRLF (text-mode stdout): drop the trailing CR.
+  # Covered by check_crlf in tests/hooks/run-tests.sh.
   printf '%s' "${path%$'\r'}"
 }
 

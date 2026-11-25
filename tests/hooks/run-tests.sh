@@ -457,9 +457,62 @@ check_session_start() {
   check "session-start: .TH detectado" grep -q "ADVPL/TLPP project detected" <<<"$out"
 }
 
+# crlf_json EVENT PATH: hook payload, one key per line, CRLF line endings
+crlf_json() {
+  printf '{\r\n  "hook_event_name": "%s",\r\n  "tool_name": "Edit",\r\n  "tool_input": {\r\n    "file_path": "%s"\r\n  }\r\n}\r\n' \
+    "$1" "$(json_quote "$2")"
+}
+
+# jq.exe on Windows writes CRLF (text-mode stdout). A jq wrapper first in PATH
+# that ends every output line with CRLF stands in for it on any OS, and the
+# payload itself has CRLF line endings: the hooks must still take the .prw
+# path (snapshot, introduced line linted). Both parsers; without a real jq the
+# jq half is reported as skipped, not passed.
+check_crlf() {
+  local d fake="$TMP_DIR/crlf-bin" real p f saved_path="$PATH" NO_JQ
+  echo "[CRLF: saida do jq no Windows e payload com CRLF]"
+  real="$(command -v jq 2>/dev/null || true)"
+  mkdir -p "$fake"
+  for p in jq builtin; do
+    PATH="$saved_path"
+    if [ "$p" = jq ]; then
+      if [ -z "$real" ]; then
+        echo "  SKIP crlf-jq: jq nao instalado (saida CRLF do jq nao exercitada)"
+        continue
+      fi
+      # shellcheck disable=SC2016 # "$@" and $0 belong to the generated wrapper
+      printf '#!/bin/sh\n"%s" "$@" | awk '\''{ sub(/\\r$/, ""); printf "%%s\\r\\n", $0 }'\''\n' "$real" >"$fake/jq"
+      chmod +x "$fake/jq"
+      PATH="$fake:$saved_path"
+      NO_JQ=0
+      check "crlf-jq: wrapper termina a linha em CRLF" \
+        [ "$(printf '{"a":"x"}' | jq -r .a | od -An -c | tr -d ' \n')" = 'x\r\n' ]
+    else
+      NO_JQ=1
+    fi
+    d="$TMP_DIR/crlf/$p"; f="$d/FATA008.prw"
+    mkdir -p "$d"
+    printf '#include "totvs.ch"\n\nUser Function FATA008()\n\tLocal nX := 0\nReturn nX\n' >"$f"
+    crlf_json PreToolUse "$f" | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$PRE" >"$TMP_DIR/pre.out" 2>&1
+    PRE_RC=$?
+    check "crlf-$p: pre exit 0" [ "$PRE_RC" = 0 ]
+    check "crlf-$p: snapshot criado" [ -f "$SNAP_DIR/$(snap_key "$f")" ]
+    set_line "$f" 4 "$(printf '\tConOut("x")')"
+    crlf_json PostToolUse "$f" | ADVPL_HOOK_NO_JQ="$NO_JQ" "$HOOK_BASH" "$POST" >"$TMP_DIR/post.out" 2>"$TMP_DIR/post.err"
+    RC=$?
+    ERR="$(cat "$TMP_DIR/post.err")"
+    check "crlf-$p: post exit 2" [ "$RC" = 2 ]
+    check "crlf-$p: acusa so a linha 4" contains "$ERR" "FATA008.prw:4: error ADV003"
+    check "crlf-$p: exatamente 1 achado" [ "$(finding_count "$ERR")" = 1 ]
+    check "crlf-$p: snapshot removido" snap_empty
+  done
+  PATH="$saved_path"
+}
+
 echo "hook bash: $HOOK_BASH ($("$HOOK_BASH" --version | head -n 1))"
 check_hooks_json
 check_session_start
+check_crlf
 if command -v jq >/dev/null 2>&1; then
   MODE=jq NO_JQ=0 run_cases
 fi
