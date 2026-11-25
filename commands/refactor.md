@@ -38,7 +38,7 @@ Analyze and refactor ADVPL/TLPP code to improve structure without changing behav
 **MANDATORY: Always enter planning mode before applying changes. Never refactor without approval.**
 
 1. **Parse arguments** — Identify target file(s) and flags
-2. **Load refactoring reference** — Read `skills/advpl-refactoring/reference.md`
+2. **Load refactoring reference** — Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-refactoring/reference.md`
 3. **Delegate to refactorer agent** — Pass target and options to the refactorer agent
 4. **Present plan** — Structured list of refactorings with before/after for each
 5. **Wait for approval** — User must approve before changes are applied

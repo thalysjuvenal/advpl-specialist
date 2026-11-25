@@ -32,20 +32,20 @@ Descreva em linguagem natural o relatorio desejado (novo ou existente para migra
 
 ### Modo `generate`
 
-1. **Carregar referencia base** — Ler `skills/smartview-development/reference.md`, `skills/smartview-development/patterns-schema.md`, `skills/smartview-development/patterns-getdata.md` e `skills/smartview-development/patterns-parameters.md`
-2. **Confirmar tabelas e colunas** — Identificar as tabelas de origem e os campos; consultar `skills/sx-configuration/` ou o agent `sx-configurator` quando o dicionario precisar ser validado
+1. **Carregar referencia base** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/patterns-schema.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/patterns-getdata.md` e `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/patterns-parameters.md`
+2. **Confirmar tabelas e colunas** — Identificar as tabelas de origem e os campos; consultar `${CLAUDE_PLUGIN_ROOT}/skills/sx-configuration/` ou o agent `sx-configurator` quando o dicionario precisar ser validado
 3. **Delegar ao agent `code-generator`** — Gerar os fontes respeitando:
    - Nome do fonte no padrao `<area>.sv.<modulo>.<nome>` — e o **id** do objeto, usado no `callTReports` e no prefixo do `.trp`; nao pode mudar depois
    - Namespace terminando em `.treportsintegratedprovider` (exigencia do framework)
    - `#include "totvs.ch"` minusculo nos `.prw`, includes `.th` nos `.tlpp`
    - Consulta estatica em `BeginSQL`; `WHERE` condicional em `FWExecStatement` com bind
    - Datas com tipo `date` e valor por `stringToTimeStamp`
-   - Demais convencoes de `skills/advpl-code-generation/reference.md`
-4. **Entregar o roteiro de publicacao** — Ler `skills/smartview-development/deploy-trp.md` e incluir o ciclo do `.trp` na resposta; o arquivo `.trp` sai do designer web e **nao e gerado por codigo**
+   - Demais convencoes de `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-generation/reference.md`
+4. **Entregar o roteiro de publicacao** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/deploy-trp.md` e incluir o ciclo do `.trp` na resposta; o arquivo `.trp` sai do designer web e **nao e gerado por codigo**
 
 ### Modo `migrate`
 
-1. **Carregar referencia base** — Ler `skills/smartview-development/reference.md`, `skills/smartview-development/patterns-migration-reports.md` e `skills/smartview-development/patterns-parameters.md`
+1. **Carregar referencia base** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/patterns-migration-reports.md` e `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/patterns-parameters.md`
 2. **Inventariar o fonte de origem** — Extrair colunas, consulta, perguntas (SX1) e regras de negocio; identificar o gerador (TReport, FWMSPrinter, TMSPrinter, FWMSExcel) e decidir o tipo de recurso
 3. **Delegar ao agent `migrator`** — Converter para objeto de negocio, apontando explicitamente:
    - O que nao sobrevive (MSDIALOG, telas de marcacao, FWMsgRun, MsgInfo, MakeDir, MsExcel por OLE)
@@ -84,4 +84,4 @@ Converter o relatorio de comissoes feito em FWMSPrinter.
 - **Modo `generate`**: a classe TLPP com a annotation `@totvsFrameworkTReportsIntegratedProvider`, `new()`, `getSchema()` e `getData()`; o fonte de menu com `callTReports`; e o roteiro de publicacao do `.trp` (exportar, renomear, liberar `.TRP` no TDS, compilar, reiniciar AppServer e servico do Smart View).
 - **Modo `migrate`**: os mesmos fontes derivados do relatorio de origem, o de/para coluna a coluna, a lista do que nao tem caminho de conversao (UI e disco do cliente) e o checklist de homologacao contra o original.
 
-Nenhum dos modos gera o arquivo `.trp`: ele e exportado do designer web do Smart View e apenas renomeado e compilado. Ver `skills/smartview-development/deploy-trp.md`.
+Nenhum dos modos gera o arquivo `.trp`: ele e exportado do designer web do Smart View e apenas renomeado e compilado. Ver `${CLAUDE_PLUGIN_ROOT}/skills/smartview-development/deploy-trp.md`.

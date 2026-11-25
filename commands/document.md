@@ -34,10 +34,10 @@ Generate technical documentation from existing ADVPL/TLPP source code.
 ## Process
 
 1. **Parse arguments** — Identify target file and options
-2. **Load documentation reference** — Read `skills/documentation-patterns/reference.md`
+2. **Load documentation reference** — Read `${CLAUDE_PLUGIN_ROOT}/skills/documentation-patterns/reference.md`
 3. **Delegate to doc-generator agent** — Pass target and type
 4. **Analyze code** — Read source, detect tables, parameters, functions, dependencies
-5. **Enrich** — Cross-reference with `skills/protheus-reference/reference.md` and `skills/protheus-business/reference.md`
+5. **Enrich** — Cross-reference with `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/reference.md` and `${CLAUDE_PLUGIN_ROOT}/skills/protheus-business/reference.md`
 6. **Generate** — Apply the correct template with extracted data
 7. **Deliver** — Display or save to output file
 

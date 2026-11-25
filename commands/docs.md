@@ -31,7 +31,7 @@ Look up documentation for Protheus functions, APIs, tables, and parameters.
    - Starts with MV_ -> param
    - Contains API/REST -> api
    - Otherwise -> function
-3. **Search local** - Check `skills/protheus-reference/` supporting files
+3. **Search local** - Check `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/` supporting files
 4. **Search TDN** - If not found locally or --source tdn, search online
 5. **Present results** - Syntax, parameters, return type, example
 

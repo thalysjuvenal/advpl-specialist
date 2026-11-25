@@ -29,9 +29,9 @@ If `--level` is not provided, default to `junior`.
 ## Process
 
 1. **Parse arguments** — Identify target file/snippet and level
-2. **Load explanation reference** — Read `skills/code-explanation/reference.md`
+2. **Load explanation reference** — Read `${CLAUDE_PLUGIN_ROOT}/skills/code-explanation/reference.md`
 3. **Read target code** — Read the file or interpret the snippet
-4. **Load supporting references** — Read `skills/protheus-reference/reference.md`, `skills/protheus-business/reference.md`, `skills/embedded-sql/reference.md` as needed
+4. **Load supporting references** — Read `${CLAUDE_PLUGIN_ROOT}/skills/protheus-reference/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/protheus-business/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/embedded-sql/reference.md` as needed
 5. **Analyze code** — Identify structure, functions, variables, DB operations, business rules
 6. **Generate explanation** — Follow the level-appropriate structure from the reference
 7. **Present result** — Clear, structured explanation in the user's language

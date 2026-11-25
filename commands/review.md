@@ -29,7 +29,7 @@ Review ADVPL/TLPP code for best practices, performance, security, and modernizat
 ## Process
 
 1. **Parse arguments** - Identify target file(s) and optional `--focus` category
-2. **Load review reference** - Read `skills/advpl-code-review/reference.md` and read relevant rules files
+2. **Load review reference** - Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-review/reference.md` and read relevant rules files
 3. **Delegate to code-reviewer agent** - Pass targets and focus to the code-reviewer agent for systematic analysis
 4. **Present findings** - Structured report grouped by severity with actionable fix suggestions
 

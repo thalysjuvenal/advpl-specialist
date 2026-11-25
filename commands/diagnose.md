@@ -34,7 +34,7 @@ Diagnose and resolve ADVPL/TLPP errors and problems.
 ## Process
 
 1. **Identify mode** - File path, error message, or log file
-2. **Load debugging reference** - Read `skills/advpl-debugging/reference.md`
+2. **Load debugging reference** - Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-debugging/reference.md`
 3. **Analyze input:**
    - **File:** Read code and scan for anti-patterns, missing error handling, lock issues
    - **Error:** Match against common-errors.md, then search TDN if not found

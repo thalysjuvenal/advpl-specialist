@@ -28,8 +28,8 @@ Descreva em linguagem natural a rotina que deseja testar após o comando. O agen
 ## Fluxo
 
 1. **Detectar tipo** — Identificar o `--type` informado ou inferir automaticamente a partir da descrição da rotina (ex.: menção a MVC, ExecAuto, relatório TReport, REST/webservice, Smart View, TOTVS Message, SmartLink ou preparação de rotina)
-2. **Carregar referência base** — Ler `skills/advpr-test-automation/reference.md` e `skills/advpr-test-automation/best-practices.md`
-3. **Carregar padrão correspondente** — Ler o arquivo `patterns-*` mapeado ao tipo detectado (ver tabela abaixo) e também `skills/advpr-test-automation/api-fwtesthelper.md`
+2. **Carregar referência base** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/reference.md` e `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/best-practices.md`
+3. **Carregar padrão correspondente** — Ler o arquivo `patterns-*` mapeado ao tipo detectado (ver tabela abaixo) e também `${CLAUDE_PLUGIN_ROOT}/skills/advpr-test-automation/api-fwtesthelper.md`
 4. **Delegar ao agent `code-generator`** — Gerar os fontes TestSuite/TestGroup/TestCase respeitando:
    - Limite de 25 caracteres no nome da classe (sem sufixo `.prw`); o nome do arquivo `.prw` deve ser idêntico ao nome da classe
    - Proibições de boas práticas: sem `Sleep`, sem acesso direto a tabelas do Protheus via alias dentro do TestCase, sem asserts dentro de Setup/TearDown, sem dependência de ordem entre TestCases

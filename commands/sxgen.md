@@ -54,7 +54,7 @@ The command automatically:
 ## Process
 
 1. **Parse input** — Identify type and field specifications from natural language
-2. **Load SX configuration reference** — Read `skills/sx-configuration/reference.md`
+2. **Load SX configuration reference** — Read `${CLAUDE_PLUGIN_ROOT}/skills/sx-configuration/reference.md`
 3. **Delegate to sx-configurator agent** — Pass parsed requirements
 4. **Validate** — Check types, sizes, pictures, validations
 5. **Generate script** — Formatted key-value blocks with all fields

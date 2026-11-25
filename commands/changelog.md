@@ -28,7 +28,7 @@ Generate a structured changelog from code changes in ADVPL/TLPP files.
 ## Process
 
 1. **Parse arguments** — Identify scope, format, and output options
-2. **Load changelog reference** — Read `skills/changelog-patterns/reference.md`
+2. **Load changelog reference** — Read `${CLAUDE_PLUGIN_ROOT}/skills/changelog-patterns/reference.md`
 3. **Delegate to changelog-generator agent** — Pass scope and options
 4. **Identify changed files** — Use git diff or provided file list
 5. **Analyze each file** — Classify change type, detect tables, assess impact
