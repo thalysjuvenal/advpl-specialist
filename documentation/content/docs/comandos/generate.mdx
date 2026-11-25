@@ -138,15 +138,25 @@ Gera novo codigo ADVPL ou TLPP seguindo as convencoes e boas praticas do Protheu
 /advpl-specialist:generate workflow AprovacaoPedido --module COM
 ```
 
+## Verificacoes antes de planejar
+
+- **Release declarada (`.protheus-version`)**: se o arquivo existir na raiz do projeto, o plugin compara a release com o minimo da funcionalidade pedida (linha correspondente em `skills/protheus-reference/releases.md`, por exemplo TLPP com MVC ou com `namespace`, 12.1.2410). Se a release for menor, avisa e propoe a alternativa (ex.: `.prw` ADVPL). Um arquivo malformado e ignorado com um aviso; sem o arquivo, o plugin segue normalmente e sugere criar `.protheus-version`.
+- **Tamanho do identificador**: `User Function` em `.prw` ate 8 caracteres, `Static Function` ate 10, TLPP com `namespace` ate 255. Se o nome excede o limite, o plano nao e aberto: voce escolhe entre encurtar o nome ou migrar para TLPP com `namespace`.
+- **Regras criticas**: o gerador le `skills/advpl-code-generation/critical-rules.md` (palavra-chave de funcao, `namespace` em TLPP, tamanho de identificador) antes de gerar.
+
 ## Saida
 
 Um arquivo-fonte completo e compilavel salvo no diretorio do projeto com:
 - Cabecalho de documentacao Protheus.doc
-- Includes apropriados (`TOTVS.CH` para `.prw`, `tlpp-core.th` / `tlpp-rest.th` para `.tlpp`)
+- Includes apropriados (`#include "totvs.ch"` em minusculas para `.prw`; `tlpp-core.th` / `tlpp-rest.th` para `.tlpp`, mais `totvs.ch` quando o fonte usa recursos do framework)
 - **Linha obrigatoria `namespace custom.<agrupador>.<servico>` para cada arquivo `.tlpp` gerado**
 - Implementacao completa seguindo convencoes
 - Tratamento de erros
 - Save/restore de area para operacoes com banco de dados
+
+### Autoverificacao apos gravar
+
+No Claude Code, os hooks do plugin convertem o arquivo para Windows-1252 (decodificador proprio, sem `iconv`) e rodam o lint nas linhas introduzidas a cada gravacao. Para lintar o arquivo inteiro sob demanda, use `/advpl-specialist:validate`. A compilacao e a validacao continuam pendentes no TDS / extensao TOTVS do VS Code.
 
 ## Cache local de pontos de entrada
 

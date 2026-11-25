@@ -33,6 +33,7 @@ Converte codigo ADVPL procedural para TLPP com padroes orientados a objetos.
 3. **Buscar chamadores** - Pesquisar na base de codigo por referencias `u_NomeFuncao`
 
 ### Fase de Planejamento (OBRIGATORIA)
+- **Release declarada**: se existir `.protheus-version` na raiz do projeto, o plugin compara a release com o minimo de TLPP com MVC e TLPP com `namespace` (12.1.2410, em `skills/protheus-reference/releases.md`). Se for menor, avisa e propoe a alternativa (ex.: manter `.prw` e aplicar so as limpezas seguras). Arquivo malformado e ignorado com aviso; sem o arquivo, o plugin segue e sugere cria-lo.
 4. **Carregar referencia** - Carregar referencia `advpl-to-tlpp-migration` para regras e checklist
 5. **Entrar em modo de planejamento** - Usar `EnterPlanMode` para criar um plano estruturado de migracao
 6. **Projetar estrutura de classes** - Mapear funcoes para classes e metodos
@@ -42,9 +43,10 @@ Converte codigo ADVPL procedural para TLPP com padroes orientados a objetos.
    - Estrutura da classe alvo (nome da classe, namespace, propriedades, metodos)
    - Mapeamento: qual funcao se torna qual metodo (publico/privado)
    - Variaveis Private/Public a converter para propriedades de classe
-   - Includes a atualizar (TOTVS.CH -> tlpp-core.th, etc.)
+   - Includes: o `.tlpp` usa `#include "tlpp-core.th"` e tambem `#include "totvs.ch"` quando usa recursos do framework (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...); o wrapper `.prw` mantem `#include "totvs.ch"`; sempre em minusculas
    - Se um wrapper de compatibilidade retroativa e necessario
    - Quaisquer riscos ou breaking changes
+   - Relatorio de lacunas preliminar: itens ja visiveis no fonte que nao serao migrados, no formato de `skills/advpl-to-tlpp-migration/gap-report.md`
 8. **Aguardar aprovacao** - O usuario deve aprovar o plano antes de qualquer codigo ser escrito. Se o usuario solicitar alteracoes, revisar o plano.
 9. **Se --dry-run** - Parar aqui apos mostrar o plano
 10. **Sair do modo de planejamento** - Usar `ExitPlanMode` apos aprovacao
@@ -53,7 +55,7 @@ Converte codigo ADVPL procedural para TLPP com padroes orientados a objetos.
 11. **Executar migracao** - Gerar arquivo(s) .tlpp seguindo o plano aprovado e referencia `advpl-to-tlpp-migration`
 12. **Gerar wrapper** - Criar wrapper .prw de compatibilidade retroativa se --wrapper
 13. **Executar checklist** - Validar contra migration-checklist.md
-14. **Relatar** - Mostrar resumo das alteracoes
+14. **Relatar** - Mostrar resumo das alteracoes, seguido do relatorio de lacunas final (obrigatorio): a tabela `Item | Status | Motivo | Acao` de `gap-report.md`, preenchida apos o checklist (status migrado, nao migravel ou mantido no legado)
 
 ## Exemplos
 
@@ -76,3 +78,9 @@ Converte codigo ADVPL procedural para TLPP com padroes orientados a objetos.
 - Arquivo `.tlpp` com codigo migrado baseado em classes
 - Wrapper `.prw` opcional para compatibilidade retroativa
 - Resumo da migracao com o que mudou e por que
+- Relatorio de lacunas (obrigatorio, tambem em `--dry-run` na versao preliminar): o que nao foi migrado
+
+## Notas de migracao
+
+- Tratamento de erros em `.tlpp` usa `Try`/`Catch`/`EndTry`; `ErrorBlock` com `Begin Sequence` fica no ADVPL (`.prw`).
+- Includes em minusculas; `protheus.ch` e obsoleto.

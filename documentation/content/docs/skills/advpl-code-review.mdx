@@ -46,7 +46,7 @@ Cada achado deve incluir:
 
 ## Processo de Revisao
 
-1. **Escanear includes e cabecalhos** - Verificar includes obsoletos (`Protheus.ch` vs `TOTVS.CH`), cabecalhos de documentacao faltantes
+1. **Escanear includes e cabecalhos** - Verificar includes obsoletos (`protheus.ch` obsoleto; use `#include "totvs.ch"` em minusculas), cabecalhos de documentacao faltantes
 2. **Analisar declaracoes de variaveis** - Verificar escopo (`Local` preferido), convencoes de nomenclatura (notacao hungara), e que TODAS as declaracoes Local estejam no topo da funcao (nunca dentro de If/While/For)
 3. **Verificar operacoes de banco** - Validar pareamento `RecLock`/`MsUnlock`, uso de `GetArea`/`RestArea`, tratamento de erros em operacoes de DB
 4. **Avaliar queries** - Revisar SQL embutido para `SELECT *`, uso correto de macros (`%exp:`, `%table:`, `%notDel%`), alinhamento de indices
@@ -61,6 +61,10 @@ Cada achado deve incluir:
 | `PERF` | Performance | `[PERF-001]` SELECT * em SQL embutido |
 | `SEC` | Seguranca | `[SEC-001]` SQL injection via concatenacao de string |
 | `MOD` | Modernizacao | `[MOD-001]` Classe .prw candidata para .tlpp |
+
+## Motor de lint deterministico
+
+Alem da revisao por regras, a skill traz um motor de lint deterministico (`scripts/advpl-lint.sh` e o gemeo `.ps1`) com as regras ADV001 a ADV022. Falsos positivos sao suprimidos no `.advpl-specialist-ignore` do projeto (`rule <ID>`, `path <glob>`, `field <FIELD>`, `function <NAME>`). O comando `/advpl-specialist:validate` roda o lint completo mais checagens semanticas em um relatorio somente leitura.
 
 ## Arquivos de Suporte
 

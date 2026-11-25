@@ -49,14 +49,15 @@ Repositorio: [https://github.com/thalysjuvenal/advpl-specialist](https://github.
 ### Para Desenvolvedores
 
 - **Geracao de codigo** - Funcoes, classes TLPP, MVC, REST APIs, Web Services, pontos de entrada, TReport, FWMSPrinter (relatorios PDF por coordenadas), FWFormBrowse, Jobs, Workflow
-- **Migracao ADVPL -> TLPP** - Conversao de codigo procedural para orientado a objetos
+- **Migracao ADVPL -> TLPP** - Conversao de codigo procedural para orientado a objetos, com relatorio de lacunas obrigatorio (preliminar no plano, final na entrega)
+- **Release declarada** - `/generate`, `/migrate` e `/smartx` respeitam o arquivo `.protheus-version` na raiz do projeto
 - **Diagnostico de erros** - Analise de erros de compilacao, runtime, performance e locks
 - **Revisao de codigo** - Analise com 24 regras de boas praticas, performance, seguranca e modernizacao (inclui deteccao de funcoes restritas da TOTVS e variaveis reservadas do sistema)
 - **Testes ProBat** - Geracao de testes unitarios para codigo TLPP
 - **Referencia de documentacao** - Funcoes nativas, dicionario SX, APIs REST, parametros MV_*, funcoes FW* de empresa/filial, lista de funcoes restritas da TOTVS
 - **Processos de negocio** - Consulta de rotinas, tabelas, integracoes e fluxos de 8 modulos ERP
 - **Explicacao de codigo** - Explicacao em linguagem simples com niveis junior, senior e funcional
-- **Refatoracao** - Sugestoes de melhoria de estrutura com 6 padroes (RF-001 a RF-006)
+- **Refatoracao** - Sugestoes de melhoria de estrutura com 12 padroes (RF-001 a RF-006 estruturais; RF-007 a RF-012 de modernizacao via `/refactor --focus modernize`)
 - **Documentacao automatica** - Cabecalho Protheus.doc, documentacao completa e documentacao de API
 - **Changelog** - Geracao de changelog a partir do git diff com classificacao de impacto
 - **Conversao automatica para CP1252** - Todo arquivo ADVPL/TLPP (`.prw`, `.tlpp`, `.prx`, `.ch`, `.th`, `.prg`, `.apw`, `.aph`, `.tlh`) escrito ou editado pelo plugin e automaticamente convertido para Windows-1252 (CP1252), encoding esperado pelo TOTVS Protheus. A conversao usa decodificador proprio (scripts `skills/advpl-code-generation/scripts/convert-encoding.sh` e `.ps1`), sem depender de `iconv`. No hook PostToolUse a conversao roda com transliteracao (`--translit`): um caractere sem equivalente em Windows-1252 (ex: emojis, kanji) vira `?` e uma nota visivel, sem bloqueio, avisa. O script avulso e estrito por padrao: um arquivo com caractere incompativel falha sem ser alterado, a menos que se passe `--translit`.
@@ -64,7 +65,7 @@ Repositorio: [https://github.com/thalysjuvenal/advpl-specialist](https://github.
 ### Para Consultores Funcionais
 
 - **Explicacao de codigo** - Nivel funcional: entenda customizacoes sem ler codigo
-- **Geracao de dicionario SX** - Descreva campos em linguagem natural e gere scripts SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB e SX7
+- **Geracao de dicionario SX** - Descreva campos em linguagem natural e gere scripts SX2, SX3, SIX, SXG, SXA, SX1, SX5, SX6, SX7, SX9 e SXB
 - **Changelog** - Documento de mudancas pronto para entregar ao cliente
 
 ## Instalacao
@@ -253,10 +254,10 @@ Os agents e commands carregam automaticamente bases de conhecimento internas (`s
 | `query-builder` | Decisao Workarea vs SQL, FWPreparedStatement, consciencia de indices SIX, queries cross-database |
 | `protheus-locks-deadlocks` | Semantica de locks (RecLock/MsUnlock/DBAccess), leaks, prevencao (BEGIN SEQUENCE/RECOVER, SoftLock) e diagnostico de deadlocks |
 | `code-explanation` | Metodologia de explicacao de codigo com 3 niveis de audiencia |
-| `advpl-refactoring` | 6 padroes de refatoracao com before/after e regras de seguranca |
+| `advpl-refactoring` | 12 padroes de refatoracao (RF-001 a RF-012) com before/after e regras de seguranca |
 | `documentation-patterns` | Templates para Protheus.doc header, documentacao completa e API REST |
 | `changelog-patterns` | Tipos de mudanca, niveis de impacto e formatos markdown/texto |
-| `sx-configuration` | Definicoes completas SX2/SX3/SIX/SXG/SXA/SX1/SX5/SXB/SX7 com validacoes e pictures |
+| `sx-configuration` | Definicoes completas SX2/SX3/SIX/SXG/SXA/SX1/SX5/SX6/SX7/SX9/SXB com validacoes e pictures |
 | `tdn-lookup` | Estrategia de busca online no TDN via API REST do Confluence (4 tiers) |
 
 ## Estrutura do Projeto
@@ -314,10 +315,10 @@ advpl-specialist/
 │   ├── protheus-locks-deadlocks/  # Locks/deadlocks: semantica, leaks, prevencao e diagnostico
 │   ├── protheus-reference/        # 190+ funcoes nativas, SX, REST API, funcoes restritas
 │   ├── code-explanation/          # Explicacao de codigo com 3 niveis de audiencia
-│   ├── advpl-refactoring/         # 6 padroes de refatoracao com before/after
+│   ├── advpl-refactoring/         # 12 padroes de refatoracao (RF-001 a RF-012) com before/after
 │   ├── documentation-patterns/    # Templates Protheus.doc, documentacao completa, API
 │   ├── changelog-patterns/        # Tipos de mudanca, impacto, formatos
-│   ├── sx-configuration/          # Dicionario SX2/SX3/SIX/SXG/SXA/SX1/SX5/SXB/SX7 completo
+│   ├── sx-configuration/          # Dicionario SX2/SX3/SIX/SXG/SXA/SX1/SX5/SX6/SX7/SX9/SXB completo
 │   └── tdn-lookup/                # Busca online no TDN via API Confluence
 ├── hooks/                         # SessionStart hook
 │   ├── hooks.json
@@ -337,13 +338,13 @@ O plugin inclui referencia local para consulta rapida:
 - **190+ funcoes nativas** documentadas com sintaxe, parametros e exemplos
 - **10 funcoes FW*** de gestao de empresa/filial (FWCodFil, FWCodEmp, FWFilial, FWCompany, etc.)
 - **195+ funcoes restritas** da TOTVS catalogadas com alternativas documentadas
-- **9 tabelas SX** (SX1-SX9, SIX) com campos e uso programatico, e geracao de scripts para SX2/SX3/SIX/SXG/SXA/SX1/SX5/SXB/SX7
+- **9 tabelas SX** (SX1-SX9, SIX) com campos e uso programatico, e geracao de scripts para SX2/SX3/SIX/SXG/SXA/SX1/SX5/SX6/SX7/SX9/SXB
 - **REST API patterns** completos para WsRestFul e TLPP annotations
 - **50 erros comuns** com causa e solucao
 - **10 categorias de otimizacao** de performance com before/after
 - **16 pontos de entrada** mais usados por modulo
 - **Templates de classes TLPP** (Service, Repository, DTO)
-- **MVC completo** com MenuDef, ModelDef, ViewDef e FWMVCRotAuto
+- **MVC completo** com MenuDef, ModelDef, ViewDef e automacao pela API do modelo (`FWLoadModel` + `SetOperation` + `Activate` + `SetValue` + `VldData` + `CommitData` + `DeActivate`) ou `MsExecAuto` conforme o exemplo da rotina
 - **Embedded SQL** completo com BeginSQL/EndSQL, macros, JOINs, aggregations
 
 Para casos nao cobertos localmente, o plugin busca no TDN (TOTVS Developer Network) automaticamente. Se o acesso ao TDN falhar (timeout, erro ou conteudo vazio), o plugin utiliza o **Playwright MCP** como fallback — abrindo a pagina em um navegador real para extrair a documentacao via snapshot de texto ou captura visual.
