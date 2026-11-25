@@ -30,10 +30,10 @@ function check(rel, limit) {
   const line = lines.slice(1, end).find((l) => /^description:/.test(l));
   if (line === undefined) return 'description ausente';
   let value = line.replace(/^description:/, '').trim();
-  if (value === '') return 'description vazia';
   if (/^[>|]/.test(value)) return 'description em bloco (> ou |) nao suportada';
   const m = value.match(/^(["'])(.*)\1$/);
   if (m) value = m[2];
+  if (value.trim() === '') return 'description vazia';
   const len = [...value].length;
   return len > limit ? `${len} > ${limit}` : null;
 }

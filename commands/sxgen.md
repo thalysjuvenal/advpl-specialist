@@ -1,5 +1,5 @@
 ---
-description: Gera scripts do dicionario SX do Protheus - SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB e SX7
+description: Generate Protheus SX dictionary scripts - SX2 tables, SX3 fields, SIX indexes, SXG groups, SXA folders, SX1 questions, SX5, SXB lookups, SX7 triggers
 allowed-tools: Read, Write, Glob, Grep, Bash, Agent
 argument-hint: "[--type sx2|sx3|six|sxg|sxa|sx1|sx5|sxb|sx7] [--output path]"
 ---
