@@ -1,0 +1,63 @@
+---
+title: /validate
+description: Valida arquivos ADVPL/TLPP com o lint completo e checagens semanticas S1-S6 em um unico relatorio
+---
+
+# /advpl-specialist:validate
+
+Valida fontes ADVPL/TLPP sob demanda: primeiro roda o motor de lint deterministico sobre o arquivo inteiro (`--scope all`, incluindo as regras de escopo de arquivo ADV019 a ADV021 que o hook PostToolUse nao executa nas edicoes) e depois faz uma passada semantica (S1 a S6) com as skills de referencia do plugin. O comando e somente leitura: reporta, nunca edita os arquivos.
+
+## Uso
+
+```bash
+/advpl-specialist:validate <arquivo|glob|diretorio>... [--errors-only]
+```
+
+## Opcoes
+
+| Opcao | Descricao |
+|-------|-----------|
+| `--errors-only` | Omite a secao de avisos do lint no relatorio (o resumo continua mostrando a contagem de avisos) |
+
+## Processo
+
+1. **Resolver os alvos** - Arquivos, globs ou diretorios (extensoes `.prw`, `.prx`, `.tlpp`, `.th`, sem diferenciar caixa). Sem alvo, o comando pergunta quais arquivos validar; nunca varre o projeto por conta propria
+2. **Rodar o motor de lint** - `advpl-lint.sh --scope all` (ou o gemeo PowerShell `advpl-lint.ps1`, com saida e codigos de saida identicos), a partir da raiz do projeto para respeitar o `.advpl-specialist-ignore`
+3. **Passada semantica (S1 a S6)** - Leitura completa de cada fonte, sem repetir o que o lint ja reportou
+4. **Relatorio** - Resumo, erros, avisos, suprimidos e achados semanticos
+
+## Checagens semanticas
+
+| ID | Checagem |
+|----|----------|
+| **S1** | Assinatura de funcao nativa: numero e tipo dos parametros em cada chamada |
+| **S2** | Campos SX3 de tabelas fora da cobertura da referencia local; campos customizados `_X*` sempre listados para confirmacao |
+| **S3** | Ponto de entrada usando contexto indisponivel: posicoes e tipos de PARAMIXB, tipo de retorno, variaveis da rotina chamadora |
+| **S4** | Coerencia MVC entre `ModelDef` e `ViewDef`: mesma tabela e estrutura, `FWLoadModel` do proprio fonte e IDs de componentes iguais |
+| **S5** | ADVPL/TLPP misturados de forma incorreta: `Function` solta, namespace ausente ou malformado, `using namespace tlpp.*`, identificador acima do limite |
+| **S6** | Automacao: qualquer uso de `FWMVCRotAuto` (restrita) e codigos de operacao de `MsExecAuto` e da API de modelo (3 inclusao, 4 alteracao, 5 exclusao) |
+
+Achados semanticos nunca sao erros de lint: nao entram nas contagens do motor e nunca mudam o veredito dele. O que nenhuma fonte confirma e reportado como **a confirmar**, nunca como fato.
+
+## Exemplos
+
+```bash
+# Validar um unico fonte
+/advpl-specialist:validate src/FATA001.prw
+
+# Validar todos os .prw/.prx/.tlpp/.th de um diretorio, so erros
+/advpl-specialist:validate src/ --errors-only
+
+# Validar um glob de fontes TLPP
+/advpl-specialist:validate "src/REST/*.tlpp"
+```
+
+## Saida
+
+- Resumo em uma linha: quantidade de arquivos, resumo do motor (`advpl-lint: N error(s), M warning(s), K suppressed`) e quantidade de achados semanticos
+- Erros e avisos copiados literalmente do motor, no formato `ARQUIVO:LINHA: error|warning ID MENSAGEM [REF]`
+- Itens suprimidos pelo `.advpl-specialist-ignore`
+- Achados semanticos rotulados com `semantico`, com sugestao de correcao, fonte e situacao (`confirmado` ou `a confirmar`)
+- Encerramento sempre informando que a compilacao e a validacao no TDS / extensao TOTVS do VS Code continuam pendentes: um relatorio limpo nao significa que o codigo compila
+
+O motor termina com codigo `0` (sem erros), `1` (erros encontrados) ou `2` (erro de uso ou de leitura); no codigo `2` o comando reporta a mensagem do motor e para, sem relatorio.

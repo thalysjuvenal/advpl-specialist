@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'advpl-specialist',
     description:
-      'Plugin para Claude Code especializado em ADVPL e TLPP para desenvolvimento no ecossistema TOTVS Protheus. 15 comandos, 10 agentes, 19 skills.',
+      'Plugin para Claude Code especializado em ADVPL e TLPP para desenvolvimento no ecossistema TOTVS Protheus. 16 comandos, 10 agentes, 19 skills.',
     url: 'https://thalysjuvenal.github.io/advpl-specialist',
     siteName: 'advpl-specialist',
     type: 'website',

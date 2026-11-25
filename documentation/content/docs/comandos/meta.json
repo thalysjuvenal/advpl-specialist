@@ -15,6 +15,7 @@
     "sxgen",
     "advpr",
     "smartx",
-    "smartview"
+    "smartview",
+    "validate"
   ]
 }
