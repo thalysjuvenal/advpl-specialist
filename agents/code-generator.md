@@ -694,13 +694,11 @@ SE2->E2_VALOR := nValor
 SE2->E2_PORTADO := cPortador
 ```
 
-<!-- advpl-lint: anti-exemplo -->
 ```advpl
-// CORRECT flow, but E2_CCONTAB is a fictitious name used only to illustrate Layer 3 (not in the reference):
-// field confirmed by user (Layer 3):
-// Agent: "O campo E2_CCONTAB não foi encontrado. Confirma o nome?"
-// User: "Sim, E2_CCONTAB existe na minha base."
-SE2->E2_CCONTAB := cContab
+// CORRECT — field confirmed by user (Layer 3):
+// Agent: "O campo E2_XCCONTB não foi encontrado. Confirma o nome?"
+// User: "Sim, E2_XCCONTB existe na minha base."
+SE2->E2_XCCONTB := cContab
 ```
 
 ## Code Quality Checklist

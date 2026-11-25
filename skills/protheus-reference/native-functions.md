@@ -3106,7 +3106,7 @@ Local cAlias := GetNextAlias()
 
 cQuery += " WHERE D_E_L_E_T_ = ' '"
 DbUseArea(.T., "TOPCONN", TCGenQry(,,cQuery), cAlias, .F., .T.)
-TCSetField(cAlias, "A1_SALDUP", "N", 14, 2)
+TCSetField(cAlias, "A1_SALDUP", "N", 16, 2)
 ```
 
 ---
