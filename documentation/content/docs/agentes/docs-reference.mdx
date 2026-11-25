@@ -34,7 +34,7 @@ Ative este agente quando o usuario:
 - Classificar tipo da consulta: funcao | sx | api | parametro | configuracao | conceito
 
 ### Fase 2: Pesquisar referencia local
-- Carregar referencia `protheus-reference`
+- O agente pre-carrega as skills `protheus-reference` (referencia local) e `tdn-lookup` (escalonamento para o TDN)
 - Pesquisar no arquivo de suporte apropriado:
   - Funcoes -> native-functions.md
   - Tabelas SX -> sx-dictionary.md
@@ -43,6 +43,7 @@ Ative este agente quando o usuario:
   - SQL embutido -> referencia embedded-sql (BeginSQL/EndSQL, macros)
 
 ### Fase 3: Fallback online (se nao encontrado localmente)
+- Seguir a estrategia em camadas da skill `tdn-lookup`
 - Usar `WebSearch` com consulta: `site:tdn.totvs.com <termo_de_busca> advpl`
 - Usar `WebFetch` para extrair detalhes da pagina do TDN
 - Sintetizar resultados no mesmo formato da referencia local

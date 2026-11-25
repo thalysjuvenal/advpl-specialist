@@ -1,22 +1,29 @@
 ---
 title: SX Configurator
-description: Agente especializado em geracao de scripts de configuracao do dicionario de dados SX do Protheus - campos SX3, indices SIX, perguntas SX1, tabelas genericas SX5 e triggers SX7
+description: Agente especializado em geracao de scripts de configuracao do dicionario de dados SX do Protheus - tabelas SX2, campos SX3, indices SIX, grupos SXG, pastas SXA, perguntas SX1, tabelas genericas SX5, consultas SXB, triggers SX7, parametros SX6 e relacionamentos SX9
 ---
 
 # Configurador SX do Protheus
 
 ## Visao geral
 
-Especialista em configuracao do dicionario de dados do TOTVS Protheus. Gera scripts de configuracao SX completos e validados a partir de descricoes em linguagem natural. Abrange SX3 (campos), SIX (indices), SX1 (perguntas de relatorio), SX5 (tabelas genericas) e SX7 (triggers).
+Especialista em configuracao do dicionario de dados do TOTVS Protheus. Gera scripts de configuracao SX completos e validados a partir de descricoes em linguagem natural. Abrange SX2 (cabecalho de tabelas), SX3 (campos), SIX (indices), SXG (grupos de campos), SXA (pastas/abas), SX1 (perguntas de relatorio), SX5 (tabelas genericas), SXB (consultas F3), SX7 (triggers), SX6 (parametros `MV_*`) e SX9 (relacionamentos entre tabelas).
+
+O agente pre-carrega a skill `sx-configuration`; para SX6 e SX9 ele consulta tambem o padrao `patterns-sx6-sx9.md`, usa apenas os campos listados ali e mantem as notas "a confirmar no TDS".
 
 ## Gatilhos de ativacao
 
 Ative este agente quando o usuario:
+- Pedir para registrar o cabecalho de uma tabela customizada (SX2)
 - Pedir para criar ou configurar campos SX3
 - Precisar definir indices (SIX)
 - Quiser criar perguntas de relatorio (SX1)
+- Precisar de um grupo de campos (SXG) ou de pastas/abas de formulario (SXA)
 - Precisar de uma tabela generica (SX5)
+- Pedir uma consulta padrao F3 (SXB)
 - Pedir para configurar triggers de campo (SX7)
+- Pedir para criar um parametro de sistema `MV_*` (SX6)
+- Pedir para registrar um relacionamento entre tabelas (SX9)
 - Quiser gerar scripts de configuracao de dicionario
 - Mencionar APSDU, UPDDISTR ou Configurador
 
@@ -33,15 +40,18 @@ Ative este agente quando o usuario:
 
 ### Fase 1: Entender requisitos
 - Interpretar a entrada do usuario para: alias da tabela, definicoes de campo, necessidades de indice, grupos de perguntas
-- Determinar quais tabelas SX precisam de configuracao (SX3, SIX, SX1, SX5, SX7)
+- Determinar quais tabelas SX precisam de configuracao (SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB, SX7, SX6, SX9)
 - Se a entrada for vaga, fazer perguntas esclarecedoras:
   - Para SX3: nome do campo, tipo, tamanho, obrigatorio?, tabela de consulta?, opcoes de combo?
   - Para SIX: quais campos indexar, prioridade de ordenacao
   - Para SX1: quais parametros o relatorio precisa (faixas de data, faixas de codigo, combos)
   - Para SX5: codigo da tabela, pares chave-valor
+  - Para SX6: nome do parametro, tipo (C/N/D/L), valor, descricao, para todas as filiais ou para uma filial especifica
+  - Para SX9: tabela dominio, tabela contra-dominio, campos de ligacao de cada lado, cardinalidade
 
 ### Fase 2: Validar e enriquecer
 - Carregar referencia `sx-configuration` para templates e regras de validacao
+- Para SX6 ou SX9, carregar `patterns-sx6-sx9.md` (da skill `sx-configuration`), usar apenas os campos listados e manter as notas "a confirmar no TDS"
 - Carregar referencia `protheus-reference` para estrutura do dicionario SX
 - Para cada definicao de campo:
   - Validar formato do nome do campo (ALIAS_XXXXXX)

@@ -4,7 +4,7 @@
 
 Uma rotina batch de reprocessamento está levando 45 minutos para rodar com 10k registros. O desenvolvedor original saiu da empresa. Você precisa identificar gargalos sem reescrever tudo — prioridade é achar os 2-3 pontos mais caros.
 
-O arquivo [`exemplo-lento.prw`](exemplo-lento.prw) simula problemas típicos: queries em loop, `DbSeek` sem índice, processamento sem `BeginSQL`.
+O arquivo [`exemplo-lento.prw`](exemplo-lento.prw) simula problemas típicos: `DbSeek` dentro de loop, consulta sem `TCSetField` e concatenação de string em loop.
 
 ## Prompt exato
 
@@ -14,54 +14,55 @@ O arquivo [`exemplo-lento.prw`](exemplo-lento.prw) simula problemas típicos: qu
 
 ## O que o plugin faz
 
-1. **Lê o arquivo** e aplica as 6 regras da skill `advpl-code-review/rules-performance`:
-   - `RP-001` — N+1 queries (SELECT dentro de loop)
-   - `RP-002` — `DbSeek` sem índice dedicado
-   - `RP-003` — Concatenação de string em loop (`cTexto += ...`)
-   - `RP-004` — `MsExecAuto` em batch (usar `FWMVCRotAuto`)
-   - `RP-005` — Falta de `BeginSQL` em consultas parametrizáveis
-   - `RP-006` — `GetArea/RestArea` sem `DbSelectArea` específico em hot paths
-2. **Classifica cada finding** por severidade (crítica, alta, média) e custo estimado de correção
-3. **Apresenta relatório** com:
-   - Top 3 findings por impacto (geralmente `RP-001` + `RP-002` dominam)
-   - Código antes/depois para cada finding
-   - Estimativa de ganho (% ou ordem de grandeza)
-4. **Sugere ordem de correção:** atacar primeiro o que dá mais ganho por menos esforço
+1. **Lê o arquivo** e aplica as regras da skill `advpl-code-review` (`rules-performance.md`, prefixo `PERF`):
+   - `PERF-001` — `SELECT *` em Embedded SQL
+   - `PERF-002` — `DbSeek` dentro de loop quando uma única query resolveria
+   - `PERF-003` — falta de `TCSetField` para tipar colunas após a query
+   - `PERF-004` — concatenação de string dentro de loop
+   - `PERF-005` — `RecCount()` para verificar existência de registros
+   - `PERF-006` — query sem índice adequado ou sem `ORDER BY` compatível
+2. **Classifica cada finding** por severidade (`CRITICAL`, `WARNING`, `INFO`), como definido em cada regra
+3. **Apresenta relatório** agrupado por severidade, com:
+   - Trecho atual e sugestão de correção para cada finding
+   - Uma explicação curta do motivo
+4. **Resumo** com a contagem de findings por severidade, para priorizar a correção
+
+Neste exemplo, `exemplo-lento.prw` dispara `PERF-002`, `PERF-003` e `PERF-004`. As regras `PERF-001`, `PERF-005` e `PERF-006` não se aplicam a ele.
 
 ## Output esperado
 
-Relatório estruturado tipo:
+Relatório estruturado no formato do agente `code-reviewer` (a redação exata e os números de linha podem variar):
 
-```
-=== Review performance: exemplo-lento.prw ===
+```text
+## Review: exemplo-lento.prw
 
-[CRITICAL] RP-001 N+1 queries - linha 28
-  Loop com TcQuery dentro de While; 10k iteracoes = 10k queries.
-  Ganho estimado: 100x (reduzir para 1 query com JOIN + INDEX).
-  Fix sugerido: reescrever com BeginSQL e processar com DbUseArea("TMP").
+### CRITICAL (0)
 
-[HIGH] RP-002 DbSeek sem indice - linha 45
-  DbSetOrder(2) em SB1 por B1_DESC nao tem indice customizado.
-  Ganho estimado: 10x em producao (usa TableScan hoje).
-  Fix sugerido: criar indice SB1 com chave B1_DESC ou usar DbSetOrder(1) + filtro.
+### WARNING (3)
+1. **[PERF-002]** exemplo-lento.prw:45 - DbSeek dentro de loop
+   DbSeek na SB1 a cada iteracao do While; N buscas individuais.
+   Sugestao: trazer o dado da SB1 na query principal (JOIN) ou fazer uma unica consulta.
+2. **[PERF-003]** exemplo-lento.prw:38 - Falta de TCSetField
+   B2_QATU lido da query sem tipagem de coluna numerica.
+   Sugestao: chamar TCSetField na coluna numerica logo apos a query.
+3. **[PERF-004]** exemplo-lento.prw:51 - Concatenacao de string em loop
+   cLog := cLog + cLinha realoca a string a cada iteracao.
+   Sugestao: acumular em array e montar o texto uma unica vez ao final.
 
-[MEDIUM] RP-003 Concatenacao de string em loop - linha 62
-  cLog := cLog + cLinha repete alocacao a cada iteracao.
-  Ganho estimado: 2x no loop de log (baixo ganho absoluto).
-  Fix sugerido: usar array e fazer FWArrayToString() no final.
+### INFO (0)
 
-Ordem sugerida: 1 (RP-001) -> 2 (RP-002) -> ignorar RP-003 por enquanto.
+### Resumo: 0 critical, 3 warnings, 0 info
 ```
 
 ## Arquivo de apoio
 
-- [`exemplo-lento.prw`](exemplo-lento.prw) — rotina batch com os 3 problemas principais
+- [`exemplo-lento.prw`](exemplo-lento.prw) — rotina batch com os problemas `PERF-002`, `PERF-003` e `PERF-004`
 
 ## Variações
 
-- `--focus security` — troca regras de performance por regras de segurança (SQL injection, macro injection)
-- `--focus best-practices` — regras gerais (naming, error handling, documentação)
-- `--focus modernization` — sugestões de refatoração para TLPP
+- `--focus seguranca` — troca regras de performance por regras de segurança (SQL injection, credenciais, validação de entrada)
+- `--focus boas-praticas` — boas práticas (variáveis, locks, tratamento de erro, nomenclatura)
+- `--focus modernizacao` — migração ADVPL para TLPP e padrões legados
 
 ## Próximos passos sugeridos
 

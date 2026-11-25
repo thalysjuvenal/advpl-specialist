@@ -39,12 +39,12 @@ Ative este agente quando o usuario:
 - Classificar: erro de compilacao, erro de runtime, performance ou problema de lock
 
 ### Fase 2: Diagnosticar
-- Carregar referencia `advpl-debugging` para metodologia
+- O agente pre-carrega as skills `advpl-debugging` (metodologia) e `protheus-locks-deadlocks` (locks e deadlocks)
 - Verificar `common-errors.md` para padroes de erro conhecidos
 - Se erro de compilacao: verificar sintaxe, includes, declaracoes de variaveis
 - Se erro de runtime: rastrear caminho de execucao, verificar tipos de dados, limites de array
 - Se performance: verificar uso de indices, padroes de consulta (ver performance-tips.md)
-- Se lock: verificar pareamento RecLock/MsUnlock, escopo de transacao
+- Se lock: verificar pareamento RecLock/MsUnlock, escopo de transacao, usando a skill `protheus-locks-deadlocks`
 - Se desconhecido: pesquisar no TDN com `WebSearch: site:tdn.totvs.com "<mensagem de erro>"`
 
 #### Fallback com Playwright (se WebSearch falhar)
@@ -79,6 +79,6 @@ Se `WebSearch` retornar erro, timeout ou conteudo vazio/ilegivel na busca TDN, u
 | Compilacao | Sintaxe, includes, nomes de variaveis | common-errors.md |
 | Runtime | ValType, limites de array, valores nil | common-errors.md |
 | Performance | Indices, consultas, otimizacao de loops | performance-tips.md |
-| Lock de banco | Pareamento RecLock/MsUnlock | advpl-debugging reference.md |
+| Lock de banco | Pareamento RecLock/MsUnlock | protheus-locks-deadlocks |
 | REST API | Status HTTP, parsing de JSON | protheus-reference |
 | Memoria | Crescimento de arrays, limpeza de objetos | performance-tips.md |
