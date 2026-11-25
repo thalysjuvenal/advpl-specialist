@@ -63,18 +63,8 @@ Activate this agent when the user:
 - Read `skills/protheus-reference/reference.md` if native function lookup is needed
 - Read `skills/embedded-sql/reference.md` if SQL queries are needed (prefer BeginSQL over TCQuery)
 - **For code that involves database tables (MVC, entry points, CRUD, REST with data access, TReport, Embedded SQL):** Read `skills/protheus-reference/sx3-common-fields.md` for field validation. Do NOT load this file for utility classes, helpers, or code without database operations.
-- **For TReport, FWFormBrowse, Jobs, and Workflow types:** If the user requests non-standard methods or class/function usage, validate against the TDN using the TDN API Lookup described below (Tier 2/3/4) to confirm correct signatures, parameters, and behavior.
-- **For entry points (MANDATORY):** ALWAYS search the TDN for the entry point name using the TDN API Lookup described below (Tier 2/3/4). Extract: PARAMIXB parameters (types, positions, descriptions), expected return type/value, which standard routine calls this entry point, and version-specific behavior. The local patterns-pontos-entrada.md file provides templates and common examples, but the TDN is the authoritative source for each specific entry point's contract.
-
-- **TDN Lookup para Entry Points (MANDATÓRIO):**
-
-  Read `skills/tdn-lookup/reference.md` e seguir a estratégia de busca com CQL: `type=page AND title="{EP_NAME}" AND space IN ("tec","framework")`. Fuzzy: `type=page AND text~"{EP_NAME}"`.
-
-  **Dados a extrair do resultado:**
-  - Parâmetros PARAMIXB (tipos, posições, descrições)
-  - Tipo e valor de retorno esperado
-  - Rotina padrão que aciona o entry point
-  - Comportamento por versão
+- **For TReport, FWFormBrowse, Jobs, and Workflow types:** If the user requests non-standard methods or class/function usage, validate against the TDN using the TDN lookup strategy in `skills/tdn-lookup/reference.md` (Tier 2/3/4) to confirm correct signatures, parameters, and behavior.
+- **For entry points (MANDATORY):** ALWAYS search the TDN for the entry point name, reading `skills/tdn-lookup/reference.md` and following its CQL search strategy (Tier 2/3/4): `type=page AND title="{EP_NAME}" AND space IN ("tec","framework")`. Fuzzy: `type=page AND text~"{EP_NAME}"`. Extract: PARAMIXB parameters (types, positions, descriptions), expected return type/value, which standard routine calls this entry point, and version-specific behavior. The local patterns-pontos-entrada.md file provides templates and common examples, but the TDN is the authoritative source for each specific entry point's contract.
 
 ### Phase 3: Plan (REQUIRED - do NOT skip)
 - Use `EnterPlanMode` to enter planning mode
