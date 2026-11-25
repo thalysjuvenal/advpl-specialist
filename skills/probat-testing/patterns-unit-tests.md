@@ -489,19 +489,13 @@ using namespace tlpp.probat
 @TestFixture(suite='database')
 class TestDatabaseOperations
 
-  private data nConn   as numeric
-  private data lConn   as logical
-  private data cTable  as character
   private data cAlias  as character
   private data oTmp    as object
 
   public method new() constructor
 
   @OneTimeSetUp()
-  public method openConnection()
-
-  @Setup()
-  public method prepareTable()
+  public method createTable()
 
   @Test('should insert record into table')
   public method testInsert()
@@ -513,34 +507,18 @@ class TestDatabaseOperations
   public method clearData()
 
   @OneTimeTearDown()
-  public method closeConnection()
+  public method dropTable()
 
 endclass
 
 method new() class TestDatabaseOperations
-  ::nConn  := -1
-  ::lConn  := .F.
-  ::cTable := 'TEST_TBL'
   ::cAlias := 'TST'
   ::oTmp   := nil
 return self
 
-method openConnection() class TestDatabaseOperations
-  local cEnv := GetEnvServer()
-  local cIni := GetSrvIniName()
-  local cDB  := GetPvProfString(cEnv, 'DBDATABASE', '', cIni)
-  local cDsn := GetPvProfString(cEnv, 'DBALIAS', '', cIni)
-  local cSrv := GetPvProfString(cEnv, 'DBSERVER', '', cIni)
-  local nPort := Val(GetPvProfString(cEnv, 'DBPORT', '', cIni))
-
-  ::nConn := TcLink(cDB + '/' + cDsn, cSrv, nPort)
-  ::lConn := (::nConn >= 0)
-
-  assertTrue(::lConn, 'database connection should succeed')
-return .T.
-
-method prepareTable() class TestDatabaseOperations
-  // Create the test table as a temporary table (FWTemporaryTable, relational mode)
+method createTable() class TestDatabaseOperations
+  // Created ONCE per fixture: temporary table (FWTemporaryTable, relational mode)
+  // on the framework connection (no separate TcLink needed). Validation in TDS pending (a confirmar no TDS).
   local aFields := {{'ID', 'C', 5, 0}, {'DESCR', 'C', 50, 0}}
 
   ::oTmp := FWTemporaryTable():New(::cAlias, aFields)
@@ -561,7 +539,14 @@ method testInsert() class TestDatabaseOperations
 return .T.
 
 method testUpdate() class TestDatabaseOperations
+  // Self-contained: inserts the record it needs (the table is emptied after each test)
   dbSelectArea(::cAlias)
+  dbAppend(.T.)
+    (::cAlias)->ID    := '00002'
+    (::cAlias)->DESCR := 'Original Record'
+  dbCommit()
+  dbRUnLock(RecNo())
+
   dbRLock(RecNo())
     (::cAlias)->DESCR := 'Updated Record'
   dbCommit()
@@ -571,20 +556,14 @@ method testUpdate() class TestDatabaseOperations
 return .T.
 
 method clearData() class TestDatabaseOperations
-  TCCommit(1)
-  dbSelectArea(::cAlias)
+  // Runs after EACH test: empties the table so tests stay isolated
   TcSqlExec('DELETE FROM ' + ::oTmp:GetRealName())
-  TCCommit(2)
-  TCCommit(4)
 return .T.
 
-method closeConnection() class TestDatabaseOperations
+method dropTable() class TestDatabaseOperations
   if (::oTmp != nil)
     ::oTmp:Delete()
     ::oTmp := nil
-  endif
-  if (::lConn)
-    TCUNLink(::nConn)
   endif
 return .T.
 ```
