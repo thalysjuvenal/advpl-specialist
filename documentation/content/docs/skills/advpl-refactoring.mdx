@@ -7,6 +7,13 @@ description: Padroes e regras para refatoracao segura de codigo ADVPL/TLPP no TO
 
 Padroes e regras para refatoracao segura de codigo ADVPL/TLPP no TOTVS Protheus. Foca em melhorar a estrutura do codigo sem alterar o comportamento.
 
+## Arquivos da Skill
+
+| Arquivo | Conteudo |
+|---------|----------|
+| `SKILL.md` e `reference.md` | Padroes estruturais RF-001 a RF-006, processo e regras de seguranca |
+| `patterns-modernization.md` | Padroes de modernizacao RF-007 a RF-012, com candidatos encontrados pelo motor de lint |
+
 ## Quando Usar
 
 - Funcoes muito longas (>100 linhas)
@@ -15,6 +22,7 @@ Padroes e regras para refatoracao segura de codigo ADVPL/TLPP no TOTVS Protheus.
 - Variaveis com nomes pouco claros
 - Codigo morto (blocos inalcancaveis, variaveis/funcoes nao usadas)
 - Funcoes "deus" que fazem coisas demais
+- APIs legadas apontadas pelo lint (`TCQuery` concatenada, `ConOut`, `CriaTrab`/`DbCreate`, `IIf`, acesso direto ao SX) - veja a secao de modernizacao
 
 ## Padroes de Refatoracao
 
@@ -118,6 +126,29 @@ EndIf
 **Detectar:** Funcoes com >5 parametros
 **Acao:** Agrupar parametros relacionados em um objeto JSON ou array
 **Regra:** Somente aplicar se os parametros sao logicamente relacionados
+
+## Padroes de Modernizacao (RF-007 a RF-012)
+
+Descritos em `patterns-modernization.md` e executados por `/refactor --focus modernize`. Os candidatos vem do motor de lint (`--scope all`); cada padrao traz antes/depois, risco, verificacoes de "mesmo comportamento" e a lista de quando NAO aplicar.
+
+| ID | Padrao | Lint | Risco | Aplica a |
+|----|--------|------|-------|----------|
+| RF-007 | `TCQuery` concatenada para `FWPreparedStatement` ou `BeginSQL` | ADV015 | Medio | `.prw`, `.tlpp` |
+| RF-008 | `ErrorBlock` + `Begin Sequence` para `Try`/`Catch` | nenhum (Grep por `ErrorBlock(`) | Medio | somente `.tlpp` |
+| RF-009 | `ConOut` para `FWLogMsg` | ADV003 | Baixo | todos |
+| RF-010 | `CriaTrab`/`DbCreate` para `FWTemporaryTable` | ADV010, ADV011 | Medio | todos |
+| RF-011 | `IIf` para `If`/`Else`/`EndIf` | ADV009 | Baixo | fora de code blocks e expressoes de dicionario |
+| RF-012 | Acesso direto ao SX para API do framework | ADV008 | Medio | todos (somente leitura) |
+
+Regras de todos os padroes de modernizacao:
+
+- Um padrao em uma funcao por vez; o lint e executado de novo no arquivo apos cada mudanca
+- Manter o que os chamadores veem: retorno e tipo, registros gravados, linhas de log, area de trabalho restaurada e assinatura
+- Se um item de "quando NAO aplicar" corresponder, o codigo fica como esta e o motivo e reportado (exemplos: `IIf` dentro de code block, SQL estatico com valores internos, `Try`/`Catch` em `.prw`)
+- Ordem sugerida: RF-009 e RF-011 (baixo risco), depois RF-012, RF-010, RF-007 e RF-008
+- No RF-007, `%exp:` insere o valor no texto do SQL e nao e binding; entrada de usuario passa por `FWPreparedStatement`
+- Testes: ProBat para TLPP; para `.prw`, executar a rotina em ambiente de teste com as entradas de "mesmo comportamento" e comparar com a versao original
+- Compilacao e validacao continuam pendentes no TDS ou na extensao TOTVS do VS Code
 
 ## Processo de Refatoracao
 

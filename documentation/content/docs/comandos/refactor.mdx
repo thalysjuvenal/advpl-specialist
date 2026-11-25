@@ -18,6 +18,7 @@ Analisa e refatora codigo ADVPL/TLPP para melhorar a estrutura sem alterar o com
 | Flag | Descricao | Padrao |
 |------|-----------|--------|
 | `--dry-run` | Mostrar sugestoes sem aplicar alteracoes | false |
+| `--focus modernize` | Somente os padroes de modernizacao RF-007 a RF-012, com candidatos encontrados pelo motor de lint | Padroes estruturais RF-001 a RF-006 |
 
 ## Padroes de Refatoracao
 
@@ -29,6 +30,14 @@ Analisa e refatora codigo ADVPL/TLPP para melhorar a estrutura sem alterar o com
 | RF-004 | Melhorar Nomenclatura (notacao hungara) | Baixo |
 | RF-005 | Eliminar Duplicacao | Medio |
 | RF-006 | Reduzir Parametros (>5 params) | Medio |
+| RF-007 | `TCQuery` concatenada para `FWPreparedStatement` / `BeginSQL` (lint ADV015) | Medio |
+| RF-008 | `ErrorBlock` + `Begin Sequence` para `Try`/`Catch`, somente `.tlpp` (sem regra de lint) | Medio |
+| RF-009 | `ConOut` para `FWLogMsg` (lint ADV003) | Baixo |
+| RF-010 | `CriaTrab`/`DbCreate` para `FWTemporaryTable` (lint ADV010, ADV011) | Medio |
+| RF-011 | `IIf` para `If`/`Else`/`EndIf` fora de code blocks (lint ADV009) | Baixo |
+| RF-012 | Acesso direto ao SX para API do framework (lint ADV008) | Medio |
+
+RF-007 a RF-012 rodam somente com `--focus modernize`. Cada padrao de modernizacao tem antes/depois, risco, verificacoes de "mesmo comportamento" e a lista de quando NAO aplicar, na skill [advpl-refactoring](/docs/skills/advpl-refactoring).
 
 ## Processo
 
@@ -42,6 +51,16 @@ Analisa e refatora codigo ADVPL/TLPP para melhorar a estrutura sem alterar o com
 6. **Aplicar alteracoes** - Uma refatoracao por vez (a menos que --dry-run)
 7. **Relatar** - Resumo das alteracoes aplicadas
 
+### Com `--focus modernize`
+
+1. **Carregar os padroes** - Referencia `advpl-refactoring` com `patterns-modernization.md`
+2. **Rodar o motor de lint** - `advpl-lint.sh --scope all` sobre os arquivos `.prw`, `.prx`, `.tlpp` ou `.th` do alvo, a partir da raiz do projeto
+3. **Mapear achados para padroes** - ADV015 vira RF-007, ADV003 vira RF-009, ADV010/ADV011 viram RF-010, ADV009 vira RF-011 e ADV008 vira RF-012. RF-008 nao tem regra de lint: e encontrado com Grep por `ErrorBlock(` e vale somente para `.tlpp`. Achados com outros IDs sao correcoes, listados a parte
+4. **Filtrar** - Candidatos que caem em "quando NAO aplicar" (por exemplo `IIf` dentro de code block) sao reportados com o motivo e nao alterados
+5. **Planejar** - O agente refactorer recebe o alvo e as linhas do lint; o plano mostra `ARQUIVO:LINHA`, o ID RF, antes/depois, risco e as verificacoes de mesmo comportamento. Aguarda aprovacao
+6. **Aplicar** - Um padrao em uma funcao por vez; apos cada mudanca o lint e executado de novo no arquivo: o achado deve sumir e nenhum erro novo pode aparecer
+7. **Relatar** - Linha-resumo do lint antes e depois, avisos mantidos, testes de mesmo comportamento a executar e a pendencia de compilacao e validacao no TDS
+
 ## Exemplos
 
 ```bash
@@ -53,6 +72,9 @@ Analisa e refatora codigo ADVPL/TLPP para melhorar a estrutura sem alterar o com
 
 # Refatorar todos os arquivos de um diretorio
 /advpl-specialist:refactor src/
+
+# Planejar a modernizacao de APIs legadas apontadas pelo lint, sem aplicar
+/advpl-specialist:refactor src/FATA001.prw --focus modernize --dry-run
 ```
 
 ## Saida
@@ -60,3 +82,4 @@ Analisa e refatora codigo ADVPL/TLPP para melhorar a estrutura sem alterar o com
 - Lista de oportunidades de refatoracao encontradas, ordenadas por prioridade
 - Codigo antes/depois para cada sugestao
 - Resumo de melhorias (contagem de funcoes, tamanho maximo, conformidade de nomenclatura)
+- Com `--focus modernize`: resumo do lint antes e depois, cada candidato com sua linha do lint e ID RF, e os candidatos mantidos com o motivo

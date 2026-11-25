@@ -1,6 +1,6 @@
 ---
 title: /sxgen
-description: Gera scripts de configuracao do dicionario de dados SX do Protheus - tabelas SX2, campos SX3, indices SIX, grupos SXG, pastas SXA, perguntas SX1, tabelas genericas SX5, consultas SXB e gatilhos SX7
+description: Gera scripts de configuracao do dicionario de dados SX do Protheus - tabelas SX2, campos SX3, indices SIX, grupos SXG, pastas SXA, perguntas SX1, tabelas genericas SX5, consultas SXB, gatilhos SX7, parametros SX6 e relacionamentos SX9
 ---
 
 # /advpl-specialist:sxgen
@@ -19,7 +19,7 @@ Descreva o que voce precisa em linguagem natural apos o comando. O agente ira an
 
 | Flag | Descricao | Padrao |
 |------|-----------|--------|
-| `--type` | Tipo SX: `sx2`, `sx3`, `six`, `sxg`, `sxa`, `sx1`, `sx5`, `sxb`, `sx7` | Auto-detectar a partir da descricao |
+| `--type` | Tipo SX: `sx2`, `sx3`, `six`, `sxg`, `sxa`, `sx1`, `sx5`, `sxb`, `sx7`, `sx6`, `sx9` | Auto-detectar a partir da descricao |
 | `--output` | Salvar script em arquivo | Exibir no chat |
 
 ## Tipos de Configuracao
@@ -35,6 +35,10 @@ Descreva o que voce precisa em linguagem natural apos o comando. O agente ira an
 | `sx5` | Entradas de tabela generica (X5_TABELA, X5_CHAVE, X5_DESCRI) |
 | `sxb` | Consultas padrao / lookups F3 (XB_ALIAS, XB_TIPO, XB_SEQ, XB_CHAVE) |
 | `sx7` | Gatilhos de campo (X7_CAMPO, X7_SEQUENC, X7_REGRA, X7_CDOMAIN) |
+| `sx6` | Parametro de sistema `MV_*` (X6_FIL, X6_VAR, X6_TIPO, X6_DESCRIC, X6_CONTEUD, X6_PROPRI) |
+| `sx9` | Relacionamento entre tabelas (X9_DOM, X9_IDENT, X9_CDOM, X9_EXPDOM, X9_EXPCDOM, X9_LIGDOM, X9_LIGCDOM) |
+
+SX6 e SX9 usam somente campos confirmados no TDN; onde o TDN nao define valor ou obrigatoriedade, o script traz "a confirmar no TDS". O TDN nao marca campos obrigatorios do SX6 e do SX9: o conjunto do SX6 e um minimo pratico e o do SX9 lista todos os campos documentados.
 
 ## Validacoes Automaticas
 
@@ -51,7 +55,7 @@ O comando automaticamente:
 ## Processo
 
 1. **Analisar entrada** - Identificar tipo e especificacoes de campos a partir de linguagem natural
-2. **Carregar referencia de configuracao SX** - Carregar referencia `sx-configuration`
+2. **Carregar referencia de configuracao SX** - Carregar referencia `sx-configuration` (para `sx6` e `sx9`, tambem `patterns-sx6-sx9.md`)
 3. **Delegar ao agente sx-configurator** - Passar requisitos analisados
 4. **Validar** - Verificar tipos, tamanhos, pictures, validacoes
 5. **Gerar script** - Blocos de chave-valor formatados com todos os campos
@@ -86,6 +90,14 @@ Perguntas para relatorio de OS (grupo ZA1):
 Tabela generica ZZ para tipos de servico:
 01=Preventiva, 02=Corretiva, 03=Instalacao
 
+# Gerar parametro de sistema SX6
+/advpl-specialist:sxgen --type sx6
+Parametro MV_XDIASVC numerico, 30 dias de validade de cotacao, filial compartilhada
+
+# Gerar relacionamento SX9 (ZA1 relacionada a SA1)
+/advpl-specialist:sxgen --type sx9
+Relacionamento SA1 -> ZA1: A1_COD+A1_LOJA com ZA1_CLIENT+ZA1_LOJA, um cliente para N ordens
+
 # Salvar em arquivo
 /advpl-specialist:sxgen --type sx3 --output config/ZA1-campos.txt
 ```
@@ -98,3 +110,10 @@ Script de configuracao formatado com:
 - Validacoes e pictures geradas automaticamente
 - Gatilhos SX7 (para SX3 com consultas F3)
 - Pronto para entrada manual no Configurador ou referencia para importacao APSDU/UPDDISTR
+
+### SX6 e SX9 em resumo
+
+Para `MV_XDIASVC`, o bloco SX6 traz `X6_VAR = MV_XDIASVC`, `X6_TIPO = N`, descricoes pt-BR/es/en, `X6_CONTEUD = 30` (sempre caractere) e `X6_PROPRI = U`. Para ZA1 e SA1, o bloco SX9 traz `X9_DOM = SA1`, `X9_CDOM = ZA1`, `X9_EXPDOM = A1_COD+A1_LOJA`, `X9_EXPCDOM = ZA1_CLIENT+ZA1_LOJA`, cardinalidade `X9_LIGDOM = 1` e `X9_LIGCDOM = N`. O proximo `X9_IDENT` livre de SA1 deve ser conferido no Configurador.
+
+- As entradas sao criadas pelo Configurador ou por pacote UPDDISTR, nunca por `RecLock` direto no SX
+- Em tempo de execucao, o parametro e lido com `SuperGetMV("MV_XDIASVC", .F., 30)`, uma unica vez antes de qualquer laco

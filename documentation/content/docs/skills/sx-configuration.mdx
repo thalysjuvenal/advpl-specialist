@@ -1,11 +1,11 @@
 ---
 title: SX Configuration
-description: "Templates e regras de validacao para gerar scripts de configuracao do dicionario SX do TOTVS Protheus - SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB e SX7"
+description: "Templates e regras de validacao para gerar scripts de configuracao do dicionario SX do TOTVS Protheus - SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB, SX7, SX6 e SX9"
 ---
 
 # SX Configuration
 
-Templates e regras de validacao para gerar scripts de configuracao do dicionario de dados Protheus. Cobre SX2 (cabecalho de tabela), SX3 (campos), SIX (indices), SXG (grupos de campos), SXA (pastas de cadastro), SX1 (perguntas de relatorio), SX5 (tabelas genericas), SXB (consultas padrao F3) e SX7 (gatilhos).
+Templates e regras de validacao para gerar scripts de configuracao do dicionario de dados Protheus. Cobre SX2 (cabecalho de tabela), SX3 (campos), SIX (indices), SXG (grupos de campos), SXA (pastas de cadastro), SX1 (perguntas de relatorio), SX5 (tabelas genericas), SXB (consultas padrao F3), SX7 (gatilhos), SX6 (parametros `MV_*`) e SX9 (relacionamentos entre tabelas). SX6 e SX9 ficam no arquivo complementar `patterns-sx6-sx9.md`.
 
 ## Quando Usar
 
@@ -18,6 +18,8 @@ Templates e regras de validacao para gerar scripts de configuracao do dicionario
 - Criar tabelas genericas de lookup
 - Configurar consultas padrao F3
 - Configurar gatilhos de campo
+- Registrar parametros de sistema `MV_X*` (SX6)
+- Definir relacionamentos entre tabelas (SX9)
 
 ## SX2 -- Mapeamento de Tabelas
 
@@ -364,6 +366,51 @@ X3_F3 = SACN
 - Posicione() e a funcao padrao para lookups
 - Sempre incluir xFilial() na expressao de seek
 - Sequencia permite multiplos gatilhos no mesmo campo
+
+## SX6 -- Parametros do Sistema (MV_*)
+
+Detalhado em `patterns-sx6-sx9.md`. Chave: `X6_FIL` + `X6_VAR`.
+
+| Campo | Descricao | Exemplo |
+|-------|-----------|---------|
+| X6_FIL | Filial (vazio = todas) | |
+| X6_VAR | Nome do parametro, unico | MV_XDIASVC |
+| X6_TIPO | Tipo do valor: C, N, D, L | N |
+| X6_DESCRIC | Descricao pt-BR (continua em `X6_DESC1`/`X6_DESC2`; es e en nos campos `X6_DSC*`) | Dias de validade da cotacao |
+| X6_CONTEUD | Valor pt-BR, sempre armazenado como caractere | 30 |
+| X6_PROPRI | Proprietario: S = sistema, U = usuario | U |
+
+### Regras
+
+- O TDN documenta a estrutura do SX6, mas nao marca campos obrigatorios: o conjunto acima e um minimo pratico
+- `X6_VAR` tem 10 caracteres; o plugin usa `MV_X*` para parametros customizados. Nunca reutilize nome padrao
+- Para valor diferente por filial, um bloco por filial com o mesmo `X6_VAR`
+- Formato de armazenamento de valores D e L, uso de `X6_EXPDEST` e o nome do campo de proprietario (`X6_PRIORI` ou `X6_PROPRI`): a confirmar no TDS
+- Leitura em tempo de execucao com `SuperGetMV("MV_XDIASVC", .F., 30)`, sempre com default e uma unica vez antes de qualquer laco
+- Crie pelo Configurador ou por pacote UPDDISTR, nunca por `RecLock` direto no SX6
+
+## SX9 -- Relacionamentos entre Tabelas
+
+Detalhado em `patterns-sx6-sx9.md`. O dominio (`X9_DOM`) e a tabela referenciada; o contra-dominio (`X9_CDOM`) e a que guarda a referencia.
+
+| Campo | Descricao | Exemplo |
+|-------|-----------|---------|
+| X9_DOM | Alias do dominio | SA1 |
+| X9_IDENT | Sequencial dentro do dominio | proximo livre de SA1 |
+| X9_CDOM | Alias do contra-dominio (tabela, nao campo) | ZA1 |
+| X9_EXPDOM | Expressao do dominio | A1_COD+A1_LOJA |
+| X9_EXPCDOM | Expressao do contra-dominio | ZA1_CLIENT+ZA1_LOJA |
+| X9_LIGDOM / X9_LIGCDOM | Cardinalidade: 1 ou N | 1 / N |
+| X9_ENABLE | Ativo quando S | S |
+| X9_PROPRI | Proprietario | U |
+
+### Regras
+
+- Preencha todos os campos documentados: o TDN nao informa quais sao obrigatorios (a confirmar no TDS), e os valores de `X9_USEFIL` tambem
+- As expressoes dos dois lados devem ter mesmo tipo e tamanho; vincule os campos ao mesmo grupo SXG
+- Nunca assuma `001` em `X9_IDENT`: tabelas padrao como SA1 ja tem relacionamentos
+- A tabela do contra-dominio e seus campos (SX2/SX3) devem existir antes do relacionamento
+- Crie pelo Configurador ou UPDDISTR, nunca por `RecLock` direto no SX9. A unica API documentada, `FWSX9Util():SearchX9Paths`, le caminhos e nao grava
 
 ## Formato de Saida
 

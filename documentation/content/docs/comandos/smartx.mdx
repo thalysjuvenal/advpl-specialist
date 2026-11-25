@@ -24,24 +24,36 @@ Descreva em linguagem natural a rotina Smart X desejada (nova ou existente para 
 
 ## Fluxo
 
+### Passo inicial (ambos os modos) - release declarada
+
+Se existir um arquivo `.protheus-version` na raiz do projeto (uma release por arquivo, ex.: `12.1.2510`), o comando compara o terceiro componente como inteiro com o minimo do recurso (`skills/protheus-reference/releases.md`). Abaixo do minimo, avisa e propoe a alternativa; segue apenas com a escolha do usuario.
+
+| Recurso | Release minima | Alternativa abaixo dela |
+|---------|----------------|-------------------------|
+| Rotina Smart X nativa (`generate`) | 12.1.2510 | Manter a rotina em MVC/ADVPL |
+| Conversao de browse legado e campo "Valid Smart X" (`migrate`) | 12.1.2610 em ambiente produtivo (desenvolvimento interno: RPO D-1) | Manter o fonte legado |
+
+Conteudo invalido (vazio, varias linhas, `12.1`, nao numerico) e ignorado com aviso. Sem o arquivo, o fluxo segue normalmente e sugere criar `.protheus-version`.
+
 ### Modo `generate`
 
 1. **Carregar referencia base** — Ler `skills/smartx-development/reference.md`, `skills/smartx-development/patterns-model.md`, `skills/smartx-development/patterns-interface.md` e `skills/smartx-development/patterns-launcher-browse.md`
 2. **Carregar integracao ADVPL (condicional)** — Se a descricao mencionar ponto de entrada ou reaproveitamento de funcao ADVPL existente, ler tambem `skills/smartx-development/patterns-advpl-integration.md`
-3. **Delegar ao agent `code-generator`** — Gerar os fontes respeitando o namespace `custom.<agrupador>.<servico>`, a separacao entre `model.tlpp`, `interface.tlpp` e o launcher, alem das convencoes de `skills/advpl-code-generation/reference.md`
+3. **Delegar ao agent `code-generator`** (que ja carrega a skill `smartx-development`) — Gerar os fontes respeitando o namespace `custom.<agrupador>.<servico>`, a separacao entre `model.tlpp`, `interface.tlpp` e o launcher, alem das convencoes de `skills/advpl-code-generation/reference.md`
 
 ### Modo `migrate`
 
-1. **Carregar referencia base** — Ler `skills/smartx-development/reference.md`, `skills/smartx-development/patterns-migration.md` e `skills/smartx-development/troubleshooting.md`
+1. **Carregar referencia base** — Ler `skills/smartx-development/reference.md`, `skills/smartx-development/patterns-migration.md`, `skills/smartx-development/troubleshooting.md` e `skills/advpl-to-tlpp-migration/gap-report.md` (modelo do relatorio de lacunas)
 2. **Analisar rotina de origem** — Identificar se a origem e mBrowse, AxCadastro ou MVC (ModelDef/ViewDef/MenuDef) para mapear a estrategia de conversao
-3. **Delegar ao agent `migrator`** — Converter a rotina para a estrutura Smart X equivalente, preservando regras de negocio e apontando riscos/pontos de atencao da migracao
+3. **Delegar ao agent `migrator`** (que ja carrega a skill `smartx-development`) — Converter a rotina para a estrutura Smart X equivalente, preservando regras de negocio e apontando riscos/pontos de atencao da migracao, e devolver as linhas do relatorio de lacunas
+4. **Entregar o relatorio de lacunas (obrigatorio)** — Junto com os fontes, a tabela `Item | Situacao | Motivo | Acao` do `gap-report.md`, com situacao `migrado`, `nao migravel` ou `mantido no legado`, o checklist geral daquele arquivo e as linhas do "Passo 9 - Relatorio de lacunas" de `patterns-migration.md`. Sem o relatorio, a migracao nao esta concluida
 
 ### Mapeamento --mode para arquivos
 
 | Modo | Arquivos gerados/afetados |
 |------|---------------------------|
 | `generate` | `model.tlpp` (regras de negocio e persistencia), `interface.tlpp` (metadados de campos e layout), launcher (browse/entrada da rotina) |
-| `migrate` | `model.tlpp` e `interface.tlpp` convertidos a partir da rotina de origem (mBrowse/AxCadastro/MVC), launcher atualizado, relatorio de pontos de atencao da migracao |
+| `migrate` | `model.tlpp` e `interface.tlpp` convertidos a partir da rotina de origem (mBrowse/AxCadastro/MVC), launcher atualizado, relatorio de lacunas obrigatorio (formato do `gap-report.md`) |
 
 ## Exemplos
 
@@ -65,4 +77,4 @@ Converter o mBrowse de pedidos de compra para Smart X.
 ## Saida
 
 - **Modo `generate`**: `model.tlpp` (regras de negocio e persistencia via `ObjectFromMetadata()`/`BuildFromCode()`), `interface.tlpp` (contrato de UI com browse e formularios de inclusao/edicao/visualizacao) e a funcao launcher que registra a rotina no menu Protheus.
-- **Modo `migrate`**: o fonte migrado (`model.tlpp`/`interface.tlpp`/launcher) equivalente a rotina de origem, com relatorio de pontos de atencao — por exemplo, recursos que nao tem caminho de conversao suportado (`AxCadastro`, Tree) e que exigem manter o fonte legado.
+- **Modo `migrate`**: o fonte migrado (`model.tlpp`/`interface.tlpp`/launcher) equivalente a rotina de origem, com o relatorio de lacunas obrigatorio — por exemplo, recursos que nao tem caminho de conversao suportado (`AxCadastro`, Tree) e que exigem manter o fonte legado.
