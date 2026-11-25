@@ -168,6 +168,13 @@ make_base() {
   printf '\303\257\302\273\302\277// a\303\247\303\243o\r\n' >"$BASE/bom-cp1252.expected"
   # Windows-1252 e acute that becomes C3 A9 across byte offset 1024
   cp "$BASE/boundary.expected" "$BASE/cp-boundary.prw"
+  # empty file (valid UTF-8 and Windows-1252 alike) and files made only of
+  # high bytes: one alone (a truncated UTF-8 lead) and e c a EUR en-dash
+  : >"$BASE/empty.prw"
+  printf '\351' >"$BASE/cp-high1.prw"
+  printf '\303\251' >"$BASE/cp-high1.expected"
+  printf '\351\347\343\200\226' >"$BASE/cp-high.prw"
+  printf '\303\251\303\247\303\243\342\202\254\342\200\223' >"$BASE/cp-high.expected"
   # the 5 bytes Windows-1252 leaves undefined, one per file, after valid text
   printf '// a\347\343o \201 fim\n' >"$BASE/undef-81.prw"
   printf '// a\347\343o \215 fim\n' >"$BASE/undef-8d.prw"
@@ -452,7 +459,8 @@ case_to_utf8() {
   new_case to-utf8
   step --to-utf8 01-ascii-puro.prw 02-acentos-ptbr.prw 04-emoji-fail.prw 05-already-cp1252.prw \
     06-utf8-bom.prw 07-not-advpl.txt 09-tlpp-header.th bom-ascii.prw bom-only.prw boundary.prw \
-    cp-acentos.prw bom-cp1252.prw bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw
+    cp-acentos.prw bom-cp1252.prw bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw \
+    empty.prw cp-high1.prw cp-high.prw
   expect_rc 0
   expect_no_stderr
   expect_stdout \
@@ -471,12 +479,17 @@ case_to_utf8() {
     "converted: bad-overlong.prw" \
     "converted: bad-surrogate.prw" \
     "converted: bad-stray.prw" \
-    "converted: bad-truncated.prw"
+    "converted: bad-truncated.prw" \
+    "already-utf8: empty.prw" \
+    "converted: cp-high1.prw" \
+    "converted: cp-high.prw"
   # valid UTF-8 (ASCII, BOM kept, characters outside Windows-1252) untouched
   untouched 01-ascii-puro.prw 02-acentos-ptbr.prw 04-emoji-fail.prw 06-utf8-bom.prw 07-not-advpl.txt \
-    bom-ascii.prw bom-only.prw boundary.prw
+    bom-ascii.prw bom-only.prw boundary.prw empty.prw
   expect_that "cp-acentos: not the expected UTF-8 bytes (CRLF, no final newline)" \
     same_file "$BASE/cp-acentos.expected" "$CS/cp-acentos.prw"
+  expect_that "cp-high1: not C3 A9" same_file "$BASE/cp-high1.expected" "$CS/cp-high1.prw"
+  expect_that "cp-high: not the expected UTF-8 bytes" same_file "$BASE/cp-high.expected" "$CS/cp-high.prw"
   expect_that "bom-cp1252: BOM bytes not taken as Windows-1252" \
     same_file "$BASE/bom-cp1252.expected" "$CS/bom-cp1252.prw"
   local f
@@ -486,15 +499,17 @@ case_to_utf8() {
     expect_that "$f: BOM written" no_bom "$CS/$f"
   done
   # idempotent: a second run finds everything in UTF-8 already
-  step --to-utf8 05-already-cp1252.prw 09-tlpp-header.th cp-acentos.prw bom-cp1252.prw
+  step --to-utf8 05-already-cp1252.prw 09-tlpp-header.th cp-acentos.prw bom-cp1252.prw cp-high1.prw cp-high.prw
   expect_rc 0
   expect_no_stderr
   expect_stdout \
     "already-utf8: 05-already-cp1252.prw" \
     "already-utf8: 09-tlpp-header.th" \
     "already-utf8: cp-acentos.prw" \
-    "already-utf8: bom-cp1252.prw"
-  end_case "--to-utf8: Windows-1252 -> UTF-8 (C1, CRLF, no BOM), already-utf8 untouched, skipped, idempotent"
+    "already-utf8: bom-cp1252.prw" \
+    "already-utf8: cp-high1.prw" \
+    "already-utf8: cp-high.prw"
+  end_case "--to-utf8: Windows-1252 -> UTF-8 (C1, CRLF, no BOM, only high bytes), already-utf8 untouched (empty too), skipped, idempotent"
 }
 
 case_to_utf8_fails() {
@@ -531,45 +546,33 @@ case_to_utf8_sweep() {
 case_round_trip() {
   new_case round-trip
   local files="cp-sweep.prw cp-acentos.prw 05-already-cp1252.prw 09-tlpp-header.th bom-cp1252.prw
-    cp-boundary.prw bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw mixed/a.PRW"
+    cp-boundary.prw bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw mixed/a.PRW
+    cp-high1.prw cp-high.prw" f
+  local -a conv=() keep=()
+  for f in $files; do
+    conv[${#conv[@]}]="converted: $f"
+    keep[${#keep[@]}]="already-cp1252: $f"
+  done
+  # the normal mode leaves the Windows-1252 originals alone
   # shellcheck disable=SC2086  # $files is a list of plain names
-  step --to-utf8 $files 01-ascii-puro.prw
+  step $files empty.prw 01-ascii-puro.prw
   expect_rc 0
   expect_no_stderr
-  expect_stdout \
-    "converted: cp-sweep.prw" \
-    "converted: cp-acentos.prw" \
-    "converted: 05-already-cp1252.prw" \
-    "converted: 09-tlpp-header.th" \
-    "converted: bom-cp1252.prw" \
-    "converted: cp-boundary.prw" \
-    "converted: bad-overlong.prw" \
-    "converted: bad-surrogate.prw" \
-    "converted: bad-stray.prw" \
-    "converted: bad-truncated.prw" \
-    "converted: mixed/a.PRW" \
-    "already-utf8: 01-ascii-puro.prw"
+  expect_stdout "${keep[@]}" "already-cp1252: empty.prw" "already-cp1252: 01-ascii-puro.prw"
+  # shellcheck disable=SC2086
+  step --to-utf8 $files empty.prw 01-ascii-puro.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout "${conv[@]}" "already-utf8: empty.prw" "already-utf8: 01-ascii-puro.prw"
   expect_that "cp-boundary: C3 A9 across offset 1024 not written" same_file "$BASE/boundary.prw" "$CS/cp-boundary.prw"
   # shellcheck disable=SC2086
-  step $files 01-ascii-puro.prw
+  step $files empty.prw 01-ascii-puro.prw
   expect_rc 0
   expect_no_stderr
-  expect_stdout \
-    "converted: cp-sweep.prw" \
-    "converted: cp-acentos.prw" \
-    "converted: 05-already-cp1252.prw" \
-    "converted: 09-tlpp-header.th" \
-    "converted: bom-cp1252.prw" \
-    "converted: cp-boundary.prw" \
-    "converted: bad-overlong.prw" \
-    "converted: bad-surrogate.prw" \
-    "converted: bad-stray.prw" \
-    "converted: bad-truncated.prw" \
-    "converted: mixed/a.PRW" \
-    "already-cp1252: 01-ascii-puro.prw"
+  expect_stdout "${conv[@]}" "already-cp1252: empty.prw" "already-cp1252: 01-ascii-puro.prw"
   # shellcheck disable=SC2086
-  untouched $files 01-ascii-puro.prw
-  end_case "round trip: --to-utf8 then the normal mode gives back every byte (sweep, CRLF, BOM bytes, offset 1024)"
+  untouched $files empty.prw 01-ascii-puro.prw
+  end_case "round trip: --to-utf8 then the normal mode gives back every byte (sweep, CRLF, BOM bytes, offset 1024, only high bytes, empty)"
 }
 
 case_to_utf8_dry_run() {

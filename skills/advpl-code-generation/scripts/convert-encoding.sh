@@ -131,13 +131,17 @@ to_cp1252() {
     }' <"$TMPD/bytes" >"$TMPD/out"
 }
 
-# from_cp1252 FILE: FILE read as Windows-1252 -> $TMPD/out in UTF-8 (no BOM);
-# $TMPD/status gets "ok", or "undefined" at the first byte of 0x80-0x9F that
-# CP1252_EXTRA lacks. Bytes go through as decimal numbers, so NUL and CR come
-# out unchanged. Fails when FILE cannot be read.
+# from_cp1252 FILE SKIP: FILE read as Windows-1252 -> $TMPD/out in UTF-8 (no
+# BOM); $TMPD/status gets "ok", or "undefined" at the first byte of 0x80-0x9F
+# that CP1252_EXTRA lacks. SKIP is the one to_cp1252 just used: with 0, its
+# $TMPD/bytes already holds every byte of FILE; otherwise FILE is read again
+# from byte 0. Bytes go through as decimal numbers, so NUL and CR come out
+# unchanged. Fails when FILE cannot be read.
 from_cp1252() {
   rm -f "$TMPD/status"
-  od -An -v -tu1 -- "$1" >"$TMPD/bytes" 2>/dev/null || return 1
+  if [ "$2" != 0 ]; then
+    od -An -v -tu1 -- "$1" >"$TMPD/bytes" 2>/dev/null || return 1
+  fi
   STATUS_FILE="$TMPD/status" awk -v extra="$CP1252_EXTRA" '
     function emit(c) {
       if (c < 2048) printf "%c%c", 192 + int(c / 64), 128 + c % 64
@@ -194,7 +198,7 @@ process() {
   fi
   if ! to_cp1252 "$f" "$skip"; then fail "$f" "read error"; return 0; fi
   q=$(cat "$TMPD/status" 2>/dev/null)
-  if [ "$to_utf8" = 1 ]; then process_to_utf8 "$f" "$q"; return 0; fi
+  if [ "$to_utf8" = 1 ]; then process_to_utf8 "$f" "$q" "$skip"; return 0; fi
   case $q in
     invalid) report "already-cp1252: $f"; return 0 ;;
     0) ;;
@@ -205,8 +209,9 @@ process() {
   if [ "$q" = 0 ]; then report "converted: $f"; else report "translit: $f ($q)"; fi
 }
 
-# process_to_utf8 FILE STATUS: the --to-utf8 end of process; STATUS is the
-# verdict of the UTF-8 decoder (to_cp1252), the same in both directions.
+# process_to_utf8 FILE STATUS SKIP: the --to-utf8 end of process; STATUS is
+# the verdict of the UTF-8 decoder (to_cp1252 FILE SKIP), the same in both
+# directions.
 process_to_utf8() {
   local f="$1"
   case $2 in
@@ -214,7 +219,7 @@ process_to_utf8() {
     [0-9]*) report "already-utf8: $f"; return 0 ;;
     *) fail "$f" "read error"; return 0 ;;   # awk died
   esac
-  if ! from_cp1252 "$f"; then fail "$f" "read error"; return 0; fi
+  if ! from_cp1252 "$f" "$3"; then fail "$f" "read error"; return 0; fi
   case $(cat "$TMPD/status" 2>/dev/null) in
     ok) ;;
     undefined) fail "$f" "undefined byte"; return 0 ;;
