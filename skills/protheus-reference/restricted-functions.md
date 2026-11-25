@@ -252,7 +252,7 @@ These functions compile but are NOT supported. They may be altered or removed in
 | `__SaveParam()` | `PutMV()` or custom save logic |
 | `PROXNUM` | `GetSXENum()` for automatic numbering |
 | `FILE2PRINTER` | `FWMsPrinter` class |
-| `GERATMP` | `CriaTrab()` for temporary tables |
+| `GERATMP` | `FWTemporaryTable` class (relational mode) for temporary tables |
 
 ---
 
