@@ -34,6 +34,8 @@ Antes de gerar ou planejar, se existir um arquivo `.protheus-version` na raiz do
 - Rotina Smart X nativa (`generate`): exige a release 12.1.2510. Abaixo dela, avise e proponha manter a rotina em MVC/ADVPL.
 - Conversão de browse legado e campo "Valid Smart X" (`migrate`): exigem a release 12.1.2610 em ambiente produtivo (desenvolvimento interno: RPO D-1). Abaixo dela, avise e proponha manter o fonte legado.
 
+Se o conteúdo, após remover espaços em branco, não for `12.1.N` com N só dígitos (vazio, várias linhas, `12.1`, não numérico), ignore o arquivo, avise o usuário e siga como se ele não existisse.
+
 Se o arquivo não existir, siga normalmente e acrescente uma linha sugerindo criar `.protheus-version` com a release do Protheus.
 
 ### Modo `generate`

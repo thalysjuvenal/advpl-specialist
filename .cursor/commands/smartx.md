@@ -19,6 +19,8 @@ Before generating or planning, if a `.protheus-version` file exists in the proje
 - Native Smart X routine (`generate`): needs release 12.1.2510. Below it, propose keeping the routine in MVC/ADVPL.
 - Legacy browse conversion and the "Valid Smart X" field (`migrate`): need release 12.1.2610 in production (internal development: RPO D-1). Below it, propose keeping the legacy source.
 
+If the content, after trimming whitespace, is not `12.1.N` with N all digits (empty, multi-line, `12.1`, non-numeric), ignore the file, tell the user, and proceed as if it were absent.
+
 If the file does not exist, proceed as usual and add one line suggesting the user create `.protheus-version` with the Protheus release.
 
 ### Mode detection

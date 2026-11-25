@@ -6,7 +6,7 @@ Os comandos `/generate`, `/migrate` e `/smartx` leem o arquivo `.protheus-versio
 
 ## Como comparar
 
-Compare o **terceiro componente como inteiro**, ignorando zeros à esquerda: `12.1.17` < `12.1.33` < `12.1.2210` < `12.1.2310` < `12.1.2410` < `12.1.2510` < `12.1.2610`. Vale para os dois estilos de numeração (`12.1.NN` antigo e `12.1.AAMM` novo, em que `AAMM` = ano e mês). É a mesma ordem que `version_gte` do hook (`hooks/lib/detect-protheus-version.sh`) obtém com `sort -V`.
+Compare o **terceiro componente como inteiro**, ignorando zeros à esquerda: `12.1.17` < `12.1.33` < `12.1.2210` < `12.1.2310` < `12.1.2410` < `12.1.2510` < `12.1.2610`. Vale para os dois estilos de numeração (`12.1.NN` antigo e `12.1.AAMM` novo, em que `AAMM` = ano e mês). A comparação por inteiro foi pensada para ser consistente com `version_gte` do hook (`hooks/lib/detect-protheus-version.sh`), que usa `sort -V`. As grafias com zero à esquerda (`12.1.023`, `12.1.025`) valem 23 e 25 (ver Notas): `12.1.023` < `12.1.025` < `12.1.33`.
 
 ## Tabela
 
