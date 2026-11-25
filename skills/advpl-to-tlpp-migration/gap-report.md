@@ -55,8 +55,8 @@ For each item: what to search for in the source, why it gets lost, and what goes
 ### 1. `VerifyAccess`
 
 - **Look for:** `VerifyAccess(`.
-- **Why it gets lost:** it is an access check written into the routine itself. When the logic moves into a class and the class gains new callers (job, REST endpoint, Smart X action, another routine), the check stays on the old screen path or disappears, and the new caller runs without it. Its signature and return value are not in the plugin's references (a confirmar no TDS).
-- **Report:** one row per call, saying where the check is now. If it stayed only in the `.prw` wrapper, the row is `kept in legacy` and the action is to repeat the check before every new caller of the class.
+- **Why it gets lost:** neither the plugin's references nor the TDN document `VerifyAccess`: whether it exists as a framework function, what it checks, its signature and its return value are all "a confirmar no TDS". Whatever it verifies, a call found in the source is tied to the routine's original flow. When the logic moves into a class and the class gains new callers (job, REST endpoint, Smart X action, another routine), the call stays on the old screen path or disappears, and the new caller runs without it.
+- **Report:** one row per call, saying where the call is now. If it stayed only in the `.prw` wrapper, the row is `kept in legacy` and the action is to confirm in TDS what it checks and to repeat it before every new direct caller of the class.
 
 ### 2. `SuperGetMv` / `GetMV` / `MV_` parameters
 
@@ -91,12 +91,12 @@ For each item: what to search for in the source, why it gets lost, and what goes
 ### 7. SX7 triggers
 
 - **Look for:** the fields the routine edits (`M->` memory variables, `SetValue(` on an MVC model, `Enchoice(`), then the SX7 rows whose `X7_CAMPO` is one of them.
-- **Why it gets lost:** triggers live in the dictionary, not in the source: when the source field (`X7_CAMPO`) changes, they fill the target field (`X7_CDOMIN`). A migrated class that writes the record directly with `RecLock`, instead of going through the screen or the model, may not fire them and leave the target field empty (a confirmar no TDS). In Smart X the framework loads the dictionary triggers unless the Model calls `disableDefaultTriggers()`, and trigger logic the conversion cannot carry must move to the dictionary (see `patterns-migration.md` of the `smartx-development` skill).
+- **Why it gets lost:** triggers live in the dictionary, not in the source: when the source field (`X7_CAMPO`) changes, they fill the target field (`X7_CDOMIN`). A migrated class that writes the record directly with `RecLock`, instead of going through the screen or the model, may not fire them and leave the target field empty (a confirmar no TDS). In Smart X the framework loads the dictionary triggers automatically, and the Model can turn them off with `disableDefaultTriggers()` (`patterns-model.md` of the `smartx-development` skill); that skill recommends describing triggers in the dictionary (SX7) whenever possible instead of building the action by hand (`patterns-interface.md`).
 - **Report:** one row per trigger (`X7_CAMPO` + `X7_SEQUENC` → `X7_CDOMIN`): still fired, reproduced in the code, or lost.
 
 ### 8. Filters
 
-- **Look for:** `SetFilterDefault(`, `DbSetFilter(`, `cFilterDefault`, and filter expressions passed to the browse.
+- **Look for:** `SetFilterDefault(`, `DbSetFilter(`, and the filter expressions passed to the browse (in the plugin's `mBrowse` example, an assignment to a variable named `cFilterDefault`; other sources use other names).
 - **Why it gets lost:** a browse filter is an ADVPL expression evaluated on the browse's work area. If the browse setup is rebuilt, the filter is easy to leave behind. In Smart X it must become SQL with the `@` prefix: expressions with `Date()` or `U_Func()` stop working, `DbSetFilter` on the browse work area is ignored, and filters that users saved (Papel de Trabalho) are lost.
 - **Report:** one row per filter expression: carried over as is, converted (show the new form) or lost. For Smart X, add a row reminding the users to recreate their saved filters.
 
@@ -120,8 +120,8 @@ For each item: what to search for in the source, why it gets lost, and what goes
 
 | Item | Status | Reason | Action |
 |---|---|---|---|
-| `U_ZFATA01` (menu, job `ZJOB01`) | kept in legacy | The wrapper in `ZFATA01.prw` delegates to `ComissaoService` | None: callers unchanged |
-| `VerifyAccess` in `ZFATA01()`, before the edit screen | kept in legacy | Stays on the wrapper's screen path; `ComissaoService:calcular()` has no check | Repeat the check before every new caller, job `ZJOB01` included |
+| `U_ZFATA01` (menu) | kept in legacy | The wrapper in `ZFATA01.prw` delegates to `ComissaoService` | None: the menu still calls the wrapper |
+| `VerifyAccess` in `ZFATA01()`, before the edit screen | kept in legacy | Stays on the wrapper's screen path; `ComissaoService:calcular()` has no `VerifyAccess` call | Confirm in TDS what it checks; repeat it before any new direct caller of `ComissaoService` (job, REST endpoint, Smart X action) |
 | `SuperGetMV("MV_ZPCOMI", .F., 5)` | migrated | Read in `calcular()`, same default | Check that `MV_ZPCOMI` exists in the SX6 of every branch |
 | `ExistBlock("ZFAT01GR")` + `ExecBlock("ZFAT01GR", .F., .F., {cNumPed})` | migrated | Guard and call moved to `gravar()`; `PARAMIXB` unchanged | Test with `ZFAT01GR` compiled |
 | `Private cZTpCom`, read by the entry point `ZFAT01GR` | not migratable | Became `data cTipoCom`; the entry point no longer sees it | Pass it as `PARAMIXB[2]` and adapt `ZFAT01GR` (customer's decision) |

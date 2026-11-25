@@ -170,7 +170,7 @@ Toda migração para Smart X é entregue com o relatório de lacunas no formato 
 
 - Rode no fonte de origem o checklist geral do `gap-report.md` (`VerifyAccess`, `SuperGetMV`/`MV_`, `FwAliasInDic`, `cPaisLoc`, pontos de entrada, `ExistBlock`, gatilhos SX7, filtros, legendas, permissões).
 - Cada recurso da tabela do Passo 8 e cada "Não faz"/"Parcial" do checklist Faz/Não-Faz (em Boas Práticas) encontrado na rotina vira uma linha: cite o recurso, o passo e a ação, sem copiar a explicação.
-- PEs do Passo 7 sem equivalente (`MODELPRE`, `FORMLINEPRE`, `FORMLINEPOS`, `BUTTONBAR`) entram como `não migrável`, ou como `mantido no legado` enquanto o MVC legado continuar no fonte.
+- PEs do Passo 7 sem equivalente (`MODELPRE`, `FORMLINEPRE`, `FORMLINEPOS`) entram como `não migrável`, ou como `mantido no legado` enquanto o MVC legado continuar no fonte. Os botões do `BUTTONBAR` entram como `migrado` quando viram Actions de Interface (`addTableAction`/`addPageAction`, Passo 7), e como `não migrável` se nenhuma Action os substituir.
 - No Caminho B, o `ModelDef`/`ViewDef`/`MenuDef` e o handler de ExecAuto preservados entram como `mantido no legado`.
 
 Exemplo de linhas (rotina fictícia `ZCADA01`):

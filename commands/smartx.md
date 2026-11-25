@@ -51,7 +51,7 @@ Se o arquivo não existir, siga normalmente e acrescente uma linha sugerindo cri
 
 1. **Carregar referência base** — Ler `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/reference.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/patterns-migration.md`, `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/troubleshooting.md` e `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md` (modelo do relatório de lacunas)
 2. **Analisar rotina de origem** — Identificar se a origem é mBrowse, AxCadastro ou MVC (ModelDef/ViewDef/MenuDef) para mapear a estratégia de conversão
-3. **Delegar ao agent `migrator`** — Converter a rotina para a estrutura Smart X equivalente, preservando regras de negócio e apontando riscos/pontos de atenção da migração
+3. **Delegar ao agent `migrator`** — Converter a rotina para a estrutura Smart X equivalente, preservando regras de negócio e apontando riscos/pontos de atenção da migração, e devolver as linhas do relatório de lacunas (formato do `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md`)
 4. **Entregar o relatório de lacunas (obrigatório)** — Junto com os fontes, a tabela `Item | Situação | Motivo | Ação` do `${CLAUDE_PLUGIN_ROOT}/skills/advpl-to-tlpp-migration/gap-report.md` (situação `migrado`, `não migrável` ou `mantido no legado`), com o checklist geral daquele arquivo e as linhas do "Passo 9 — Relatório de lacunas" de `${CLAUDE_PLUGIN_ROOT}/skills/smartx-development/patterns-migration.md`
 
 ## Mapeamento --mode → arquivos

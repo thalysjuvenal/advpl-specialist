@@ -34,7 +34,7 @@ If `--mode` is not provided, infer it: mentions of an existing routine, mBrowse,
 ### Mode `migrate`
 1. Read the base reference and pattern files listed above for `migrate`.
 2. Analyze the source routine to identify whether it is mBrowse, AxCadastro, or MVC (`ModelDef`/`ViewDef`/`MenuDef`), and map the appropriate conversion strategy.
-3. Convert it to the equivalent Smart X structure, preserving business rules, and point out migration risks and points of attention.
+3. Convert it to the equivalent Smart X structure, preserving business rules, point out migration risks and points of attention, and collect the gap-report rows (in the `skills/advpl-to-tlpp-migration/gap-report.md` format) for everything that did not carry over.
 4. Deliver the gap report (mandatory) with the sources: the `Item | Status | Reason | Action` table of `skills/advpl-to-tlpp-migration/gap-report.md` (status `migrated`, `not migratable` or `kept in legacy`; in pt-BR, headers `Item | Situação | Motivo | Ação` and status `migrado`, `não migrável` or `mantido no legado`), filled with that file's checklist and with the rows of "Passo 9 — Relatório de lacunas" in `skills/smartx-development/patterns-migration.md`.
 
 ## Mode → output mapping

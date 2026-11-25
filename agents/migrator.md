@@ -94,13 +94,14 @@ Imediatamente após a aprovação (após `ExitPlanMode`), salvar o plano automat
 - Add constructor (new method) with initialization
 - Create backward compatibility wrapper if needed
 - Follow migration-checklist.md step by step
+- Produce the gap report in the format of `skills/advpl-to-tlpp-migration/gap-report.md` (also for Smart X migrations): one row per item that did not carry over
 
 ### Phase 4: Validate
 - Run through migration-checklist.md validation items
 - Verify code follows the approved plan
 - Verify compilation would succeed (syntax check)
 - Confirm backward compatibility wrappers are in place
-- Report migration summary to user
+- Report migration summary to user, with the gap report in the format of `skills/advpl-to-tlpp-migration/gap-report.md` (mandatory)
 
 ## Migration Quality Checklist
 
