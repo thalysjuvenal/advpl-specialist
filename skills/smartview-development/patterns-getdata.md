@@ -9,6 +9,7 @@ decorrem disso, antes de qualquer linha de SQL:
 
 - Nenhuma chamada de interface: `MsgInfo`, `Alert`, `MsgYesNo`, `MSDIALOG`, `FWMsgRun`,
   `ParamBox`. O que for aviso vira `FWLogMsg()`.
+- `EndSQL` deve começar na coluna 1, sem espaços ou tabulações (erro de compilação C2001, TDN Embedded SQL, "Erros de compilação"); o `BeginSQL` pode ficar indentado.
 - Nenhum acesso a disco do cliente: `MakeDir`, `__CopyFile`, `MsExcel()` por OLE.
 - Nenhum `ConOut()` — o `AGENTS.md` já proíbe, e aqui não há onde ler a saída.
 - Toda função que mexe em workarea precisa de `GetArea()` / `RestArea()`.
@@ -56,7 +57,7 @@ Method loadBilling(aFil as array) Class MeuObjeto
            AND F2.F2_EMISSAO BETWEEN %exp:cDataDe% AND %exp:cDataAt%
          ORDER BY F2.F2_EMISSAO, D2.D2_DOC, D2.D2_ITEM
 
-    EndSQL
+EndSQL
 
     While !(cAlias)->(Eof())
 
@@ -292,7 +293,7 @@ Method hasQuotation(cData as character) as logical Class SvTools
          WHERE M2.%notDel%
            AND M2.M2_DATA = %exp:cData%
 
-    EndSQL
+EndSQL
 
     nQtd := (cAlias)->QTD
 

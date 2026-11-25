@@ -256,7 +256,7 @@ Method getData(nPage as numeric, oFilter as object) as object Class CustomerList
            AND A1.A1_COD BETWEEN %exp:cCliDe% AND %exp:cCliAte%
          ORDER BY A1.A1_COD, A1.A1_LOJA
 
-    EndSQL
+EndSQL
 
     While !(cAlias)->(Eof())
 

@@ -264,6 +264,8 @@ User Function zRelProd()
 
     // O grupo de perguntas ZRELPROD (SX1) deve existir com os parametros:
     // MV_PAR01/02 = Produto De/Ate, MV_PAR03/04 = Tipo De/Ate
+    // Crie o grupo SX1 antes (ex.: /advpl-specialist:sxgen --type sx1, ver skills/sx-configuration/).
+    // PrintDialog exibe o dialogo do Pergunte (a confirmar no TDS).
     oReport := fReportDef()
     oReport:PrintDialog()
 
@@ -441,6 +443,7 @@ Use a code block to format or compute cell values at print time:
 
 ```advpl
 // Celula com codigo customizado
+// IIf e o idioma dentro de code block (nao ha If/Else nesse contexto)
 TRCell():New(oSection, "SITUACAO", "QRY_REP", "Situacao", /*cPicture*/, 15, /*lPixel*/, ;
     {|| IIf(QRY_REP->B1_MSBLQL == "1", "Bloqueado", "Ativo")}, "LEFT")
 ```

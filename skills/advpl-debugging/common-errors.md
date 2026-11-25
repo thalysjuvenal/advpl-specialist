@@ -726,11 +726,13 @@ oRest:SetContentType("application/json; charset=utf-8")
 
 **Solution:**
 ```advpl
-// Check if table exists in SX2
-// Do not open SX2 directly (DbSelectArea("SX2")): use the framework API.
-// Check the physical table instead (TCCanOpen) and review the SX2 registration in the configurator.
-If !TCCanOpen(RetSqlName("ZA1"))
-    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Table ZA1 not found in the database. Check the SX2 registration in the configurator and run UPDDISTR.")
+// 1) Check the dictionary (SX2) registration - do not open SX2 directly
+//    (DbSelectArea("SX2")); FwAliasInDic is the framework check (confirm in TDS).
+// 2) Check the physical table in the database (TCCanOpen).
+If !FwAliasInDic("ZA1")
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Alias ZA1 is not registered in SX2. Check the registration in the configurator.")
+ElseIf !TCCanOpen(RetSqlName("ZA1"))
+    FWLogMsg("ERROR", /*cTransactionId*/, "ADVPLDBG", /*cCategory*/, /*cStep*/, /*cMsgId*/, "Table ZA1 is registered in SX2 but was not created in the database. Run UPDDISTR.")
 EndIf
 
 // If table exists in SX2 but not in DB, run:

@@ -288,7 +288,7 @@ User Function QueryEx()
         AND SE2.E2_EMISSAO >= %exp:DtoS(dDataIni)%
         AND SE2.E2_SALDO > 0
         ORDER BY SE2.E2_VENCTO
-    EndSQL
+EndSQL
 
     DbSelectArea(cAlias)
     While !(cAlias)->(Eof())
@@ -311,6 +311,7 @@ Return aResult
 
 | Rule | Why |
 |------|-----|
+| `EndSQL` must start at column 1 (no spaces or tabs before it); `BeginSQL` may be indented | Otherwise compile error C2001 (TDN Embedded SQL, "Erros de compilação") |
 | Do NOT start a line with `*` inside BeginSQL | ADVPL pre-compiler treats `*` at line start as comment |
 | Always include `%notDel%` | Protheus uses logical deletion, never rely on physical |
 | Always include `%xfilial%` or filial filter | Multi-branch environments will return wrong data |
