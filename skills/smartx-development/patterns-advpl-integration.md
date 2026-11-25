@@ -101,9 +101,11 @@ Criar User Functions com o NOME de cada PE; elas retornam um valor lógico indic
 
 ### Exemplo fiel — beforeCommitInTransaction
 
+> Sobre os includes (`totvs.ch` no lugar de `protheus.ch`, `Interface.th` em minúsculas), veja a nota em `reference.md` desta skill.
+
 ```advpl
 #include "fw-tlpp-core.th"
-#include "protheus.ch"
+#include "totvs.ch"
 #include "totvs.framework.structure.model.th"
 
 namespace custom.entrypoint.protheus.faturamento.model
@@ -132,7 +134,7 @@ Return lReturn
 
 ```advpl
 #include 'fw-tlpp-core.th'
-#include "protheus.ch"
+#include "totvs.ch"
 
 namespace custom.entrypoint.protheus.faturamento
 

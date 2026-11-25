@@ -109,14 +109,14 @@ TestSuite  →  agrupa um ou mais TestGroups
 | TestGroup | `FWDefaultTestSuite` | Agrupamento e ordenação dos TestCases |
 | TestCase | `FWDefaultTestCase` | Implementação de cada caso de teste conforme especificação |
 
-> **Nota sobre includes:** Os exemplos abaixo são verbatim do TDN e usam `#Include "PROTHEUS.CH"`. Para código novo, use `#Include "TOTVS.CH"` (convenção atual do plugin).
+> **Nota sobre includes:** Os exemplos abaixo são verbatim do TDN e usam `#include "totvs.ch"`. Para código novo, use `#Include "TOTVS.CH"` (convenção atual do plugin).
 
 ### TestSuite
 
 O TestSuite configura todas as pré-condições para um conjunto de testes: abertura de ambiente (Empresa/Filial), alteração de parâmetros, append em tabelas. Os métodos `SetUpSuite` e `TearDownSuite` executam antes e depois de toda a suíte, respectivamente.
 
 ```advpl
-#Include "PROTHEUS.CH"
+#include "totvs.ch"
 
 //-------------------------------------------------------------------
 /*/{Protheus.doc} FINA040TestSuite
@@ -196,7 +196,7 @@ Return oHelper
 O TestGroup configura as rotinas que serão testadas e em qual sequência. Seu objetivo é agrupar o conjunto de casos de teste (`AddTestCase`).
 
 ```advpl
-#include "PROTHEUS.CH"
+#include "totvs.ch"
 
 //-------------------------------------------------------------------
 /*/{Protheus.doc} FINA040TestGroup
@@ -234,7 +234,7 @@ Return
 O TestCase implementa cada caso de teste conforme a especificação. Cada método de teste deve ter 10 caracteres, com o número do caso (ex.: `FIN040_001`). Os métodos são registrados via `AddTestMethod` no construtor.
 
 ```advpl
-#include "PROTHEUS.CH"
+#include "totvs.ch"
 
 //-------------------------------------------------------------------
 /*/{Protheus.doc} FINA040TestCase

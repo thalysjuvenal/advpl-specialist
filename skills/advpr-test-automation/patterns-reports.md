@@ -125,7 +125,7 @@ Return( oHelper )
 ### FWMSPrinter — MATR797 (TestCase completo)
 
 ```advpl
-#include "PROTHEUS.CH"
+#include "totvs.ch"
 //-------------------------------------------------------------------
 /*/{Protheus.doc} MATR797TestCase
 @author renan.lisboa

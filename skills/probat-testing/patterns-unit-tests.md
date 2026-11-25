@@ -148,14 +148,14 @@ return self
 method initEnvironment() class TestPedidoService
   // One-time initialization (e.g., open connection, prepare data)
   ::lSetup := .T.
-  conout('-> [OneTimeSetUp] Environment initialized')
+  FWLogMsg('INFO', , 'PROBAT', , , , '-> [OneTimeSetUp] Environment initialized')
 return .T.
 
 method resetValues() class TestPedidoService
   // Reset state before each test
   ::nTotal  := 0
   ::cPedido := ''
-  conout('  -> [Setup] Values reset')
+  FWLogMsg('INFO', , 'PROBAT', , , , '-> [Setup] Values reset')
 return .T.
 
 method testCalculateTotal() class TestPedidoService
@@ -172,12 +172,12 @@ return .T.
 method clearValues() class TestPedidoService
   ::nTotal  := 0
   ::cPedido := ''
-  conout('  -> [TearDown] Values cleared')
+  FWLogMsg('INFO', , 'PROBAT', , , , '-> [TearDown] Values cleared')
 return .T.
 
 method cleanupEnvironment() class TestPedidoService
   ::lSetup := .F.
-  conout('-> [OneTimeTearDown] Environment cleaned up')
+  FWLogMsg('INFO', , 'PROBAT', , , , '-> [OneTimeTearDown] Environment cleaned up')
 return .T.
 ```
 
@@ -493,6 +493,7 @@ class TestDatabaseOperations
   private data lConn   as logical
   private data cTable  as character
   private data cAlias  as character
+  private data oTmp    as object
 
   public method new() constructor
 
@@ -521,6 +522,7 @@ method new() class TestDatabaseOperations
   ::lConn  := .F.
   ::cTable := 'TEST_TBL'
   ::cAlias := 'TST'
+  ::oTmp   := nil
 return self
 
 method openConnection() class TestDatabaseOperations
@@ -538,17 +540,13 @@ method openConnection() class TestDatabaseOperations
 return .T.
 
 method prepareTable() class TestDatabaseOperations
-  // Create or clean test table before each test
-  if (!TCCanOpen(::cTable))
-    local aFields := {              ;
-      {'ID',    'C',  5, 0},        ;
-      {'DESCR', 'C', 50, 0}         ;
-    }
-    dbCreate(::cTable, aFields, 'TOPCONN')
-  endif
+  // Create the test table as a temporary table (FWTemporaryTable, relational mode)
+  local aFields := {{'ID', 'C', 5, 0}, {'DESCR', 'C', 50, 0}}
 
-  assertTrue(TCCanOpen(::cTable), 'table should exist')
-  dbUseArea(.T., 'TOPCONN', ::cTable, ::cAlias, .T., .F.)
+  ::oTmp := FWTemporaryTable():New(::cAlias, aFields)
+  ::oTmp:Create()
+
+  assertTrue(Select(::cAlias) > 0, 'temporary table should be open')
 return .T.
 
 method testInsert() class TestDatabaseOperations
@@ -575,18 +573,17 @@ return .T.
 method clearData() class TestDatabaseOperations
   TCCommit(1)
   dbSelectArea(::cAlias)
-  TcSqlExec('DELETE FROM ' + ::cTable)
+  TcSqlExec('DELETE FROM ' + ::oTmp:GetRealName())
   TCCommit(2)
   TCCommit(4)
 return .T.
 
 method closeConnection() class TestDatabaseOperations
+  if (::oTmp != nil)
+    ::oTmp:Delete()
+    ::oTmp := nil
+  endif
   if (::lConn)
-    dbSelectArea(::cAlias)
-    if (TCCanOpen(::cTable))
-      dbCloseArea()
-      TCDelFile(::cTable)
-    endif
     TCUNLink(::nConn)
   endif
 return .T.

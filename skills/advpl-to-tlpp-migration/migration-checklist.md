@@ -16,7 +16,7 @@ Perform this analysis before writing any TLPP code.
 - [ ] Identify `Static` file-level variables and their usage patterns
 - [ ] List all external callers of each `User Function` (other `.prw` files, menus, jobs, schedules)
 - [ ] Identify all database aliases used (`DbSelectArea`, `RecLock`, direct alias references)
-- [ ] Document all `#Include` directives (they will be replaced by TLPP `.th` includes: `tlpp-core.th`, `tlpp-rest.th`, etc.)
+- [ ] Document all `#Include` directives (the `.tlpp` file gets the TLPP `.th` includes — `tlpp-core.th`, `tlpp-rest.th`, etc. — and keeps `totvs.ch` when framework features are used)
 - [ ] Identify any code blocks (`{|| ...}`) that reference `Private`/`Static` variables
 - [ ] Check for `MV_*` parameter usage (`GetMV`, `SuperGetMV`) that may need class-level access
 - [ ] Note any UI elements (dialogs, buttons, gets) that will need a separate View class
@@ -31,7 +31,7 @@ Create the TLPP class structure and convert all functions.
 
 - [ ] Define the namespace following TOTVS convention: `custom.<agrupador>.<servico>` for customizations or `totvs.protheus.<segmento>.<agrupador>` for product code (all lowercase, dots, no underscores)
 - [ ] Create the `.tlpp` file with one class per file, named following convention: `custom.<agrupador>.<funcionalidade>.tlpp`
-- [ ] Add `#Include "tlpp-core.th"` at the top of the file (and `tlpp-rest.th` if using REST annotations)
+- [ ] Add `#include "tlpp-core.th"` (and `#include "totvs.ch"` if framework features are used) at the top of the file (and `tlpp-rest.th` if using REST annotations)
 
 ### Class Skeleton
 
@@ -60,11 +60,11 @@ Create the TLPP class structure and convert all functions.
 
 ### Update Includes (in the `.tlpp` file)
 
-- [ ] Replace ADVPL `.ch` includes with TLPP `.th` includes: `#Include "tlpp-core.th"` (main), `#Include "tlpp-rest.th"` (REST annotations), `#Include "tlpp-object.th"` (advanced objects)
+- [ ] Add the TLPP `.th` includes and keep `#include "totvs.ch"` when the code uses framework features (PARAMIXB, DEFAULT, MsExecAuto, BeginSQL, MVC): `#include "tlpp-core.th"` (main), `#Include "tlpp-rest.th"` (REST annotations), `#Include "tlpp-object.th"` (advanced objects)
 - [ ] Add the `namespace` declaration for the project (e.g., `namespace custom.faturamento.pedido`)
 - [ ] Do NOT add `using namespace tlpp.core`, `tlpp.log`, `tlpp.rest`, `tlpp.data`, etc. -- these are NOT needed; use the `.th` includes instead
 
-### Backward Compatibility Wrapper (`.prw` file — uses `#Include "TOTVS.CH"`)
+### Backward Compatibility Wrapper (`.prw` file — uses `#include "totvs.ch"`)
 
 - [ ] Create or update the `.prw` wrapper file that preserves the original `User Function` name
 - [ ] The wrapper must instantiate the TLPP class and delegate to the appropriate method
