@@ -2,7 +2,7 @@
 
 ## Overview
 
-Templates and validation rules for generating Protheus data dictionary configuration scripts. Covers SX2 (table headers), SX3 (fields), SIX (indexes), SXG (field groups), SXA (form folders/tabs), SX1 (report questions), SX5 (generic tables), SXB (F3 lookup queries), and SX7 (triggers).
+Templates and validation rules for generating Protheus data dictionary configuration scripts. Covers SX2 (table headers), SX3 (fields), SIX (indexes), SXG (field groups), SXA (form folders/tabs), SX1 (report questions), SX5 (generic tables), SXB (F3 lookup queries), and SX7 (triggers). SX6 (system parameters `MV_*`) and SX9 (table relationships) are covered in [`patterns-sx6-sx9.md`](patterns-sx6-sx9.md).
 
 > **For programmatic READ access** to the same dictionary at runtime (FW APIs, `Posicione`, `TamSx3`, etc.), see [`../protheus-reference/sx-dictionary.md`](../protheus-reference/sx-dictionary.md). This skill focuses on **generation/configuration scripts**.
 
@@ -17,6 +17,8 @@ Templates and validation rules for generating Protheus data dictionary configura
 - Creating generic lookup tables
 - Configuring F3 standard query lookups
 - Configuring field triggers
+- Registering a custom system parameter `MV_X*` (SX6) — see [`patterns-sx6-sx9.md`](patterns-sx6-sx9.md)
+- Registering a relationship between tables (SX9) — see [`patterns-sx6-sx9.md`](patterns-sx6-sx9.md)
 
 ## SX2 — Table Header
 

@@ -12,3 +12,4 @@ Activate this skill when the user is registering a new custom table, adding cust
 | Reference file | Read when |
 |---|---|
 | reference.md | Always -- SX2/SX3/SIX/SXG/SXA/SX1/SX5/SXB/SX7 field templates, share modes, naming rules, and common pitfalls |
+| patterns-sx6-sx9.md | Generating an SX6 system parameter (custom `MV_X*`) or an SX9 relationship between tables -- TDN-documented fields, example scripts, runtime read with `SuperGetMV` |
