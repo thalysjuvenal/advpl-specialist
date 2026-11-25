@@ -3,6 +3,53 @@
 # advpl-specialist SessionStart hook
 # Detects ADVPL/TLPP project files and activates plugin context.
 # Sem efeitos colaterais: nao remove arquivos nem executa comandos externos.
+# Also names, read-only, the sources on pending lists left by other sessions
+# (stale_pending_notice below): nothing is converted or removed here.
+
+# Payload (session_id); a terminal on stdin (a manual run) is not read.
+SS_INPUT=""
+[ -t 0 ] || SS_INPUT=$(cat 2>/dev/null)
+case "${BASH_SOURCE[0]}" in
+    */*) SS_DIR=${BASH_SOURCE[0]%/*} ;;
+    *) SS_DIR=. ;;
+esac
+
+# stale_pending_notice JSON: hooks/stop converts a session's pending list
+# (${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}/advpl-specialist-pending/<session_id>,
+# work files <session_id>.<pid>) back to Windows-1252 at the end of each turn
+# and on SessionEnd, so a list of another session that is still there was
+# left by an abnormal end (or belongs to a session still running elsewhere):
+# its sources may still be in UTF-8. Prints up to 10 of them (absolute paths
+# of regular files, duplicates dropped) with the command that converts them
+# back and the lists to delete afterwards. This session's own list is skipped
+# (its Stop converts it). Runs in a subshell with the post-tool-use helpers.
+stale_pending_notice() {
+    local cur dir list l total=0 shown="" lists="" seen=$'\n' conv
+    cur=$(advpl_pending_list "$1")
+    dir=${cur%/*}
+    [ -d "$dir" ] || return 0
+    for list in "$dir"/*; do
+        [ -f "$list" ] || continue
+        case $list in "$cur" | "$cur".*) continue ;; esac
+        lists="$lists \"$list\""
+        while IFS= read -r l || [ -n "$l" ]; do
+            l=${l%$'\r'}
+            advpl_is_abs_path "$l" && [ -f "$l" ] || continue
+            case $seen in *$'\n'"$l"$'\n'*) continue ;; esac
+            seen="$seen$l"$'\n'
+            total=$((total + 1))
+            [ "$total" -le 10 ] && shown="$shown  $l"$'\n'
+        done <"$list"
+    done
+    [ "$total" -gt 0 ] || return 0
+    conv=$(plugin_script skills/advpl-code-generation/scripts/convert-encoding.sh) ||
+        conv=skills/advpl-code-generation/scripts/convert-encoding.sh
+    echo ""
+    echo "advpl-specialist: pending lists of other Claude Code sessions (left by an abnormal end, or by a session still running) name sources that may still be in UTF-8, while Protheus compiles Windows-1252. Nothing was converted:"
+    printf '%s' "$shown"
+    [ "$total" -le 10 ] || echo "  ... and $((total - 10)) more"
+    echo "If no other Claude Code session is working on them, convert each one back with: bash \"$conv\" FILE (or -r DIR for a folder). Then delete the lists:$lists"
+}
 
 # Detecta arquivos ADVPL/TLPP (case-insensitive, profundidade 3, para no primeiro)
 FOUND=0
@@ -57,3 +104,12 @@ if [ "$FOUND" -eq 1 ]; then
     fi
     # --- End Protheus release detection ---
 fi
+
+# Leftover pending lists: in any project, since the listed paths are absolute.
+(
+    # Not followed by shellcheck, for the reason given in post-tool-use-read.
+    # shellcheck source=/dev/null
+    . "$SS_DIR/post-tool-use" 2>/dev/null || exit 0
+    stale_pending_notice "$SS_INPUT"
+)
+exit 0

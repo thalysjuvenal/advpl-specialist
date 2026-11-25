@@ -1260,11 +1260,11 @@ check_session_start() {
   chmod +x "$fake/claude"
   rm -f "$TMP_DIR/claude-called"
 
-  out="$(cd "$d" && HOME="$home" PATH="$fake:$PATH" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  out="$(cd "$d" && HOME="$home" PATH="$fake:$PATH" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1 </dev/null)"
   check "session-start: sem arquivos ADVPL nao imprime nada" [ -z "$out" ]
 
   touch "$d/FOO.PRW"
-  out="$(cd "$d" && HOME="$home" PATH="$fake:$PATH" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  out="$(cd "$d" && HOME="$home" PATH="$fake:$PATH" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1 </dev/null)"
   check "session-start: FOO.PRW detectado" grep -q "ADVPL/TLPP project detected" <<<"$out"
   n="$(grep -c '/advpl-specialist:' <<<"$out")"
   check "session-start: lista 16 comandos (achou $n)" [ "$n" = 16 ]
@@ -1280,8 +1280,69 @@ check_session_start() {
     [ -d "$home/.claude/plugins/cache/advpl-specialist-marketplace/advpl-specialist/0.0.1" ]
 
   rm -f "$d/FOO.PRW"; touch "$d/x.TH"
-  out="$(cd "$d" && HOME="$home" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  out="$(cd "$d" && HOME="$home" "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1 </dev/null)"
   check "session-start: .TH detectado" grep -q "ADVPL/TLPP project detected" <<<"$out"
+
+  # Pending lists left by other sessions: a read-only notice, in any project
+  local src="$TMP_DIR/ss-src" a b c i nj sum
+  rm -f "$d/x.TH"; rm -rf "$src"; mkdir -p "$src" "$PEND_DIR"
+  a="$src/A.prw"; b="$src/B b.tlpp"; c="$src/C.prw"
+  printf 'x\303\247\n' >"$a"; printf 'y\303\247\n' >"$b"; printf 'z\n' >"$c"
+  printf '%s\n' "$a" rel.prw "$src/sumiu.prw" "$a" >"$PEND_DIR/ss-outra"
+  printf '%s\r\n' "$b" >"$PEND_DIR/ss-morta.4242"
+  printf '%s\n' "$c" >"$PEND_DIR/ss-atual"
+  sum="$(cksum <"$a")$(cksum <"$b")"
+  for nj in 0 1; do
+    out="$(cd "$d" && printf '{"session_id":"ss-atual","hook_event_name":"SessionStart","source":"startup"}' |
+      ADVPL_HOOK_NO_JQ=$nj "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+    check "session-start pendentes ($nj): aviso mesmo sem fontes ADVPL no projeto" \
+      grep -qF "advpl-specialist: pending lists of other Claude Code sessions" <<<"$out"
+    check "session-start pendentes ($nj): diz que nada foi convertido" grep -qF "Nothing was converted" <<<"$out"
+    check "session-start pendentes ($nj): A listado uma vez" [ "$(grep -cxF "  $a" <<<"$out")" = 1 ]
+    check "session-start pendentes ($nj): B do arquivo de trabalho (CRLF)" grep -qxF "  $b" <<<"$out"
+    check "session-start pendentes ($nj): sem a lista da sessao atual" not grep -qF "$c" <<<"$out"
+    check "session-start pendentes ($nj): sem caminho relativo nem arquivo sumido" \
+      not grep -qE 'rel\.prw|sumiu\.prw' <<<"$out"
+    check "session-start pendentes ($nj): comando do conversor" \
+      grep -qF "bash \"$ROOT/skills/advpl-code-generation/scripts/convert-encoding.sh\" FILE" <<<"$out"
+    check "session-start pendentes ($nj): nomeia as listas a apagar" \
+      grep -qF "\"$PEND_DIR/ss-morta.4242\" \"$PEND_DIR/ss-outra\"" <<<"$out"
+  done
+  check "session-start pendentes: nenhum fonte convertido" [ "$(cksum <"$a")$(cksum <"$b")" = "$sum" ]
+  check "session-start pendentes: lista de outra sessao mantida" [ -f "$PEND_DIR/ss-outra" ]
+  check "session-start pendentes: arquivo de trabalho mantido" [ -f "$PEND_DIR/ss-morta.4242" ]
+  # more than 10 sources: 10 paths, then the count of the others
+  rm -f "$PEND_DIR/ss-morta.4242" "$PEND_DIR/ss-outra"
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    : >"$src/M$i.prw"; printf '%s\n' "$src/M$i.prw" >>"$PEND_DIR/ss-outra"
+  done
+  out="$(cd "$d" && printf '{"session_id":"ss-atual"}' | "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  check "session-start pendentes: 10 caminhos" [ "$(grep -cF "  $src/M" <<<"$out")" = 10 ]
+  check "session-start pendentes: conta os outros 2" grep -qxF "  ... and 2 more" <<<"$out"
+  # only this session's list: no notice
+  rm -f "$PEND_DIR/ss-outra"
+  out="$(cd "$d" && printf '{"session_id":"ss-atual"}' | "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  check "session-start pendentes: so a lista da sessao atual, nada impresso" [ -z "$out" ]
+  rm -f "$PEND_DIR/ss-atual"; rm -rf "$src"
+}
+
+# post-tool-use fast path: a file the converter does not handle never reaches
+# convert-encoding.sh (a stub that records its calls); a source does.
+check_fast_path() {
+  local stub="$TMP_DIR/fp-root" d="$TMP_DIR/fp" m="$TMP_DIR/fp-called" rc
+  echo "[post-tool-use: caminho rapido]"
+  rm -rf "$stub" "$d" "$m"
+  mkdir -p "$stub/skills/advpl-code-generation/scripts" "$d"
+  printf '#!/bin/sh\necho "$@" >>"%s"\n' "$m" >"$stub/skills/advpl-code-generation/scripts/convert-encoding.sh"
+  printf 'texto\n' >"$d/notas.md"
+  hook_json PostToolUse Write "$d/notas.md" | CLAUDE_PLUGIN_ROOT="$stub" "$HOOK_BASH" "$POST" >/dev/null 2>&1
+  rc=$?
+  check "caminho rapido: .md exit 0" [ "$rc" = 0 ]
+  check "caminho rapido: .md nao chama o conversor" [ ! -e "$m" ]
+  printf 'User Function FP()\nReturn\n' >"$d/FP.PRW"
+  hook_json PostToolUse Write "$d/FP.PRW" | CLAUDE_PLUGIN_ROOT="$stub" "$HOOK_BASH" "$POST" >/dev/null 2>&1
+  check "caminho rapido: .PRW chama o conversor (dry run)" grep -qF -- "--dry-run" "$m"
+  rm -rf "$stub" "$d" "$m"
 }
 
 # crlf_json EVENT PATH [TOOL]: hook payload, one key per line, CRLF line endings
@@ -1393,6 +1454,7 @@ $d/FATA009.prw" ]
 echo "hook bash: $HOOK_BASH ($("$HOOK_BASH" --version | head -n 1))"
 check_hooks_json
 check_session_start
+check_fast_path
 check_crlf
 if command -v jq >/dev/null 2>&1; then
   MODE=jq NO_JQ=0 run_cases

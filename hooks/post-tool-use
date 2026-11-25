@@ -3,6 +3,8 @@
 # advpl-specialist - PostToolUse hook (Write|Edit|MultiEdit)
 #
 # After Claude writes or edits a file (tool_input.file_path of the stdin JSON):
+#   0. Fast path: a file whose extension the converter does not handle
+#      (advpl_is_conv_file) is left at once, without a dry run or the lint.
 #   1. Pending list: a source the converter handles (the strict
 #      convert-encoding.sh --dry-run report is not "skipped") goes on the
 #      session's pending list (advpl_pending_add); hooks/stop converts the
@@ -75,6 +77,18 @@ convert_encoding() {
 }
 
 lint_engine() { plugin_script skills/advpl-code-review/scripts/advpl-lint.sh; }
+
+# advpl_is_conv_file FILE: succeeds when the last path component of FILE ends
+# in an extension convert-encoding.sh handles (.prw .tlpp .prx .ch .prg .apw
+# .aph .tlh .th, any case; the lint extensions are among them). The fast path
+# of the main flow: any other file is left before the converter's dry run.
+advpl_is_conv_file() {
+  case ${1##*/} in
+    *.[Pp][Rr][Ww] | *.[Tt][Ll][Pp][Pp] | *.[Pp][Rr][Xx] | *.[Cc][Hh] | *.[Pp][Rr][Gg] | \
+      *.[Aa][Pp][Ww] | *.[Aa][Pp][Hh] | *.[Tt][Ll][Hh] | *.[Tt][Hh]) return 0 ;;
+  esac
+  return 1
+}
 
 # advpl_pending_list JSON: the session's pending list, the sources hooks/stop
 # converts back to Windows-1252 at the end of the turn:
@@ -171,6 +185,8 @@ base="$snap.base.$ext"   # snapshot and file as Windows-1252 (step 3)
 cur="$snap.cur.$ext"
 trap 'rm -f "$snap" "$snap.lines" "$base" "$cur"' EXIT
 [ -f "$file" ] || exit 0
+# Fast path: a file the converter does not handle is not linted either.
+advpl_is_conv_file "$file" || exit 0
 
 notes=""
 report=$(convert_encoding --dry-run -- "$file" 2>/dev/null)

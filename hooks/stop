@@ -4,8 +4,9 @@
 #
 # Converts the session's pending sources back to Windows-1252 at the end of
 # the turn. post-tool-use (each Write|Edit|MultiEdit of a source the converter
-# handles) and post-tool-use-read (a Read of a Windows-1252 source, where
-# Claude is told to run --to-utf8) put their absolute paths on
+# handles), post-tool-use-read (a Read of a Windows-1252 source, where Claude
+# is told to run --to-utf8) and post-tool-use-bash (a Bash call that ran
+# convert-encoding.sh --to-utf8) put their absolute paths on
 # ${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}/advpl-specialist-pending/<session_id>
 # (advpl_pending_list in post-tool-use). Converting once at the end of the
 # turn, not after each edit, keeps the source in UTF-8 while Claude edits it:
