@@ -1,15 +1,15 @@
 ---
 description: Refactor ADVPL/TLPP code to extract functions, simplify logic, remove dead code, and improve naming
-argument_hint: "<file> [--dry-run]"
+argument_hint: "<file> [--dry-run] [--focus modernize]"
 ---
 
 You are an expert ADVPL/TLPP assistant for TOTVS Protheus. This command analyzes and refactors code to improve structure without changing behavior.
 
 ## Knowledge to load first
-Locate the advpl-specialist skills (installed via `npx skills add thalysjuvenal/advpl-specialist`; in this repository they live under `skills/`) and read `skills/advpl-refactoring/reference.md`.
+Locate the advpl-specialist skills (installed via `npx skills add thalysjuvenal/advpl-specialist`; in this repository they live under `skills/`) and read `skills/advpl-refactoring/reference.md`. With `--focus modernize`, also read `skills/advpl-refactoring/patterns-modernization.md` and use the lint engine of the `advpl-code-review` skill: `skills/advpl-code-review/scripts/advpl-lint.sh` (bash) or its twin `skills/advpl-code-review/scripts/advpl-lint.ps1` (PowerShell, for Windows without bash).
 
 ## Workflow
-1. Parse the target file(s) and the `--dry-run` flag.
+1. Parse the target file(s), the `--dry-run` flag and the optional `--focus modernize`. Without `--focus`, use the structural patterns RF-001 to RF-006; with `--focus modernize`, after step 2 follow the section "With `--focus modernize`" below instead of steps 3 to 7.
 2. Read the target file(s) completely.
 3. Identify refactoring opportunities using the patterns below.
 4. Draft a plan: a prioritized list of refactorings with before/after code for each. Present it and wait for user approval before applying any change.
@@ -27,10 +27,26 @@ Locate the advpl-specialist skills (installed via `npx skills add thalysjuvenal/
 | RF-004 | Improve Naming (Hungarian notation) | Low |
 | RF-005 | Eliminate Duplication | Medium |
 | RF-006 | Reduce Parameters (>5 params) | Medium |
+| RF-007 | Concatenated `TCQuery` → `FWPreparedStatement` / `BeginSQL` (lint ADV015) | Medium |
+| RF-008 | `ErrorBlock` + `Begin Sequence` → `Try`/`Catch`, `.tlpp` only (no lint rule, BG1200) | Medium |
+| RF-009 | `ConOut` → `FWLogMsg` (lint ADV003) | Low |
+| RF-010 | `CriaTrab`/`DbCreate` → `FWTemporaryTable` (lint ADV010, ADV011) | Medium |
+| RF-011 | `IIf` → `If`/`Else`/`EndIf` outside code blocks (lint ADV009) | Low |
+| RF-012 | Direct SX access → framework API (lint ADV008) | Medium |
+
+RF-007 to RF-012 run only with `--focus modernize`.
+
+## With `--focus modernize`
+1. From the project root (so the engine picks up `./.advpl-specialist-ignore` when it exists), with `<skill>` being the installed `advpl-code-review` skill directory, run `bash <skill>/scripts/advpl-lint.sh --scope all <files>` over the targets with extension `.prw`, `.prx`, `.tlpp` or `.th`; on Windows without bash, `pwsh -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/advpl-lint.ps1 --scope all <files>` (or `powershell` on Windows PowerShell 5.1). Each finding is `FILE:LINE: error|warning ID MESSAGE [REF]`. On exit code `2` (usage or IO error), report the engine's stderr message and stop.
+2. Map the findings with the table in "Finding candidates" of `skills/advpl-refactoring/patterns-modernization.md`: ADV015 → RF-007, ADV003 → RF-009, ADV010/ADV011 → RF-010, ADV009 → RF-011, ADV008 → RF-012. RF-008 has no lint rule: in `.tlpp` targets, search for `ErrorBlock(`; never propose RF-008 for `.prw`. Findings with other IDs are fixes, not refactorings: list them apart as outside this focus.
+3. Check each candidate against the pattern's "Do not apply when" list (for example `IIf` inside a code block or dictionary expression, static SQL with internal values only, `CriaTrab(NIL, .F.)` used only for a file name). Report excluded candidates with the reason; do not change them.
+4. Plan each remaining candidate with `FILE:LINE`, the engine line verbatim, the RF ID, before/after, the risk and the "Same behavior" checks of the pattern. Wait for approval (stop here with `--dry-run`).
+5. Apply one pattern in one function at a time. After each change, re-run the lint engine on that file: the finding must be gone and no new error may appear.
+6. Report the engine summary line before and after, the warnings kept and why, and the "Same behavior" tests the user must run.
 
 ## Output rules
 - Every refactoring must preserve the original behavior — no functional changes without explicit user request.
 - Renamed identifiers must follow Hungarian notation and existing module-prefix conventions.
-- Preserve `#include "totvs.ch"` and Embedded SQL usage (`BeginSQL`/`EndSQL`) — never introduce raw SQL strings during refactoring.
+- Preserve `#include "totvs.ch"` and Embedded SQL usage (`BeginSQL`/`EndSQL`) — never concatenate values into SQL strings during refactoring. When RF-007 builds a template for `FWPreparedStatement`, only fixed text and `RetSqlName()` are concatenated; values go as `?` parameters.
 - Report improvements with a summary (function count, max function length, naming compliance).
 - Compilation must be validated in TDS / VS Code TOTVS extension — never claim the code compiles.

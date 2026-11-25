@@ -1,7 +1,7 @@
 ---
 description: Refactor ADVPL/TLPP code - extract functions, simplify logic, remove dead code, improve naming
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, WebSearch, WebFetch
-argument-hint: "<file> [--dry-run]"
+argument-hint: "<file> [--dry-run] [--focus modernize]"
 ---
 
 **IMPORTANT:** Always respond in the same language the user is writing in. If the user writes in Portuguese, respond in Portuguese. If in English, respond in English.
@@ -21,6 +21,7 @@ Analyze and refactor ADVPL/TLPP code to improve structure without changing behav
 | Flag | Description | Default |
 |------|------------|---------|
 | `--dry-run` | Show suggestions without applying changes | false |
+| `--focus modernize` | Only the modernization patterns RF-007 to RF-012, with candidates found by the lint engine (see "With `--focus modernize`") | structural patterns RF-001 to RF-006 |
 
 ## Refactoring Patterns
 
@@ -32,6 +33,14 @@ Analyze and refactor ADVPL/TLPP code to improve structure without changing behav
 | RF-004 | Improve Naming (Hungarian notation) | Low |
 | RF-005 | Eliminate Duplication | Medium |
 | RF-006 | Reduce Parameters (>5 params) | Medium |
+| RF-007 | Concatenated `TCQuery` → `FWPreparedStatement` / `BeginSQL` (lint ADV015) | Medium |
+| RF-008 | `ErrorBlock` + `Begin Sequence` → `Try`/`Catch`, `.tlpp` only (no lint rule, BG1200) | Medium |
+| RF-009 | `ConOut` → `FWLogMsg` (lint ADV003) | Low |
+| RF-010 | `CriaTrab`/`DbCreate` → `FWTemporaryTable` (lint ADV010, ADV011) | Medium |
+| RF-011 | `IIf` → `If`/`Else`/`EndIf` outside code blocks (lint ADV009) | Low |
+| RF-012 | Direct SX access → framework API (lint ADV008) | Medium |
+
+RF-007 to RF-012 run only with `--focus modernize`.
 
 ## Process
 
@@ -45,6 +54,24 @@ Analyze and refactor ADVPL/TLPP code to improve structure without changing behav
 6. **Apply changes** — One refactoring at a time (unless --dry-run)
 7. **Report** — Summary of changes applied
 
+### With `--focus modernize`
+
+Only RF-007 to RF-012. The lint engine finds the candidates; the approval, one-change-at-a-time and behavior-preserving rules above still apply.
+
+1. **Load the patterns** — Read `${CLAUDE_PLUGIN_ROOT}/skills/advpl-refactoring/patterns-modernization.md` as well as `${CLAUDE_PLUGIN_ROOT}/skills/advpl-refactoring/reference.md`.
+2. **Run the lint engine** — From the project root, so `./.advpl-specialist-ignore` is honored, over the target files with extension `.prw`, `.prx`, `.tlpp` or `.th`:
+
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-review/scripts/advpl-lint.sh" --scope all "<file1>" "<file2>" ...
+   ```
+
+   Windows without `bash`: `pwsh -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/skills/advpl-code-review/scripts/advpl-lint.ps1" --scope all ...` (or `powershell` on Windows PowerShell 5.1). Each finding is `FILE:LINE: error|warning ID MESSAGE [REF]`. On exit code `2` (usage or IO error), report the engine's stderr message and stop.
+3. **Map findings to patterns** — Use the table in "Finding candidates" of `${CLAUDE_PLUGIN_ROOT}/skills/advpl-refactoring/patterns-modernization.md`: ADV015 → RF-007, ADV003 → RF-009, ADV010/ADV011 → RF-010, ADV009 → RF-011, ADV008 → RF-012. RF-008 has no lint rule: in `.tlpp` targets, search `ErrorBlock(` with Grep; never propose RF-008 for `.prw`. Findings with other IDs are fixes, not refactorings: list them apart as outside this focus.
+4. **Filter** — Check each candidate against the pattern's "Do not apply when" list (for example `IIf` inside a code block or dictionary expression, static SQL with internal values only, `CriaTrab(NIL, .F.)` used only for a file name). Report excluded candidates with the reason; do not change them.
+5. **Plan** — Delegate to the refactorer agent with the target, the lint output and the patterns file. For each candidate: `FILE:LINE`, the engine line verbatim, the RF ID, before/after, the risk, and the "Same behavior" checks of the pattern. Wait for approval.
+6. **Apply** — One pattern in one function at a time (unless `--dry-run`). After each change, re-run the lint engine on that file: the finding must be gone and no new error may appear.
+7. **Report** — The engine summary line before and after, the warnings kept and why, the "Same behavior" tests the user must run, and that compilation and validation in TDS / the VS Code TOTVS extension are still pending. Never claim the code compiles.
+
 ## Examples
 
 ```bash
@@ -56,6 +83,9 @@ Analyze and refactor ADVPL/TLPP code to improve structure without changing behav
 
 # Refactor all files in a directory
 /advpl-specialist:refactor src/
+
+# Plan the modernization of legacy APIs flagged by the lint, without applying
+/advpl-specialist:refactor src/FATA001.prw --focus modernize --dry-run
 ```
 
 ## Output
@@ -63,3 +93,4 @@ Analyze and refactor ADVPL/TLPP code to improve structure without changing behav
 - List of refactoring opportunities found, ordered by priority
 - Before/after code for each suggestion
 - Summary of improvements (function count, max length, naming compliance)
+- With `--focus modernize`: the engine summary line before and after, each candidate with its lint line and RF ID, and the candidates kept with the reason
