@@ -131,7 +131,12 @@ function Convert-File([string]$p) {
     Write-Report ('skipped: ' + $p + ' (not advpl)')
     return
   }
-  $bytes = [System.IO.File]::ReadAllBytes($p)
+  try {
+    $bytes = [System.IO.File]::ReadAllBytes($p)
+  } catch {
+    Set-Failed ('failed: ' + $p + ' (read error)')
+    return
+  }
   $n = $bytes.Length
   $start = 0
   if ($n -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { $start = 3 }
@@ -160,6 +165,8 @@ function Convert-File([string]$p) {
     Set-Failed ('failed: ' + $p + ' (incompatible char)')
     return
   }
+  # In place, not via temp file + rename: keeps inode, owner, permissions and
+  # links, at the cost of atomicity (an interrupted write truncates the file).
   if (-not $script:DryRun) {
     try {
       [System.IO.File]::WriteAllBytes($p, $out)

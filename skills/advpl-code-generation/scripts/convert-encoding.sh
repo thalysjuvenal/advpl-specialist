@@ -23,6 +23,7 @@
 #   failed: P (incompatible char)  a character has no Windows-1252
 #                           representation (no --translit): file left untouched
 #   failed: P (write error) the converted bytes could not be written
+#   failed: P (read error)  a file found by -r cannot be read (the run goes on)
 #   skipped: P (not advpl)  extension other than .prw .tlpp .prx .ch .prg .apw
 #                           .aph .tlh .th (any case)
 # Exit: 0 ok; 1 some file failed; 2 usage error (unknown option, no PATH,
@@ -74,9 +75,12 @@ is_advpl() {
 # to_cp1252 FILE SKIP: FILE from byte SKIP on, decoded as UTF-8 -> $TMPD/out
 # in Windows-1252 ("?" for each code point outside it); $TMPD/status gets
 # "invalid" (not UTF-8) or the number of "?" written. Bytes go through as
-# decimal numbers, so NUL and CR come out unchanged.
+# decimal numbers, so NUL and CR come out unchanged. Fails when FILE cannot
+# be read.
 to_cp1252() {
-  od -An -v -tu1 -j "$2" "$1" | STATUS_FILE="$TMPD/status" awk -v extra="$CP1252_EXTRA" '
+  rm -f "$TMPD/status"
+  od -An -v -tu1 -j "$2" -- "$1" >"$TMPD/bytes" 2>/dev/null || return 1
+  STATUS_FILE="$TMPD/status" awk -v extra="$CP1252_EXTRA" '
     function emit(c) {
       if (c >= 160 && c <= 255) printf "%c", c
       else if (c in byte_of) printf "%c", byte_of[c]
@@ -106,35 +110,38 @@ to_cp1252() {
     END {
       if (bad || need) print "invalid" > ENVIRON["STATUS_FILE"]
       else print q + 0 > ENVIRON["STATUS_FILE"]
-    }' >"$TMPD/out"
+    }' <"$TMPD/bytes" >"$TMPD/out"
 }
 
+fail() { report "failed: $1 ($2)"; failed=1; }
+
+# Every external command gets FILE after "--": a path may start with "-".
 process() {
-  local f="$1" skip=0 q
+  local f="$1" skip=0 bom q
   if ! is_advpl "$f"; then report "skipped: $f (not advpl)"; return 0; fi
-  if [ "$(od -An -tx1 -N3 "$f" | tr -d ' \n')" = efbbbf ]; then
+  if ! bom=$(od -An -tx1 -N3 -- "$f" 2>/dev/null); then fail "$f" "read error"; return 0; fi
+  if [ "${bom//[[:space:]]/}" = efbbbf ]; then
     skip=3
-  elif ! grep -q "$HIGH_BYTE" "$f"; then
-    report "already-cp1252: $f"   # pure ASCII is valid Windows-1252
-    return 0
+  else
+    grep -q -e "$HIGH_BYTE" -- "$f" 2>/dev/null
+    case $? in
+      0) ;;
+      1) report "already-cp1252: $f"; return 0 ;;   # pure ASCII is valid Windows-1252
+      *) fail "$f" "read error"; return 0 ;;
+    esac
   fi
-  rm -f "$TMPD/status"
-  to_cp1252 "$f" "$skip"
+  if ! to_cp1252 "$f" "$skip"; then fail "$f" "read error"; return 0; fi
   q=$(cat "$TMPD/status" 2>/dev/null)
   case $q in
     invalid) report "already-cp1252: $f"; return 0 ;;
     0) ;;
-    [1-9]*)
-      if [ "$translit" = 0 ]; then
-        report "failed: $f (incompatible char)"
-        failed=1
-        return 0
-      fi ;;
-    *) report "failed: $f (incompatible char)"; failed=1; return 0 ;;   # awk died
+    [1-9]*) if [ "$translit" = 0 ]; then fail "$f" "incompatible char"; return 0; fi ;;
+    *) fail "$f" "incompatible char"; return 0 ;;   # awk died
   esac
+  # In place, not via temp file + rename: keeps inode, owner, permissions and
+  # links, at the cost of atomicity (an interrupted write truncates the file).
   if [ "$dry_run" = 0 ] && ! { cat "$TMPD/out" >"$f"; } 2>/dev/null; then
-    report "failed: $f (write error)"
-    failed=1
+    fail "$f" "write error"
     return 0
   fi
   if [ "$q" = 0 ]; then report "converted: $f"; else report "translit: $f ($q)"; fi
@@ -164,7 +171,7 @@ for p in "${paths[@]}"; do
     usage_error "cannot read PATH: $p"
   fi
 done
-TMPD=$(mktemp -d "${TMPDIR:-/tmp}/convert-encoding.XXXXXX") || {
+TMPD=$(mktemp -d -- "${TMPDIR:-/tmp}/convert-encoding.XXXXXX") || {
   printf 'convert-encoding: cannot create a temporary directory\n' >&2
   exit 2
 }
@@ -174,8 +181,11 @@ for p in "${paths[@]}"; do
   if [ -d "$p" ]; then
     d=${p%"${p##*[!/]}"}   # without trailing slashes: "dir/" lists "dir/x.prw"
     [ -n "$d" ] || d=/
-    find "$d" -type f -print 2>/dev/null | sort >"$TMPD/list"
+    # find reads a leading "-" as an expression: list "./-dir", print "-dir/..."
+    case $d in -*) fd=./$d ;; *) fd=$d ;; esac
+    find "$fd" -type f -print 2>/dev/null | sort >"$TMPD/list"
     while IFS= read -r f; do
+      [ "$fd" = "$d" ] || f=${f#./}
       if is_advpl "$f"; then process "$f"; fi
     done <"$TMPD/list"
   else

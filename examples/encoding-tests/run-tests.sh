@@ -18,6 +18,8 @@
 # pwsh 7.4):
 #   docker run --rm -v "$PWD":/w -w /w mcr.microsoft.com/dotnet/sdk:8.0 \
 #     bash examples/encoding-tests/run-tests.sh
+# The unreadable/read-only case is skipped as root (root reads and writes any
+# file); add `--user 1000:1000 -e HOME=/tmp` to run it there with pwsh parity.
 
 set -u
 
@@ -90,7 +92,7 @@ subst_q() {
 ascii_only() { ! LC_ALL=C grep -q "$(printf '[\200-\377]')" "$1"; }
 tree_sum() {   # DIR: "PATH CRC SIZE" for every file, sorted
   (cd "$1" && find . -type f -print | LC_ALL=C sort | while IFS= read -r f; do
-    printf '%s %s\n' "$f" "$(cksum <"$f")"
+    printf '%s %s\n' "$f" "$(cksum 2>/dev/null <"$f" || echo unreadable)"
   done)
 }
 
@@ -104,6 +106,7 @@ make_base() {
   iconv -f WINDOWS-1252 -t UTF-8 <"$BASE/09-tlpp-header.th" >"$BASE/09-utf8.TH"
   # BOM + pure ASCII
   printf '\357\273\277#include "totvs.ch"\nUser Function BOMASC()\nReturn Nil\n' >"$BASE/bom-ascii.prw"
+  printf '\357\273\277' >"$BASE/bom-only.prw"   # od -j 3 reaches EOF: empty, not a read error
   # not UTF-8 (RFC 3629), one rule per file, each next to a valid C3 A9: the
   # file is taken as Windows-1252 and left alone (iconv accepts the first one)
   printf '// \364\220\200\200 \365\200\200\200 \303\251\nReturn Nil\n' >"$BASE/bad-utf8.prw"
@@ -122,6 +125,10 @@ make_base() {
   printf 'texto com acentua\303\247\303\243o\n' >"$BASE/tree/sub/notes.txt"
   printf '// cache\n' >"$BASE/tree/.hidden/z.prw"
   printf '// espa\303\247o no nome\n' >"$BASE/tree/x y.prw"
+  # paths starting with "-": a file and a directory
+  printf '// in\303\255cio\n' >"$BASE/-x.prw"
+  mkdir -p "$BASE/-dir"
+  printf '// a\303\247\303\243o\n' >"$BASE/-dir/y.prw"
   # every code point U+0080..U+FFFF (no surrogates) + 3 astral, one per line,
   # and the expected Windows-1252 result of --translit (the CP1252 table is
   # written here from the code page itself, independently of the converters)
@@ -192,7 +199,7 @@ case_strict() {
   new_case strict
   step 01-ascii-puro.prw 02-acentos-ptbr.prw 05-already-cp1252.prw 06-utf8-bom.prw \
     07-not-advpl.txt 08-tlpp-class.tlpp 09-tlpp-header.th 09-utf8.TH bom-ascii.prw bad-utf8.prw \
-    bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw boundary.prw
+    bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw boundary.prw bom-only.prw
   expect_rc 0
   expect_no_stderr
   expect_stdout \
@@ -210,7 +217,9 @@ case_strict() {
     "already-cp1252: bad-surrogate.prw" \
     "already-cp1252: bad-stray.prw" \
     "already-cp1252: bad-truncated.prw" \
-    "converted: boundary.prw"
+    "converted: boundary.prw" \
+    "converted: bom-only.prw"
+  expect_that "bom-only: not emptied" [ ! -s "$CS/bom-only.prw" ]
   untouched 01-ascii-puro.prw 05-already-cp1252.prw 07-not-advpl.txt 09-tlpp-header.th bad-utf8.prw \
     bad-overlong.prw bad-surrogate.prw bad-stray.prw bad-truncated.prw
   expect_that "boundary: C3 A9 across offset 1024 not E9" same_file "$BASE/boundary.expected" "$CS/boundary.prw"
@@ -365,6 +374,59 @@ case_sweep() {
   end_case "sweep U+0080..U+FFFF + astral: exactly the 123 CP1252 chars kept"
 }
 
+case_dash_paths() {
+  new_case dash-paths
+  step -x.prw
+  expect_rc 2
+  expect_stdout
+  expect_stderr_has "unknown option: -x.prw"
+  untouched -x.prw
+  step -- -x.prw
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout "converted: -x.prw"
+  expect_that "-x.prw: not Windows-1252" decodes_to "$CS/-x.prw" "$BASE/-x.prw"
+  step -r -- -dir
+  expect_rc 0
+  expect_no_stderr
+  expect_stdout "converted: -dir/y.prw"
+  expect_that "-dir/y.prw: not Windows-1252" decodes_to "$CS/-dir/y.prw" "$BASE/-dir/y.prw"
+  end_case "paths starting with -: option without --, converted after -- (file and -r dir)"
+}
+
+# set_mode MODE PATH: chmod in the bash copy and in the PowerShell twin
+set_mode() {
+  chmod "$1" "$CS/$2"
+  if [ -n "$PS_BIN" ]; then chmod "$1" "$CP/$2"; fi
+}
+
+case_unreadable() {
+  if [ "$(id -u)" = 0 ]; then
+    echo "  - unreadable / read-only files: skipped (running as root, which reads and writes any file)"
+    return 0
+  fi
+  new_case unreadable
+  set_mode 000 tree/sub/B.TLPP
+  set_mode 444 "tree/x y.prw"
+  step tree/sub/B.TLPP
+  expect_rc 2
+  expect_stdout
+  expect_stderr_has "cannot read PATH: tree/sub/B.TLPP"
+  step -r tree
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "already-cp1252: tree/.hidden/z.prw" \
+    "converted: tree/a.prw" \
+    "failed: tree/sub/B.TLPP (read error)" \
+    "already-cp1252: tree/sub/deep/c.ch" \
+    "failed: tree/x y.prw (write error)"
+  set_mode 644 tree/sub/B.TLPP
+  set_mode 644 "tree/x y.prw"
+  untouched tree/sub/B.TLPP "tree/x y.prw"
+  end_case "-r: unreadable file = read error, read-only file = write error, run goes on, exit 1"
+}
+
 # ---- run -------------------------------------------------------------------------
 echo "converter: $CONV"
 echo "bash: $SH ($("$SH" --version | head -n 1))"
@@ -387,6 +449,8 @@ case_dry_run
 case_recursive
 case_usage
 case_sweep
+case_dash_paths
+case_unreadable
 
 echo ""
 if [ -n "$PS_BIN" ]; then
