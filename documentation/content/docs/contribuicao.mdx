@@ -43,18 +43,19 @@ Obrigado pelo interesse em contribuir com o **advpl-specialist**! Este guia expl
 
 ### Exemplos de codigo ADVPL/TLPP
 
-- Arquivos `.prw` usam `#Include "TOTVS.CH"` (nunca `Protheus.ch` — esta obsoleto)
-- Arquivos `.tlpp` usam includes `.th` (`tlpp-core.th`, `tlpp-rest.th`, etc.)
-- Nenhum `using namespace tlpp.*` nos exemplos — sempre usar includes `.th`
+- Arquivos `.prw` usam `#include "totvs.ch"` em minusculas (nunca `protheus.ch` — `totvs.ch` ja o inclui)
+- Arquivos `.tlpp` usam `#include "tlpp-core.th"` (recomendado) e tambem `#include "totvs.ch"` quando usam recursos do framework Protheus (PARAMIXB, MsExecAuto, BeginSQL, MVC...)
+- Nenhum `using namespace tlpp.*` nos exemplos (excecao documentada: `using namespace tlpp.probat` em testes ProBat)
 - `using namespace` e valido apenas para namespaces custom (ex: `custom.vendas`)
 - Variaveis sempre `Local` (nunca `Private`/`Public` em codigo novo)
 - Notacao Hungara em todas as variaveis (`cNome`, `nValor`, `lOk`, etc.)
 
 ### Markdown
 
-- Frontmatter YAML em commands, skills e agents
+- Frontmatter YAML em commands e agents
 - Tabelas para referencia rapida
-- Blocos de codigo com linguagem especificada (` ```c ` ou ` ```tlpp `)
+- Blocos de codigo com linguagem especificada (` ```advpl ` ou ` ```tlpp `)
+- Anti-exemplos (blocos que mostram o padrao errado de proposito) levam `<!-- advpl-lint: anti-exemplo -->` na ultima linha nao vazia antes da cerca
 
 ## Ambiente de desenvolvimento
 
@@ -65,6 +66,26 @@ git clone https://github.com/thalysjuvenal/advpl-specialist.git
 # Teste localmente com Claude Code
 claude --plugin-dir ./advpl-specialist
 ```
+
+## Validacao local
+
+Antes de abrir o PR, rode as verificacoes do projeto:
+
+```bash
+# Testes do lint de exemplos
+bash tests/lint/run-tests.sh
+
+# Dogfooding: 0 erros nos blocos ADVPL/TLPP da documentacao
+bash scripts/lint-docs.sh skills commands agents AGENTS.md ai-commands
+
+# Regras do lint em sincronia
+node scripts/sync-lint-rules.mjs --check
+
+# Site compila sem erros
+cd documentation && npm run build
+```
+
+O workflow `validate-plugin.yml` revalida tudo no CI.
 
 ## Licenca
 

@@ -7,7 +7,7 @@ description: Agente especializado em refatoracao de codigo ADVPL/TLPP - analisa 
 
 ## Visao geral
 
-Especialista em refatoracao de codigo ADVPL/TLPP no TOTVS Protheus. Identifica melhorias estruturais (extrair funcao, simplificar condicionais, remover codigo morto, melhorar nomenclatura) e aplica-as de forma segura sem alterar a logica de negocio.
+Especialista em refatoracao de codigo ADVPL/TLPP no TOTVS Protheus. Identifica melhorias estruturais (extrair funcao, simplificar condicionais, remover codigo morto, melhorar nomenclatura) e aplica-as de forma segura sem alterar a logica de negocio. Com `--focus modernize`, tambem substitui APIs legadas apontadas pelo motor de lint (RF-007 a RF-012).
 
 ## Gatilhos de ativacao
 
@@ -18,6 +18,7 @@ Ative este agente quando o usuario:
 - Quiser remover codigo morto ou variaveis nao utilizadas
 - Pedir para melhorar a nomenclatura de variaveis
 - Quiser eliminar duplicacao de codigo
+- Quiser substituir APIs legadas sem alterar o comportamento (`/advpl-specialist:refactor --focus modernize`)
 
 ## Principios fundamentais
 
@@ -32,9 +33,25 @@ Ative este agente quando o usuario:
 
 ### Fase 1: Analisar
 - Ler o(s) arquivo(s) alvo completamente
-- Carregar referencia `advpl-refactoring` para padroes e regras
+- Carregar referencia `advpl-refactoring` para padroes e regras (skill pre-carregada via `skills:`)
 - Identificar todas as oportunidades de refatoracao
 - Classificar cada uma por padrao (RF-001 a RF-006) e complexidade
+
+**Com `--focus modernize` (RF-007 a RF-012):** o agente nao tem Bash, entao nao executa o motor de lint. O comando `/advpl-specialist:refactor` o executa e entrega ao agente as linhas de achado (`ARQUIVO:LINHA: error|warning ID MENSAGEM [REF]`) junto com o alvo. Se os achados nao forem repassados, o agente avisa e para; nunca adivinha o resultado do lint lendo o codigo.
+- Ler `skills/advpl-refactoring/patterns-modernization.md`, que traz os padroes, a tabela "Finding candidates" e a lista "Do not apply when" de cada padrao
+- Classificar cada achado pelo ID: ADV015 -> RF-007, ADV003 -> RF-009, ADV010/ADV011 -> RF-010, ADV009 -> RF-011, ADV008 -> RF-012
+- RF-008 nao tem regra de lint: em alvos `.tlpp`, buscar `ErrorBlock(` com Grep; nunca propor RF-008 para `.prw`
+- Conferir cada candidato contra a lista "Do not apply when" do padrao; candidatos excluidos sao reportados com o motivo e ficam inalterados
+- Achados com outros IDs ficam em lista a parte, fora deste foco (sao correcoes, nao refatoracoes)
+
+| Padrao | Troca | Risco |
+|--------|-------|-------|
+| RF-007 | `TCQuery` concatenado -> `FWPreparedStatement` / `BeginSQL` (ADV015) | Medio |
+| RF-008 | `ErrorBlock` + `Begin Sequence` -> `Try`/`Catch`, somente `.tlpp` (sem regra de lint) | Medio |
+| RF-009 | `ConOut` -> `FWLogMsg` (ADV003) | Baixo |
+| RF-010 | `CriaTrab`/`DbCreate` -> `FWTemporaryTable` (ADV010, ADV011) | Medio |
+| RF-011 | `IIf` -> `If`/`Else`/`EndIf` fora de code blocks (ADV009) | Baixo |
+| RF-012 | Acesso direto ao SX -> API do framework (ADV008) | Medio |
 
 ### Fase 2: Priorizar
 - Ordenar refatoracoes por impacto e seguranca:
@@ -44,6 +61,7 @@ Ative este agente quando o usuario:
   4. RF-001 Extrair funcao (risco medio, melhor melhoria estrutural)
   5. RF-005 Eliminar duplicacao (risco medio, DRY)
   6. RF-006 Reduzir parametros (risco medio, melhoria de API)
+- Com `--focus modernize`, usar a ordem de `patterns-modernization.md`: RF-009 e RF-011 (baixo risco) primeiro, depois RF-012, RF-010, RF-007 e RF-008
 
 ### Fase 3: Apresentar plano
 - Usar `EnterPlanMode` para apresentar o plano de refatoracao

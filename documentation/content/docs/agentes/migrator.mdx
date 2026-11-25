@@ -26,7 +26,7 @@ Ative este agente quando o usuario:
 3. **Compatibilidade retroativa** - Manter User Functions wrapper para chamadores externos
 4. **Uma classe por arquivo** - Cada arquivo .tlpp contem exatamente uma classe
 5. **Namespaces significativos** - Seguir convencao TOTVS: `custom.<agrupador>.<servico>` ou `totvs.protheus.<segmento>.<agrupador>`
-6. **Testar apos cada migracao** - Compilar e validar antes de passar para o proximo arquivo
+6. **Validar apos cada migracao** - Compilar e validar no TDS / extensao TOTVS do VS Code antes de passar para o proximo arquivo; ate la, compilacao e validacao constam como pendentes (o agente nunca afirma que o codigo compila)
 
 ## Fluxo de trabalho
 
@@ -41,7 +41,8 @@ Ative este agente quando o usuario:
 - Pesquisar no codebase por chamadores externos: `Grep por "u_NomeDaFuncao"`
 
 ### Fase 2: Planejar migracao (OBRIGATORIO - NAO pular)
-- Carregar referencia `advpl-to-tlpp-migration` para regras e padroes
+- Carregar referencia `advpl-to-tlpp-migration` para regras e padroes (o agente pre-carrega `advpl-to-tlpp-migration` e `smartx-development` via `skills:`)
+- Via `/migrate`, o arquivo `.protheus-version` da raiz do projeto e respeitado: se a release declarada for menor que o minimo de TLPP com `namespace` ou TLPP com MVC (12.1.2410), o usuario e avisado e a alternativa em `.prw` e proposta
 - Usar `EnterPlanMode` para entrar no modo de planejamento
 - Apresentar um plano de migracao detalhado ao usuario cobrindo:
   - Resumo da analise do arquivo fonte (funcoes, dependencias, variaveis compartilhadas)
@@ -49,7 +50,7 @@ Ative este agente quando o usuario:
   - Estrutura da classe alvo (nome da classe, namespace, propriedades, metodos)
   - Mapeamento funcao-para-metodo (qual funcao se torna qual metodo, publico/privado)
   - Variaveis Private/Public a converter em propriedades de classe
-  - Includes a atualizar (TOTVS.CH -> tlpp-core.th, etc.)
+  - Includes: o `.tlpp` usa `#include "tlpp-core.th"` e, quando usa recursos do framework (PARAMIXB, DEFAULT/FWDEFAULT, MsExecAuto, BeginSQL, MVC...), tambem `#include "totvs.ch"`; o wrapper `.prw` mantem `#include "totvs.ch"`; sempre em minusculas
   - Se wrapper de compatibilidade retroativa e necessario
   - Riscos e potenciais quebras de compatibilidade
 - Aguardar aprovacao do usuario antes de prosseguir
@@ -63,13 +64,14 @@ Ative este agente quando o usuario:
 - Adicionar construtor (metodo new) com inicializacao
 - Criar wrapper de compatibilidade retroativa se necessario
 - Seguir migration-checklist.md passo a passo
+- Produzir o relatorio de lacunas no formato de `skills/advpl-to-tlpp-migration/gap-report.md`, uma linha por item que nao migrou (tambem nas migracoes para Smart X)
 
 ### Fase 4: Validar
 - Percorrer os itens de validacao do migration-checklist.md
 - Verificar se o codigo segue o plano aprovado
-- Verificar se a compilacao seria bem-sucedida (verificacao de sintaxe)
+- Nunca afirmar que o codigo compila: informar no resumo que compilacao e validacao estao pendentes no TDS / extensao TOTVS do VS Code
 - Confirmar que wrappers de compatibilidade retroativa estao implementados
-- Reportar resumo da migracao ao usuario
+- Reportar resumo da migracao ao usuario, com o relatorio de lacunas (obrigatorio)
 
 ## Checklist de qualidade da migracao
 
@@ -80,6 +82,7 @@ Ative este agente quando o usuario:
 - [ ] User Functions tornam-se metodos publicos
 - [ ] Wrappers de compatibilidade retroativa criados para chamadores externos
 - [ ] Namespace reflete a estrutura do modulo
-- [ ] Includes `.th` do TLPP usados no lugar de includes `.ch` do ADVPL (ex.: `tlpp-core.th` no lugar de `TOTVS.CH`)
-- [ ] Tratamento de erros preservado ou melhorado
+- [ ] Includes: o `.tlpp` tem `#include "tlpp-core.th"`, mais `#include "totvs.ch"` quando usa recursos do framework; o wrapper `.prw` mantem `#include "totvs.ch"`; tudo em minusculas
+- [ ] Tratamento de erros preservado ou melhorado: `Try`/`Catch oError`/`EndTry` no `.tlpp` e `Begin Sequence`/`Recover` no wrapper `.prw`
 - [ ] Operacoes de banco preservam o padrao GetArea/RestArea
+- [ ] Relatorio de lacunas entregue junto com os fontes (`gap-report.md`), com as linhas de Smart X quando a migracao for para Smart X

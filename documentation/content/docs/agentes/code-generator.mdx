@@ -47,7 +47,10 @@ Ative este agente quando o usuario:
 - Determinar se a preferencia e ADVPL (.prw) ou TLPP (.tlpp)
 
 ### Fase 2: Carregar referencia
+- **OBRIGATORIO:** Ler `skills/advpl-code-generation/critical-rules.md` antes de planejar ou gerar qualquer codigo — regras vinculantes sobre a palavra-chave `User Function`, o `namespace` TLPP, o tamanho de identificador, os metodos validos de `JsonObject`/`TWsdlManager`/`FWFormView` e a validacao de campos `ALIAS_CAMPO`
 - Carregar referencia `advpl-code-generation` para padroes e templates
+- O agente pre-carrega via `skills:` as skills `advpl-code-generation`, `query-builder`, `smartx-development`, `smartview-development` e `advpr-test-automation`
+- **Se acionado por `/smartx`, `/smartview` ou `/advpr`:** seguir a skill correspondente (`smartx-development`, `smartview-development` ou `advpr-test-automation`)
 - Verificar o arquivo de suporte apropriado:
   - MVC -> patterns-mvc.md
   - REST -> patterns-rest.md
@@ -91,6 +94,8 @@ Ative este agente quando o usuario:
   - **Sempre** executar `browser_close` ao finalizar para liberar recursos do navegador, independentemente de sucesso ou falha na extracao.
 
 ### Fase 3: Planejar (OBRIGATORIO - NAO pular)
+- Antes de `EnterPlanMode`, validar o tamanho do identificador (BLOQUEANTE) — ver "Identifier Length Validation" em `skills/advpl-code-generation/critical-rules.md`
+- Via `/generate`, verificar a release declarada: se existir o arquivo `.protheus-version` na raiz do projeto, comparar com a release minima do recurso pedido (`skills/protheus-reference/releases.md`; TLPP com MVC e TLPP com `namespace` exigem 12.1.2410). Se a release for menor, avisar o usuario e propor a alternativa (ex.: `.prw` ADVPL); se o arquivo nao existir, seguir normalmente e sugerir criar o `.protheus-version`
 - Usar `EnterPlanMode` para entrar no modo de planejamento
 - Apresentar um plano de implementacao estruturado ao usuario cobrindo:
   - Arquivo(s) a criar (nome, caminho, extensao)
@@ -110,7 +115,7 @@ Ative este agente quando o usuario:
 - Adicionar tratamento de erros (Begin Sequence)
 - Adicionar salvar/restaurar area para operacoes de banco
 - Usar xFilial() para filtragem por filial
-- Gerar codigo completo e compilavel
+- Gerar codigo completo; compilacao e validacao ficam pendentes no TDS / extensao TOTVS do VS Code (nunca afirmar que o codigo compila)
 
 ### Fase 5: Revisar e entregar
 - Verificar se o codigo segue todas as convencoes e o plano aprovado
@@ -118,6 +123,8 @@ Ative este agente quando o usuario:
 - Confirmar que o tratamento de erros esta implementado
 - Salvar arquivo com extensao correta (.prw ou .tlpp)
 - Explicar decisoes importantes ao usuario
+
+> As secoes **CRITICO** abaixo resumem as regras vinculantes que, nesta versao, ficam em `skills/advpl-code-generation/critical-rules.md`. O arquivo da skill e a fonte de verdade: em caso de divergencia, vale o `critical-rules.md`.
 
 ## CRITICO: User Function vs Palavra-chave Function
 
@@ -391,7 +398,7 @@ Antes de entregar qualquer codigo gerado, verificar:
 - [ ] TODAS as declaracoes Local no TOPO da funcao (nunca dentro de If/While/For)
 - [ ] Hungarian notation em todos os nomes de variaveis
 - [ ] Cabecalho Protheus.doc com @type, @author, @since, @param, @return
-- [ ] #Include "TOTVS.CH" presente (para arquivos .prw)
+- [ ] `#include "totvs.ch"` (minusculo) presente nos arquivos .prw; nos .tlpp, `#include "tlpp-core.th"` e, com recursos do framework, tambem `#include "totvs.ch"`
 - [ ] Tratamento de erros com Begin Sequence / Recover / End Sequence
 - [ ] GetArea() / RestArea() em operacoes de banco
 - [ ] xFilial() usado para filtragem de alias

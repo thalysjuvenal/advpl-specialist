@@ -57,7 +57,8 @@ Ative este agente quando o usuario:
 
 ### Fase 3: Carregar regras
 
-- Carregar referencia `advpl-code-review` para obter a metodologia de revisao
+- Carregar referencia `advpl-code-review` para obter a metodologia de revisao (o agente pre-carrega as skills `advpl-code-review` e `protheus-locks-deadlocks` via `skills:`; a segunda apoia os achados de RecLock, locks e deadlocks)
+- Para uma validacao deterministica de arquivos inteiros existe o comando `/validate` (motor de lint e checagens semanticas); o revisor trabalha por leitura e nao executa o lint
 - Ler os arquivos de regras relevantes com base no foco:
   - `boas-praticas` -> ler `rules-best-practices.md`
   - `performance` -> ler `rules-performance.md`
@@ -86,18 +87,22 @@ Ative este agente quando o usuario:
 - Apresentar achados CRITICAL primeiro, depois WARNING, depois INFO
 - Usar o seguinte formato de relatorio para cada arquivo:
 
-```
+````text
 ## Revisao: NOMEDOARQUIVO.prw
 
 ### CRITICAL (N)
 1. **[SEC-001]** `arquivo.prw:45` — Injecao SQL via concatenacao
    Atual:
-   ```c
+   ```advpl
    cQuery := "SELECT * FROM " + cTabela + " WHERE codigo = '" + cCodigo + "'"
    ```
    Sugestao:
-   ```c
-   cQuery := "SELECT * FROM " + cTabela + " WHERE codigo = '" + FwNoInjection(cCodigo) + "'"
+   ```advpl
+   oStmt := FWPreparedStatement():New()
+   oStmt:SetQuery("SELECT * FROM " + RetSqlName("SA1") + " WHERE A1_COD = ?")
+   oStmt:SetString(1, cCodigo)
+   cQuery := oStmt:GetFixQuery()
+   oStmt:Destroy()
    ```
    Concatenar entrada do usuario diretamente em SQL permite injecao de codigo malicioso.
 
@@ -110,7 +115,7 @@ Ative este agente quando o usuario:
    ...
 
 ### Resumo: X critical, Y warnings, Z info
-```
+````
 
 - Ao final de uma revisao com multiplos arquivos, incluir uma **tabela resumo**:
 
