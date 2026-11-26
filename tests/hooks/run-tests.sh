@@ -1319,8 +1319,22 @@ check_session_start() {
   out="$(cd "$d" && printf '{"session_id":"ss-atual"}' | "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
   check "session-start pendentes: 10 caminhos" [ "$(grep -cF "  $src/M" <<<"$out")" = 10 ]
   check "session-start pendentes: conta os outros 2" grep -qxF "  ... and 2 more" <<<"$out"
-  # only this session's list: no notice
+  # more than 10 lists: the line of lists to delete names 10, then the count
+  # of the others (the same limit as the sources)
+  local lists_line
   rm -f "$PEND_DIR/ss-outra"
+  for i in 01 02 03 04 05 06 07 08 09 10 11 12; do
+    printf '%s\n' "$src/M1.prw" >"$PEND_DIR/ss-l$i"
+  done
+  out="$(cd "$d" && printf '{"session_id":"ss-atual"}' | "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
+  lists_line="$(grep -F 'Then delete the lists:' <<<"$out")"
+  check "session-start pendentes: 10 listas nomeadas" \
+    [ "$(grep -oF "\"$PEND_DIR/ss-l" <<<"$lists_line" | wc -l | tr -d ' ')" = 10 ]
+  check "session-start pendentes: lista 10 nomeada" grep -qF "\"$PEND_DIR/ss-l10\"" <<<"$lists_line"
+  check "session-start pendentes: lista 11 nao nomeada" not grep -qF "$PEND_DIR/ss-l11" <<<"$lists_line"
+  check "session-start pendentes: conta as outras 2 listas" grep -qE '\.\.\. and 2 more$' <<<"$lists_line"
+  rm -f "$PEND_DIR"/ss-l*
+  # only this session's list: no notice
   out="$(cd "$d" && printf '{"session_id":"ss-atual"}' | "$HOOK_BASH" "$ROOT/hooks/session-start" 2>&1)"
   check "session-start pendentes: so a lista da sessao atual, nada impresso" [ -z "$out" ]
   rm -f "$PEND_DIR/ss-atual"; rm -rf "$src"

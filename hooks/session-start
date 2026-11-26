@@ -21,17 +21,19 @@ esac
 # left by an abnormal end (or belongs to a session still running elsewhere):
 # its sources may still be in UTF-8. Prints up to 10 of them (absolute paths
 # of regular files, duplicates dropped) with the command that converts them
-# back and the lists to delete afterwards. This session's own list is skipped
-# (its Stop converts it). Runs in a subshell with the post-tool-use helpers.
+# back and up to 10 of the lists to delete afterwards ("... and N more" for
+# the others, in both cases). This session's own list is skipped (its Stop
+# converts it). Runs in a subshell with the post-tool-use helpers.
 stale_pending_notice() {
-    local cur dir list l total=0 shown="" lists="" seen=$'\n' conv
+    local cur dir list l total=0 shown="" lists="" nlists=0 seen=$'\n' conv
     cur=$(advpl_pending_list "$1")
     dir=${cur%/*}
     [ -d "$dir" ] || return 0
     for list in "$dir"/*; do
         [ -f "$list" ] || continue
         case $list in "$cur" | "$cur".*) continue ;; esac
-        lists="$lists \"$list\""
+        nlists=$((nlists + 1))
+        [ "$nlists" -le 10 ] && lists="$lists \"$list\""
         while IFS= read -r l || [ -n "$l" ]; do
             l=${l%$'\r'}
             advpl_is_abs_path "$l" && [ -f "$l" ] || continue
@@ -48,6 +50,7 @@ stale_pending_notice() {
     echo "advpl-specialist: pending lists of other Claude Code sessions (left by an abnormal end, or by a session still running) name sources that may still be in UTF-8, while Protheus compiles Windows-1252. Nothing was converted:"
     printf '%s' "$shown"
     [ "$total" -le 10 ] || echo "  ... and $((total - 10)) more"
+    [ "$nlists" -le 10 ] || lists="$lists ... and $((nlists - 10)) more"
     echo "If no other Claude Code session is working on them, convert each one back with: bash \"$conv\" FILE (or -r DIR for a folder). Then delete the lists:$lists"
 }
 
