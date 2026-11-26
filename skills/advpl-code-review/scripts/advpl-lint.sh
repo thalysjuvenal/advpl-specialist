@@ -753,4 +753,8 @@ BEGIN {
 }
 AWK
 
-LC_ALL=C awk "$AWK_PROG" "$scope" "$rules_file" "$ignore_file" "$lines_file" "$@"
+# BINMODE=1: gawk built for MSYS (Git Bash on Windows) opens every input file
+# in text mode, which turns "\r\n" into "\n" before sub(/\r$/) runs and so also
+# drops the stray CR of "\r\r\n" (advpl-lint.ps1 keeps it). BINMODE=1 makes it
+# read bytes like every other awk; elsewhere the variable has no effect.
+LC_ALL=C awk -v BINMODE=1 "$AWK_PROG" "$scope" "$rules_file" "$ignore_file" "$lines_file" "$@"

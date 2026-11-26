@@ -12,7 +12,9 @@
 # one), every engine run is repeated with advpl-lint.ps1, which must print the
 # same stdout byte for byte, exit with the same code and write the same stderr
 # (its usage line names advpl-lint.ps1). Without PowerShell those checks are
-# skipped and reported as skipped. Linux check (bash + mawk + pwsh 7):
+# skipped and reported as skipped; Windows PowerShell 5.1 skips (and reports)
+# only the lone '-' FILE check, a known difference of its host (see the header
+# of advpl-lint.ps1). Linux check (bash + mawk + pwsh 7):
 #   docker run --rm -v "$PWD":/w -w /w mcr.microsoft.com/powershell \
 #     bash tests/lint/run-tests.sh                       (x86_64 hosts)
 #   docker run --rm -v "$PWD":/w -w /w mcr.microsoft.com/dotnet/sdk:8.0 \
@@ -134,6 +136,19 @@ if [ -z "$PS_BIN" ]; then
   done
 fi
 PARITY_RUNS=0
+PARITY_SKIPS=0
+PARITY_SKIP=""   # non-empty: the next parity_check prints this reason as a SKIP
+# Windows PowerShell 5.1 (PSEdition Desktop) cannot receive a lone "-" after
+# -File: its host makes it a parameter with an empty name and the binder throws
+# before the script runs (PowerShell 7 passes it, PR #9479). Only that parity
+# check is skipped there, never on pwsh; see the header of advpl-lint.ps1.
+PS_DESKTOP=0
+if [ -n "$PS_BIN" ]; then
+  # shellcheck disable=SC2016 # $PSVersionTable is PowerShell, not bash
+  case "$("$PS_BIN" -NoProfile -NonInteractive -Command '$PSVersionTable.PSEdition' 2>/dev/null)" in
+    Desktop*) PS_DESKTOP=1 ;;
+  esac
+fi
 
 # Windows (Git Bash; not exercised locally): absolute POSIX paths are handed
 # to PowerShell as C:/... (cygpath -m) with MSYS path conversion off, and the
@@ -179,6 +194,11 @@ parity_check() {
     a="${a#"$FIXTURES_DIR"/}"
     label="$label $a"
   done
+  if [ -n "$PARITY_SKIP" ]; then
+    echo "  - SKIP parity [$name]:$label ($PARITY_SKIP)"
+    PARITY_SKIPS=$((PARITY_SKIPS + 1))
+    return 0
+  fi
   if [ "$PS_WIN" = 1 ]; then
     to_win_args "$@"
     set -- ${WIN_ARGS[@]+"${WIN_ARGS[@]}"}
@@ -202,7 +222,11 @@ parity_check() {
 }
 
 if [ -n "$PS_BIN" ]; then
-  echo "PowerShell parity: on ($PS_BIN)"
+  if [ "$PS_DESKTOP" = 1 ]; then
+    echo "PowerShell parity: on ($PS_BIN, Windows PowerShell 5.1: the lone '-' FILE check is skipped)"
+  else
+    echo "PowerShell parity: on ($PS_BIN)"
+  fi
 else
   echo "PowerShell parity: skipped (no pwsh/powershell found; advpl-lint.ps1 not exercised)"
 fi
@@ -438,6 +462,20 @@ begin_case
 expect_that "output contract" wellformed eol
 expect_that "findings differ (< expected, > actual)" same_file "$TMP_DIR/eol.exp" "$TMP_DIR/eol.got"
 end_case "CRLF input: \"\$\" anchors at end of line, /* */ spans CRLF lines"
+
+# Stray CRs: only the CR of the line end is removed, so "\r\r\n" leaves one CR
+# in the line and a CR inside a line stays. An awk that reads files in text
+# mode (gawk built for MSYS, i.e. Git Bash, without BINMODE=1) would already
+# have dropped the CR of every "\r\n": no finding on line 1, one on line 4.
+printf 'CRX001\twarn\tline\tforbid\traw\tc\t*\t%s\t-\tCR solto\t-\n' '\r' >"$TMP_DIR/cr.rules"
+printf 'nA := 1\r\r\nnB := 2\r\nnC\r:= 3\r\nnD := 4\r\r\r\nnE := 5\r' >"$TMP_DIR/cr.prw"
+run_lint cr --rules "$TMP_DIR/cr.rules" "$TMP_DIR/cr.prw"
+found_list cr "$TMP_DIR/cr.prw" >"$TMP_DIR/cr.got"
+printf '%s\n' 1:CRX001 3:CRX001 4:CRX001 4:CRX001 >"$TMP_DIR/cr.exp"
+begin_case
+expect_that "output contract" wellformed cr
+expect_that "findings differ (< expected, > actual)" same_file "$TMP_DIR/cr.exp" "$TMP_DIR/cr.got"
+end_case "stray CR: \"\\r\\r\\n\" keeps one CR, a CR inside a line stays (files read as bytes)"
 
 echo "=== Finding counts (successive matches on one line) ==="
 printf '%s\n' '? ?' 'ConOut(ConOut("x"))' '?? "x"' 'u_ConOutConOut("x")' 'ConOutConOut("x")' >"$TMP_DIR/counts.prw"
@@ -768,7 +806,13 @@ par_case "$RUN_DIR" par-dashdash --scope line --scope all --rules "$PLUGIN_ROOT/
 par_case "$RUN_DIR" par-custom --rules "$PAR/par.rules" "${PAR_FILES[@]}"
 cp "$PAR/mix.ignore" "$PAR/.advpl-specialist-ignore"
 par_case "$PAR" par-relative edge.prw "dir with space/rules copy.prw" "ação/regras.TLPP" crcr.Th
+# The bash assertions of this case always run; only its parity half is skipped
+# on Windows PowerShell 5.1 (PS_DESKTOP, see above).
+if [ "$PS_DESKTOP" = 1 ]; then
+  PARITY_SKIP="known difference on Windows PowerShell 5.1: its host rejects a lone '-' after -File before the script runs"
+fi
 usage_case "lone '-' is a FILE" "cannot read FILE: -" -
+PARITY_SKIP=""
 usage_case "single-dash option" "unknown option: -x" -x "$F"
 usage_case "FILE is a directory" "cannot read FILE: " "$TMP_DIR"
 usage_case "option after the first FILE is a FILE" "cannot read FILE: --scope" "$F" --scope line
@@ -907,7 +951,11 @@ docs_usage "engine error (unreadable --rules)" "cannot read rules file: " --rule
 echo ""
 echo "============================="
 if [ -n "$PS_BIN" ]; then
-  echo "PowerShell parity: $PARITY_RUNS runs compared with $PS_BIN"
+  if [ "$PARITY_SKIPS" -gt 0 ]; then
+    echo "PowerShell parity: $PARITY_RUNS runs compared with $PS_BIN, $PARITY_SKIPS skipped (see SKIP above)"
+  else
+    echo "PowerShell parity: $PARITY_RUNS runs compared with $PS_BIN"
+  fi
 else
   echo "PowerShell parity: skipped (no pwsh/powershell found)"
 fi

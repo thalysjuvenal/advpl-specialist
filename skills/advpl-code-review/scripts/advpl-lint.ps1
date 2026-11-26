@@ -12,6 +12,14 @@
 # advpl-lint.sh (stripping, matching, blocks, ignore, ordering) must be
 # mirrored here; tests/lint/run-tests.sh compares both engines run by run.
 #
+# Known difference, Windows PowerShell 5.1 only: a FILE named "-" cannot be
+# given. The 5.1 host turns every argument after -File that starts with "-"
+# into a parameter name; a lone "-" gives an empty name, which the parameter
+# binder rejects ('Cannot process argument because the value of argument
+# "name" is not valid', exit 1) before any line of this script runs, with or
+# without a param() block. PowerShell 7 passes it on as an argument (PowerShell
+# PR #9479), so there, as in advpl-lint.sh, it is a FILE. On 5.1 write ./-.
+#
 # Compatibility: Windows PowerShell 5.1 and PowerShell 7+. Keep this file
 # ASCII only (5.1 reads a BOM-less script in the ANSI code page) and do not use
 # 7-only syntax (??, ?., ternary, &&/|| chains, -Parallel, Join-String).
