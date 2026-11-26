@@ -69,6 +69,9 @@ PARITY_RUNS=0
 
 # ---- byte helpers ------------------------------------------------------------
 same_file() { cmp "$1" "$2"; }
+# same_text A B: like same_file, plus the first 10 lines of the unified diff
+# (headers dropped), so that a parity failure can be read from the CI log
+same_text() { cmp "$1" "$2" || { diff -u "$1" "$2" | tail -n +3 | head -n 10; return 1; }; }
 # decodes_to FILE EXPECTED_UTF8: FILE read as Windows-1252 is EXPECTED_UTF8.
 # The decode direction is exact on every iconv (only defined bytes occur).
 decodes_to() {
@@ -244,8 +247,8 @@ step() {
   prc=$?
   PARITY_RUNS=$((PARITY_RUNS + 1))
   expect_that "step $STEP parity: exit ps1=$prc bash=$RC" [ "$prc" = "$RC" ]
-  expect_that "step $STEP parity: stdout differs (< bash, > ps1)" same_file "$OUT_F" "$po"
-  expect_that "step $STEP parity: stderr differs (< bash, > ps1)" same_file "$ERR_F" "$pe"
+  expect_that "step $STEP parity: stdout differs (- bash, + ps1)" same_text "$OUT_F" "$po"
+  expect_that "step $STEP parity: stderr differs (- bash, + ps1)" same_text "$ERR_F" "$pe"
   tree_sum "$CS" >"$TMP_DIR/$CASE/$STEP.sum.sh"
   tree_sum "$CP" >"$TMP_DIR/$CASE/$STEP.sum.ps"
   expect_that "step $STEP parity: file bytes differ (< bash, > ps1)" \

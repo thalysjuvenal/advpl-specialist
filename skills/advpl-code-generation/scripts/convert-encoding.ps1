@@ -129,6 +129,9 @@ function Test-Link([string]$p) {
 
 # Regular files below $dir like `find DIR -type f`: hidden entries included,
 # symbolic links neither listed nor followed, unreadable directories skipped.
+# Each path is $dir as given plus "/" and the names below it, as find prints
+# it: GetFiles/GetDirectories join with "\" on Windows, so only the last
+# component of what they return is used.
 function Add-TreeFiles([string]$dir, [System.Collections.Generic.List[string]]$list) {
   try {
     $files = [System.IO.Directory]::GetFiles($dir)
@@ -136,11 +139,13 @@ function Add-TreeFiles([string]$dir, [System.Collections.Generic.List[string]]$l
   } catch {
     return
   }
+  $pre = $dir
+  if ($pre.IndexOfAny($script:Seps, $pre.Length - 1) -lt 0) { $pre = $pre + '/' }
   foreach ($f in $files) {
-    if (-not (Test-Link $f)) { $list.Add($f) }
+    if (-not (Test-Link $f)) { $list.Add($pre + [System.IO.Path]::GetFileName($f)) }
   }
   foreach ($d in $dirs) {
-    if (-not (Test-Link $d)) { Add-TreeFiles $d $list }
+    if (-not (Test-Link $d)) { Add-TreeFiles ($pre + [System.IO.Path]::GetFileName($d)) $list }
   }
 }
 
