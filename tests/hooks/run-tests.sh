@@ -18,6 +18,9 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HOOK_BASH="${HOOK_BASH:-/bin/bash}"
+# Windows (Git Bash, MSYS, Cygwin): Windows file-name rules apply to fixtures
+ON_WIN=0
+case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) ON_WIN=1 ;; esac
 PRE="$ROOT/hooks/pre-tool-use"
 POST="$ROOT/hooks/post-tool-use"
 READ="$ROOT/hooks/post-tool-use-read"
@@ -409,7 +412,7 @@ case_arquivo_grande() {
   local d="$TMP_DIR/$MODE/grande" f elapsed max=2
   # Windows (Git Bash): process start-up dominates and CI runners vary, so the
   # bound there only catches a pathological slowdown.
-  case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) max=30 ;; esac
+  [ "$ON_WIN" = 0 ] || max=30
   mkdir -p "$d"; f="$d/FATA006.prw"
   LC_ALL=C awk 'BEGIN {
     print "#include \"totvs.ch\""
@@ -476,9 +479,18 @@ json_string() {
 }
 
 case_somente_avisos() {
-  # name with a double quote and a backslash: the JSON must escape both
+  # name with a double quote and a backslash: the JSON must escape both. On
+  # Windows "\" separates directories (the file cannot be created) and '"' is
+  # not a legal file-name character, so the name there has a space, ', &, %
+  # and accents instead, and the two checks that need '"' and '\' are SKIPs.
   local d="$TMP_DIR/$MODE/avisos" f ctx
-  mkdir -p "$d"; f="$d/aspas\"e\\barra.prw"
+  local win_skip="Windows: '\\' separa diretorios e '\"' nao vale em nome de arquivo"
+  mkdir -p "$d"
+  if [ "$ON_WIN" = 1 ]; then
+    f="$d/aspa'e & 100% a$(printf '\303\247\303\243')o.prw"
+  else
+    f="$d/aspas\"e\\barra.prw"
+  fi
   new_session somente-avisos
   printf '#include "totvs.ch"\n\nUser Function FATA007()\n\tLocal nX := 0\n\tLocal lOk := .T.\nReturn nX\n' >"$f"
   pre "$f"
@@ -489,9 +501,19 @@ case_somente_avisos() {
   check "somente-avisos: JSON valido em stdout" valid_hook_json "$OUT"
   ctx="$(json_context "$OUT")"
   check "somente-avisos: contexto cita ADV009 na linha 6" contains "$ctx" ":6: warning ADV009"
-  check "somente-avisos: aspas e barra escapadas" contains "$OUT" 'aspas\"e\\barra.prw'
+  if [ "$ON_WIN" = 1 ]; then
+    echo "  SKIP somente-avisos: aspas e barra escapadas ($win_skip)"
+    check "somente-avisos: caminho com espaco, ', &, % e acento no contexto" contains "$ctx" "$f:6: warning ADV009"
+  else
+    check "somente-avisos: aspas e barra escapadas" contains "$OUT" 'aspas\"e\\barra.prw'
+  fi
   check "somente-avisos: snapshot removido" snap_empty
-  check "somente-avisos: caminho com aspas e barra na lista" pending_has "$f"
+  if [ "$ON_WIN" = 1 ]; then
+    echo "  SKIP somente-avisos: caminho com aspas e barra na lista ($win_skip)"
+    check "somente-avisos: caminho com espaco, ', &, % e acento na lista" pending_has "$f"
+  else
+    check "somente-avisos: caminho com aspas e barra na lista" pending_has "$f"
+  fi
 }
 
 case_tlpp() {
