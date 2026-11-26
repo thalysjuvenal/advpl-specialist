@@ -8,9 +8,9 @@ Todas as mudancas notaveis deste projeto sao documentadas neste arquivo.
 O formato e baseado no [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 e este projeto segue o [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.7.0] - 2026-11-25
+## [1.7.0] - 2026-11-26
 
-Nota: Exemplos ADVPL/TLPP nao compilados; validacao no TDS pendente. A suite local de evals foi criada, mas ainda nao foi executada.
+Nota: Exemplos ADVPL/TLPP nao compilados; validacao no TDS pendente. A suite local de evals rodou com os 15 casos aprovados, e os fontes que ela gerou passam no lint com 0 erros.
 
 ### Adicionado
 
@@ -21,7 +21,7 @@ Nota: Exemplos ADVPL/TLPP nao compilados; validacao no TDS pendente. A suite loc
 - `/advpl-specialist:refactor --focus modernize` (RF-007–RF-012); relatorio obrigatorio de lacunas pos-migracao no `/migrate`, no `/smartx` e na migracao de relatorios para Smart View; SX6 (parametros `MV_*`) e SX9 no `/sxgen`.
 - `/generate`, `/migrate` e `/smartx` respeitam a release declarada em `.protheus-version` (`skills/protheus-reference/releases.md`); novo `skills/advpl-code-generation/critical-rules.md`; os agentes pre-carregam suas skills pelo frontmatter `skills:`.
 - CI ampliado: motores em Linux e Windows, testes de hooks e encoding, ShellCheck, `scripts/check-refs.sh`, saidas multi-IA orfas, limites de descricao, build do site, `claude plugin validate --strict` e dogfooding dos blocos ADVPL/TLPP em skills, comandos, agentes, site, exemplos e README.
-- Suite local de evals em `evals/` (15 casos) mais `evals/lint-outputs.sh`; criada, ainda nao executada.
+- Suite local de evals em `evals/` (15 casos) mais `evals/lint-outputs.sh`; os 15 casos passam, com 0 erros de lint nos fontes gerados.
 - Novas paginas: [validate](/docs/comandos/validate), [Validacao](/docs/referencia/validacao) e [smartview-development](/docs/skills/smartview-development), alem dos scripts na pagina [Outras IAs](/docs/outras-ias); 6 novos exemplos (`examples/07` a `examples/12`).
 - Fluxo de edicao de fontes CP1252 no Claude Code, que recusa `Edit` e `Write` em arquivo que nao e UTF-8 (antes de qualquer hook): `convert-encoding.sh --to-utf8` reescreve fontes Windows-1252 como UTF-8; um hook `PostToolUse(Read)` manda o Claude rodar o conversor ao ler um `.prw`, `.prx`, `.tlpp` ou `.th` em CP1252 e registra o arquivo; um hook `PostToolUse(Bash)` registra os alvos de comandos `--to-utf8`; `/document`, `/refactor` e `/migrate` pre-convertem os alvos CP1252 existentes antes de seus agentes sem Bash editarem.
 
@@ -39,6 +39,7 @@ Nota: Exemplos ADVPL/TLPP nao compilados; validacao no TDS pendente. A suite loc
 
 - `RecLock` documentado como gravacao direta (sem `X3_VALID` e sem gatilhos SX7; quando essas regras forem necessarias, `MsExecAuto` ou a API do modelo MVC); os templates REST e de aprovacao que gravam usam tabelas customizadas Z\*, com `RollBackSX8()` na falha; exemplos de REST TLPP por classe sem `from LongClassName`.
 - Templates e exemplos alinhados ao TDN: assinatura do `FWLogMsg`, nomes dos metodos REST do `oRest`, `EndSQL` na coluna 1 (regra ADV022), nomes de campos do SX6, campos SX3 ficticios trocados por reais e as APIs inexistentes `FwNoInjection` e `FWLogError` removidas; `CriaTrab` deixa de ser recomendado.
+- Paridade no Windows, conferida no runner Windows do CI: o motor de lint em bash le os arquivos em modo binario no Git Bash; o conversor PowerShell imprime os caminhos do `-r` com `/`; um `-` sozinho como FILE e uma diferenca conhecida e documentada no Windows PowerShell 5.1; as linhas finais do relatorio de lacunas tem rotulos fixos em pt-BR.
 - Notas para Windows (hooks precisam do Git Bash); pacote do Playwright MCP (`@playwright/mcp`); id de instalacao do superpowers (`superpowers@claude-plugins-official`); drift do site.
 
 ## [1.6.0] - 2026-09-14
