@@ -40,7 +40,7 @@ Rules for filling it in:
 - The **Item** column carries the grep-able token and where it was found (function or line), e.g. `ExecBlock("ZFAT01GR")` in `ZFATA01()`.
 - A behaviour that moved but changed (a parameter read in another place, an entry point with new `PARAMIXB` positions) is `migrated`; the change goes in **Reason**, and anything the user must do goes in **Action**.
 - Items searched with no hit stay out of the table and are listed in the "Searched, not found" line, so an empty report can be told apart from a skipped one.
-- In a pt-BR delivery, use the headers `Item | Situação | Motivo | Ação` and the values `migrado` / `não migrável` / `mantido no legado`. The meaning does not change.
+- In a pt-BR delivery, use the headers `Item | Situação | Motivo | Ação` and the values `migrado` / `não migrável` / `mantido no legado`, and keep the three closing lines with these exact labels: `Pesquisado, não encontrado:`, `Totais: <n> migrados, <n> não migráveis, <n> mantidos no legado.` and `Compilação e validação no TDS / extensão TOTVS do VS Code: pendente.` The meaning does not change.
 - Never write that the code compiled.
 
 ## When to produce it
