@@ -66,7 +66,8 @@
 # mode (without --translit) gives back the original bytes.
 #
 # Requirements: bash 3.2+, od, awk (POSIX), grep, find, sort, mktemp, cp,
-# mv, dirname (no `file`, iconv, jq, Node or Python).
+# mv, dirname; chflags only where it exists (no `file`, iconv, jq, Node or
+# Python).
 
 set -u
 export LC_ALL=C
@@ -169,19 +170,37 @@ from_cp1252() {
 
 fail() { report "failed: $1 ($2)"; failed=1; }
 
+# rm_tmp FILE: deletes a temporary file of write_out. cp -p also copies the
+# BSD file flags (macOS): a copy that came out locked (uchg) or append-only
+# (uappnd) cannot be deleted, so, where chflags exists, those flags are
+# cleared first.
+rm_tmp() {
+  rm -f -- "$1" 2>/dev/null && return 0
+  command -v chflags >/dev/null 2>&1 || return 1
+  chflags nouchg,nouappnd -- "$1" 2>/dev/null
+  rm -f -- "$1" 2>/dev/null
+}
+
 # write_out FILE: $TMPD/out -> FILE unless --dry-run; reports a write error.
+# A FILE this user may not write (read-only, of another owner, locked by the
+# Finder) fails first and is never touched: the rename below would replace
+# it anyway, since it needs only a writable directory.
 # Atomic: the bytes go to a temporary file in FILE's own directory
 # (.convert-encoding.XXXXXX), which first gets a copy of FILE with its mode
 # (cp -p), and that file is then renamed over FILE, so an interrupted write
-# never leaves a truncated source. A read-only FILE still fails (the copy is
-# read-only too). The rename gives FILE a new inode: another hard link keeps
-# the old bytes, and the owner is kept only when cp -p can keep it. Written
-# in place as before (not atomic) when FILE is a symbolic link (the link
-# stays a link) or the directory does not take a new file. convert-encoding.ps1
-# follows the same steps.
+# never leaves a truncated source. The rename gives FILE a new inode: another
+# hard link keeps the old bytes, and the owner is kept only when cp -p can
+# keep it. No temporary file is left on a failure (rm_tmp). Written in place
+# as before (not atomic) when FILE is a symbolic link (the link stays a link)
+# or the directory does not take a new file. convert-encoding.ps1 follows the
+# same steps.
 write_out() {
   local d tmp
   [ "$dry_run" = 0 ] || return 0
+  if [ ! -w "$1" ]; then
+    fail "$1" "write error"
+    return 1
+  fi
   if [ ! -L "$1" ]; then
     d=$(dirname -- "$1")
     tmp=$(mktemp -- "$d/.convert-encoding.XXXXXX" 2>/dev/null) || tmp=
@@ -197,7 +216,7 @@ write_out() {
   fi
   CUR_TMP=$tmp
   if ! { cp -p -- "$1" "$tmp" && cat "$TMPD/out" >"$tmp" && mv -f -- "$tmp" "$1"; } 2>/dev/null; then
-    rm -f -- "$tmp" 2>/dev/null
+    rm_tmp "$tmp"
     CUR_TMP=
     fail "$1" "write error"
     return 1
@@ -290,7 +309,7 @@ TMPD=$(mktemp -d -- "${TMPDIR:-/tmp}/convert-encoding.XXXXXX") || {
 }
 # CUR_TMP: the temporary file of a write_out in progress (removed on any exit)
 CUR_TMP=
-trap 'rm -rf "$TMPD"; if [ -n "$CUR_TMP" ]; then rm -f -- "$CUR_TMP"; fi' EXIT
+trap 'rm -rf "$TMPD"; if [ -n "$CUR_TMP" ]; then rm_tmp "$CUR_TMP"; fi' EXIT
 
 for p in "${paths[@]}"; do
   if [ -d "$p" ]; then

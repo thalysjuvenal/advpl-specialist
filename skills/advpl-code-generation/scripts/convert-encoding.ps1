@@ -162,17 +162,55 @@ function Remove-Temp([string]$t) {
   }
 }
 
+# Recovery of a failed File.Replace that already removed the source: on
+# Windows, ReplaceFile without a backup file can fail with error 1176
+# (ERROR_UNABLE_TO_MOVE_REPLACEMENT) after deleting $full, and then the new
+# bytes exist only in $tmp. Moves $tmp to $full: $true when $full holds the
+# new bytes again; $false when $full is there (nothing to recover) or $tmp
+# is missing, or when the move fails too, and then $tmp is kept, since it is
+# the only copy of the source.
+function Restore-Temp([string]$tmp, [string]$full) {
+  try {
+    if ([System.IO.File]::Exists($full) -or -not [System.IO.File]::Exists($tmp)) { return $false }
+    [System.IO.File]::Move($tmp, $full)
+    return $true
+  } catch {
+    return $false
+  }
+}
+
+# $p opens for writing (nothing written, nothing truncated), the test that
+# [ -w FILE ] makes in convert-encoding.sh: $false for a read-only file, a
+# file of another owner this user may not write, a locked file.
+function Test-Writable([string]$p) {
+  try {
+    $fs = [System.IO.File]::Open($p, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
+    $fs.Dispose()
+    return $true
+  } catch {
+    return $false
+  }
+}
+
 # $out -> $p unless --dry-run; $false after a "write error" line.
-# Atomic, the same steps as write_out in convert-encoding.sh: the bytes go to
-# a temporary file in the directory of $p (.convert-encoding.<random>), which
+# The same steps as write_out in convert-encoding.sh. A $p this user may not
+# write (read-only, of another owner, locked) fails first and is never
+# touched: File.Replace would replace it anyway. Atomic: the bytes go to a
+# temporary file in the directory of $p (.convert-encoding.<random>), which
 # first gets a copy of $p (File.Copy keeps the mode on Unix and the
 # attributes on Windows), and File.Replace (a rename) then puts it in place
-# of $p, so an interrupted write never leaves a truncated source. A
-# read-only $p still fails (the copy is read-only too). Written in place as
-# before (not atomic) when $p is a symbolic link or the directory does not
-# take a new file.
+# of $p, so an interrupted write never leaves a truncated source. On a
+# failure the temporary file is deleted, except when File.Replace removed $p
+# after the new bytes were complete: then Restore-Temp moves it back to $p
+# and, when that works, the write counts as done. Written in place as before
+# (not atomic) when $p is a symbolic link or the directory does not take a
+# new file.
 function Save-Bytes([string]$p, [byte[]]$out) {
   if ($script:DryRun) { return $true }
+  if (-not (Test-Writable $p)) {
+    Set-Failed ('failed: ' + $p + ' (write error)')
+    return $false
+  }
   $full = [System.IO.Path]::GetFullPath($p)
   $tmp = $null
   if (-not (Test-Link $p)) {
@@ -194,12 +232,19 @@ function Save-Bytes([string]$p, [byte[]]$out) {
     }
     return $true
   }
+  $written = $false
   try {
     [System.IO.File]::Copy($full, $tmp, $true)
     [System.IO.File]::WriteAllBytes($tmp, $out)
+    $written = $true
     [System.IO.File]::Replace($tmp, $full, [NullString]::Value)
   } catch {
-    Remove-Temp $tmp
+    if ($written -and -not [System.IO.File]::Exists($full)) {
+      # $p is gone and the new bytes are only in $tmp: never delete $tmp
+      if (Restore-Temp $tmp $full) { return $true }
+    } else {
+      Remove-Temp $tmp
+    }
     Set-Failed ('failed: ' + $p + ' (write error)')
     return $false
   }

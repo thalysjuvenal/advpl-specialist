@@ -21,6 +21,9 @@
 #     bash examples/encoding-tests/run-tests.sh
 # The unreadable/read-only case is skipped as root (root reads and writes any
 # file); add `--user 1000:1000 -e HOME=/tmp` to run it there with pwsh parity.
+# The case of a file of another owner runs only as root (it stages the file and
+# runs both converters as nobody through setpriv); the locked-file case
+# (chflags uchg) only where chflags exists (macOS).
 
 set -u
 
@@ -220,17 +223,24 @@ new_case() {
   STEP=0
   begin_case
 }
+# as_runner CMD...: run CMD; while a case sets RUN_UID (as root), run it as
+# that unprivileged user instead (setpriv, HOME=$RUN_HOME)
+RUN_UID=; RUN_HOME=
+as_runner() {
+  if [ -z "$RUN_UID" ]; then "$@"; return; fi
+  setpriv --reuid="$RUN_UID" --regid="$RUN_UID" --clear-groups env HOME="$RUN_HOME" "$@"
+}
 # step ARGS...: run the bash converter in $CS (-> $OUT_F, $ERR_F, $RC) and,
 # with PowerShell, the .ps1 in $CP; any difference is a problem of the case.
 step() {
   STEP=$((STEP + 1))
   OUT_F="$TMP_DIR/$CASE/$STEP.out"; ERR_F="$TMP_DIR/$CASE/$STEP.err"
-  (cd "$CS" && "$SH" "$CONV" "$@") >"$OUT_F" 2>"$ERR_F"
+  (cd "$CS" && as_runner "$SH" "$CONV" "$@") >"$OUT_F" 2>"$ERR_F"
   RC=$?
   [ -n "$PS_BIN" ] || return 0
   local po="$TMP_DIR/$CASE/$STEP.ps.out" pe="$TMP_DIR/$CASE/$STEP.ps.err" prc
   (cd "$CP" && MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
-    "$PS_BIN" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PS_SCRIPT" "$@") >"$po" 2>"$pe"
+    as_runner "$PS_BIN" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PS_SCRIPT" "$@") >"$po" 2>"$pe"
   prc=$?
   PARITY_RUNS=$((PARITY_RUNS + 1))
   expect_that "step $STEP parity: exit ps1=$prc bash=$RC" [ "$prc" = "$RC" ]
@@ -764,6 +774,162 @@ case_unreadable() {
   end_case "-r: unreadable file = read error, read-only file = write error, run goes on, exit 1 (both directions); read-only directory = in place"
 }
 
+# set_flag FLAG PATH: chflags in the bash copy and in the PowerShell twin
+set_flag() {
+  chflags "$1" "$CS/$2"
+  if [ -n "$PS_BIN" ]; then chflags "$1" "$CP/$2"; fi
+}
+
+# A file locked by the Finder (uchg) or append-only (uappnd): cp -p would copy
+# the flag to the temporary file, which could then be neither written nor
+# deleted. BSD flags exist only where chflags does (macOS).
+case_locked() {
+  if ! command -v chflags >/dev/null 2>&1; then
+    echo "  - locked file (chflags uchg / uappnd): skipped (no chflags on this system)"
+    return 0
+  fi
+  new_case locked
+  set_flag uchg 02-acentos-ptbr.prw
+  set_flag uappnd 08-tlpp-class.tlpp
+  set_flag uchg cp-acentos.prw
+  step 02-acentos-ptbr.prw 08-tlpp-class.tlpp 06-utf8-bom.prw
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "failed: 02-acentos-ptbr.prw (write error)" \
+    "failed: 08-tlpp-class.tlpp (write error)" \
+    "converted: 06-utf8-bom.prw"
+  expect_that "a locked file left a temporary .convert-encoding.* file behind" no_temp
+  step --to-utf8 cp-acentos.prw
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout "failed: cp-acentos.prw (write error)"
+  expect_that "a locked file left a temporary .convert-encoding.* file behind" no_temp
+  # unlock everything, leftovers of a failing run included, so that the
+  # copies can be removed
+  chflags -R nouchg,nouappnd "$CS"
+  if [ -n "$PS_BIN" ]; then chflags -R nouchg,nouappnd "$CP"; fi
+  untouched 02-acentos-ptbr.prw 08-tlpp-class.tlpp cp-acentos.prw
+  end_case "locked file (uchg / uappnd): write error, file intact, no temporary file left (both directions)"
+}
+
+# owned_by UID FILE: FILE belongs to UID
+owned_by() { [ -n "$(find "$2" -prune -user "$1" -print 2>/dev/null)" ]; }
+
+# A file of another owner that the user may not write, in a directory the user
+# may write: the rename would replace it (and change its owner). Staging it
+# needs root, so the case runs as root and runs the converters as nobody
+# (setpriv); elsewhere it is skipped.
+case_foreign_owner() {
+  if [ "$(id -u)" != 0 ]; then
+    echo "  - file of another owner: skipped (staging it needs root: run this runner as root in Docker)"
+    return 0
+  fi
+  if [ "$PS_WIN" = 1 ] || ! command -v setpriv >/dev/null 2>&1; then
+    echo "  - file of another owner: skipped (needs setpriv to run the converters as another user)"
+    return 0
+  fi
+  new_case foreign
+  RUN_HOME="$TMP_DIR/foreign/home"
+  mkdir -p "$RUN_HOME"
+  chmod 755 "$TMP_DIR" "$TMP_DIR/foreign"
+  # the copies belong to nobody, except one file that stays root's (mode 644)
+  chown -R 65534:65534 "$CS" "$RUN_HOME"
+  chown 0:0 "$CS/02-acentos-ptbr.prw"
+  if [ -n "$PS_BIN" ]; then
+    chown -R 65534:65534 "$CP"
+    chown 0:0 "$CP/02-acentos-ptbr.prw"
+  fi
+  RUN_UID=65534
+  step 02-acentos-ptbr.prw 06-utf8-bom.prw
+  RUN_UID=
+  expect_rc 1
+  expect_no_stderr
+  expect_stdout \
+    "failed: 02-acentos-ptbr.prw (write error)" \
+    "converted: 06-utf8-bom.prw"
+  untouched 02-acentos-ptbr.prw
+  expect_that "02-acentos-ptbr.prw no longer belongs to root (bash)" owned_by 0 "$CS/02-acentos-ptbr.prw"
+  if [ -n "$PS_BIN" ]; then
+    expect_that "02-acentos-ptbr.prw no longer belongs to root (ps1)" owned_by 0 "$CP/02-acentos-ptbr.prw"
+  fi
+  expect_that "a write error left a temporary .convert-encoding.* file behind" no_temp
+  end_case "file of another owner, not writable (converters run as nobody): write error, file and owner kept"
+}
+
+# Restore-Temp of convert-encoding.ps1: when File.Replace fails after removing
+# the source (Windows ReplaceFile without a backup file, error 1176), the new
+# bytes exist only in the temporary file, which is moved back instead of
+# deleted. No step can make File.Replace fail that way, so the function is
+# taken from the script with the PowerShell parser and called on staged
+# states; Save-Bytes must call it.
+case_ps_restore() {
+  if [ -z "$PS_BIN" ]; then
+    echo "  - Restore-Temp of convert-encoding.ps1: skipped (no pwsh/powershell)"
+    return 0
+  fi
+  local d="$TMP_DIR/ps-restore" t="$TMP_DIR/ps-restore.ps1" conv dir script
+  mkdir -p "$d"
+  cat >"$t" <<'PS1'
+param([string]$Conv, [string]$Dir)
+$ErrorActionPreference = 'Stop'
+$tokens = $null
+$errs = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($Conv, [ref]$tokens, [ref]$errs)
+$fns = @{}
+foreach ($n in $ast.FindAll({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
+  $fns[$n.Name] = $n
+}
+if (-not $fns.ContainsKey('Restore-Temp')) {
+  [Console]::Out.Write("no Restore-Temp function`n")
+  exit 1
+}
+. ([ScriptBlock]::Create($fns['Restore-Temp'].Extent.Text))
+function Write-State([string]$label, [bool]$r, [string]$dest, [string]$tmp) {
+  $d = 'missing'
+  if ([System.IO.File]::Exists($dest)) { $d = [System.BitConverter]::ToString([System.IO.File]::ReadAllBytes($dest)) }
+  $t = 'gone'
+  if ([System.IO.File]::Exists($tmp)) { $t = 'kept' }
+  [Console]::Out.Write($label + ': ' + $r + ' dest=' + $d + ' tmp=' + $t + "`n")
+}
+$new = [byte[]](0x61, 0xE7, 0xE3, 0x6F)
+# the source is gone and the new bytes are only in the temporary file
+$dest = [System.IO.Path]::Combine($Dir, 'a.prw')
+$tmp = [System.IO.Path]::Combine($Dir, '.convert-encoding.a')
+[System.IO.File]::WriteAllBytes($tmp, $new)
+Write-State 'source gone' (Restore-Temp $tmp $dest) $dest $tmp
+# the source is still there: nothing to recover
+$dest = [System.IO.Path]::Combine($Dir, 'b.prw')
+$tmp = [System.IO.Path]::Combine($Dir, '.convert-encoding.b')
+[System.IO.File]::WriteAllBytes($dest, [byte[]](0x78))
+[System.IO.File]::WriteAllBytes($tmp, $new)
+Write-State 'source there' (Restore-Temp $tmp $dest) $dest $tmp
+# the move fails too (the directory of the source is gone): the temporary
+# file, the only copy left, is kept
+$dest = [System.IO.Path]::Combine([System.IO.Path]::Combine($Dir, 'gone'), 'c.prw')
+$tmp = [System.IO.Path]::Combine($Dir, '.convert-encoding.c')
+[System.IO.File]::WriteAllBytes($tmp, $new)
+Write-State 'move fails' (Restore-Temp $tmp $dest) $dest $tmp
+$calls = $fns['Save-Bytes'].Body.Extent.Text.Contains('Restore-Temp')
+[Console]::Out.Write('Save-Bytes calls Restore-Temp: ' + $calls + "`n")
+PS1
+  conv="$CONV_PS1"; dir="$d"; script="$t"
+  if [ "$PS_WIN" = 1 ]; then
+    conv="$(cygpath -w "$CONV_PS1")"; dir="$(cygpath -w "$d")"; script="$(cygpath -w "$t")"
+  fi
+  printf '%s\n' \
+    "source gone: True dest=61-E7-E3-6F tmp=gone" \
+    "source there: False dest=78 tmp=kept" \
+    "move fails: False dest=missing tmp=kept" \
+    "Save-Bytes calls Restore-Temp: True" >"$d.want"
+  begin_case
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
+    "$PS_BIN" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$script" "$conv" "$dir" >"$d.out" 2>"$d.err"
+  expect_that "Restore-Temp: stdout (< expected, > ps1)" diff "$d.want" "$d.out"
+  expect_that "Restore-Temp: stderr not empty" [ ! -s "$d.err" ]
+  end_case "Restore-Temp (ps1): the temporary file goes back in place of a removed source, never over a present one, and is kept when that fails too"
+}
+
 # ---- run -------------------------------------------------------------------------
 echo "converter: $CONV"
 echo "bash: $SH ($("$SH" --version | head -n 1))"
@@ -796,6 +962,9 @@ case_to_utf8_recursive
 case_to_utf8_usage
 case_atomic
 case_unreadable
+case_locked
+case_foreign_owner
+case_ps_restore
 
 echo ""
 if [ -n "$PS_BIN" ]; then
