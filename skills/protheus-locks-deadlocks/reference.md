@@ -138,13 +138,13 @@ Thread B: TCSqlExec("UPDATE SA1010 SET A1_XFLAG = '1'")
 ### Pattern 3 — Trigger Cascading Lock
 
 ```
-Thread A: RecLock("SC5", .F.)
-  → SX7 trigger fires Posicione("SA1", ...) which acquires implicit lock
-Thread B: holds SA1 record
+Thread A: fills an SC5 field through the screen, MsExecAuto or the MVC model (SetValue)
+  → the SX7 trigger of that field calls a function that does RecLock("SA1", .F.)
+Thread B: holds that SA1 record
 → A blocks on B inside the trigger
 ```
 
-**Fix:** keep SX7 trigger expressions read-only and short. Avoid `RecLock` or expensive lookups inside triggers.
+**Fix:** keep SX7 trigger expressions read-only and short. Avoid `RecLock` or expensive lookups inside triggers. A direct `RecLock` followed by field assignments never fires SX7 nor `X3_VALID` (see Lock Types): triggers and validations run only through the screen, `MsExecAuto` or the MVC model API, so that is where this cascade happens.
 
 ### Pattern 4 — Long-Running Lock
 

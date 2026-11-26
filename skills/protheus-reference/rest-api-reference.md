@@ -168,13 +168,15 @@ Return
 
 The WsRestFul approach uses the `RestFul.ch` include and class-based declarations. This is the traditional way to create REST services in ADVPL.
 
+> **The write methods (POST/PUT/DELETE) are a template for custom tables (Z\*).** The service below keeps a custom customer register in the custom table `ZB1` and writes it with `RecLock`, which runs no `X3_VALID` validation, no SX7 trigger and none of the standard routine's logic (mandatory fields, fiscal and integration rules, entry points). Never write a standard table (SA1, SB1, SC5...) this way: run the standard routine through `MsExecAuto` following its documented example (`skills/advpl-code-generation/patterns-soap.md` includes a customer with `MsExecAuto` and `CRMA980`), or, for an MVC routine, use the model API (`skills/advpl-code-generation/patterns-mvc.md`, section 6). A number reserved with `GetSXENum` is released with `RollBackSX8()` when the write fails.
+
 ### Service Declaration
 
 ```advpl
 #include "totvs.ch"
 #include "restful.ch"
 
-WsRestFul CustomerService Description "Customer CRUD Service" Format APPLICATION_JSON
+WsRestFul CustomerService Description "Customer CRUD Service (custom table ZB1)" Format APPLICATION_JSON
 
     WsData id       As String
     WsData page     As Integer
@@ -195,7 +197,7 @@ WsMethod GET WsReceive id, page, pageSize WsService CustomerService
     Local oJson     := JsonObject():New()
     Local oJsonItem := Nil
     Local aItems    := {}
-    Local cAlias    := "SA1"
+    Local cAlias    := "ZB1"
     Local nPage     := 1
     Local nPageSize := 20
     Local nSkip     := 0
@@ -215,10 +217,10 @@ WsMethod GET WsReceive id, page, pageSize WsService CustomerService
         (cAlias)->(DbSetOrder(1))
 
         If (cAlias)->(DbSeek(xFilial(cAlias) + ::id))
-            oJson["id"]    := Alltrim((cAlias)->A1_COD)
-            oJson["name"]  := Alltrim((cAlias)->A1_NOME)
-            oJson["cnpj"]  := Alltrim((cAlias)->A1_CGC)
-            oJson["email"] := Alltrim((cAlias)->A1_EMAIL)
+            oJson["id"]    := Alltrim((cAlias)->ZB1_COD)
+            oJson["name"]  := Alltrim((cAlias)->ZB1_NOME)
+            oJson["cnpj"]  := Alltrim((cAlias)->ZB1_CGC)
+            oJson["email"] := Alltrim((cAlias)->ZB1_EMAIL)
 
             ::SetResponse(oJson:ToJson())
         Else
@@ -239,7 +241,7 @@ WsMethod GET WsReceive id, page, pageSize WsService CustomerService
 
     // Skip to requested page
     While nSkip > 0 .And. !(cAlias)->(Eof())
-        If (cAlias)->A1_FILIAL == xFilial(cAlias) .And. (cAlias)->(Deleted()) == .F.
+        If (cAlias)->ZB1_FILIAL == xFilial(cAlias) .And. (cAlias)->(Deleted()) == .F.
             nSkip--
         EndIf
         (cAlias)->(DbSkip())
@@ -247,12 +249,12 @@ WsMethod GET WsReceive id, page, pageSize WsService CustomerService
 
     // Collect items for current page
     While !(cAlias)->(Eof()) .And. nCount < nPageSize
-        If (cAlias)->A1_FILIAL == xFilial(cAlias) .And. (cAlias)->(Deleted()) == .F.
+        If (cAlias)->ZB1_FILIAL == xFilial(cAlias) .And. (cAlias)->(Deleted()) == .F.
             oJsonItem := JsonObject():New()
-            oJsonItem["id"]    := Alltrim((cAlias)->A1_COD)
-            oJsonItem["name"]  := Alltrim((cAlias)->A1_NOME)
-            oJsonItem["cnpj"]  := Alltrim((cAlias)->A1_CGC)
-            oJsonItem["email"] := Alltrim((cAlias)->A1_EMAIL)
+            oJsonItem["id"]    := Alltrim((cAlias)->ZB1_COD)
+            oJsonItem["name"]  := Alltrim((cAlias)->ZB1_NOME)
+            oJsonItem["cnpj"]  := Alltrim((cAlias)->ZB1_CGC)
+            oJsonItem["email"] := Alltrim((cAlias)->ZB1_EMAIL)
             aAdd(aItems, oJsonItem)
             nCount++
         EndIf
@@ -277,7 +279,8 @@ WsMethod POST WsService CustomerService
     Local cBody   := ::GetContent()
     Local oJson   := JsonObject():New()
     Local oResp   := JsonObject():New()
-    Local cAlias  := "SA1"
+    Local cAlias  := "ZB1"
+    Local cCodigo := ""
     Local lSuccess := .F.
 
     If Empty(cBody)
@@ -303,26 +306,29 @@ WsMethod POST WsService CustomerService
         Return .F.
     EndIf
 
+    // Custom table ZB1 (a standard table goes through MsExecAuto: see the note above)
     DbSelectArea(cAlias)
     (cAlias)->(DbSetOrder(1))
+    cCodigo := GetSXENum("ZB1", "ZB1_COD")
 
     Begin Transaction
 
     If RecLock(cAlias, .T.)  // .T. = insert new record
-        (cAlias)->A1_FILIAL := xFilial(cAlias)
-        (cAlias)->A1_COD    := GetSXENum("SA1", "A1_COD")
-        (cAlias)->A1_LOJA   := "01"
-        (cAlias)->A1_NOME   := oJson["name"]
+        (cAlias)->ZB1_FILIAL := xFilial(cAlias)
+        (cAlias)->ZB1_COD    := cCodigo
+        (cAlias)->ZB1_LOJA   := "01"
+        (cAlias)->ZB1_NOME   := oJson["name"]
         If oJson["cnpj"] != Nil
-            (cAlias)->A1_CGC := oJson["cnpj"]
+            (cAlias)->ZB1_CGC := oJson["cnpj"]
         EndIf
         If oJson["email"] != Nil
-            (cAlias)->A1_EMAIL := oJson["email"]
+            (cAlias)->ZB1_EMAIL := oJson["email"]
         EndIf
         MsUnlock()
         ConfirmSX8()
         lSuccess := .T.
     Else
+        RollBackSX8() // RecLock failed: release the number reserved by GetSXENum
         DisarmTransaction()
         ::SetStatus(500)
         oResp["code"]    := "INTERNAL_ERROR"
@@ -334,8 +340,8 @@ WsMethod POST WsService CustomerService
 
     If lSuccess
         ::SetStatus(201)
-        oResp["id"]      := Alltrim((cAlias)->A1_COD)
-        oResp["name"]    := Alltrim((cAlias)->A1_NOME)
+        oResp["id"]      := Alltrim((cAlias)->ZB1_COD)
+        oResp["name"]    := Alltrim((cAlias)->ZB1_NOME)
         oResp["message"] := "Customer created successfully"
         ::SetResponse(oResp:ToJson())
     EndIf
@@ -352,7 +358,7 @@ WsMethod PUT WsReceive id WsService CustomerService
     Local cBody   := ::GetContent()
     Local oJson   := JsonObject():New()
     Local oResp   := JsonObject():New()
-    Local cAlias  := "SA1"
+    Local cAlias  := "ZB1"
     Local lSuccess := .F.
 
     If ::id == Nil .Or. Empty(::id)
@@ -394,13 +400,13 @@ WsMethod PUT WsReceive id WsService CustomerService
 
     If RecLock(cAlias, .F.)  // .F. = update existing record
         If oJson["name"] != Nil
-            (cAlias)->A1_NOME := oJson["name"]
+            (cAlias)->ZB1_NOME := oJson["name"]
         EndIf
         If oJson["cnpj"] != Nil
-            (cAlias)->A1_CGC := oJson["cnpj"]
+            (cAlias)->ZB1_CGC := oJson["cnpj"]
         EndIf
         If oJson["email"] != Nil
-            (cAlias)->A1_EMAIL := oJson["email"]
+            (cAlias)->ZB1_EMAIL := oJson["email"]
         EndIf
         MsUnlock()
         lSuccess := .T.
@@ -415,8 +421,8 @@ WsMethod PUT WsReceive id WsService CustomerService
     End Transaction
 
     If lSuccess
-        oResp["id"]      := Alltrim((cAlias)->A1_COD)
-        oResp["name"]    := Alltrim((cAlias)->A1_NOME)
+        oResp["id"]      := Alltrim((cAlias)->ZB1_COD)
+        oResp["name"]    := Alltrim((cAlias)->ZB1_NOME)
         oResp["message"] := "Customer updated successfully"
         ::SetResponse(oResp:ToJson())
     EndIf
@@ -431,7 +437,7 @@ Return lSuccess
 ```advpl
 WsMethod DELETE WsReceive id WsService CustomerService
     Local oResp   := JsonObject():New()
-    Local cAlias  := "SA1"
+    Local cAlias  := "ZB1"
     Local lSuccess := .F.
 
     If ::id == Nil .Or. Empty(::id)
@@ -491,6 +497,8 @@ The modern TLPP framework uses annotations to define REST endpoints. This approa
 
 Rules applied (TDN, tlppCore REST): `tlpp-core.th` + `tlpp-rest.th`, plus `totvs.ch` because the endpoints use framework commands; the namespace follows `custom.<agrupador>.<servico>` (lowercase, no underscores). Inside the methods the REST server exposes the `oRest` object. Official `oRest` methods: `getQueryRequest()` and `getPathParamsRequest()` (return a `JsonObject`; read-only reference), `getBodyRequest()` (raw body string), `setStatusCode(nCode)`, `setResponse(cBody)` and `setFault(cBody)` (sets the body and forces HTTP 500). There is no `setStatus`, `getQueryString`, `getBody` or `getContent` in `oRest`. Error body: `{code, message, detailedMessage}` (TOTVS API guide). Validation of these examples in TDS is pending.
 
+> **Custom table only:** as in section 3, the `create`, `update` and `remove` endpoints write the custom table `ZB1` with `RecLock`, which runs no `X3_VALID` validation, no SX7 trigger and none of the standard routine's logic. For a standard table such as SA1, run the standard routine through `MsExecAuto` following its documented example, or, for an MVC routine, use the model API. A number reserved with `GetSXENum` is released with `RollBackSX8()` when the write fails.
+
 ```tlpp
 #include "tlpp-core.th"
 #include "tlpp-rest.th"
@@ -525,7 +533,7 @@ method list() class CustomerAPI
     local oJson     := JsonObject():New()
     local aItems    := {}
     local oItem     := nil
-    local cAlias    := "SA1"
+    local cAlias    := "ZB1"
     local jQuery    := oRest:getQueryRequest()
     local nPage     := 1
     local nPageSize := 20
@@ -549,7 +557,7 @@ method list() class CustomerAPI
 
     // Skip records for pagination
     while nSkip > 0 .and. !(cAlias)->(Eof())
-        if (cAlias)->A1_FILIAL == xFilial(cAlias) .and. (cAlias)->(Deleted()) == .F.
+        if (cAlias)->ZB1_FILIAL == xFilial(cAlias) .and. (cAlias)->(Deleted()) == .F.
             nSkip--
         endif
         (cAlias)->(DbSkip())
@@ -557,13 +565,13 @@ method list() class CustomerAPI
 
     // Collect page items
     while !(cAlias)->(Eof()) .and. nCount < nPageSize
-        if (cAlias)->A1_FILIAL == xFilial(cAlias) .and. (cAlias)->(Deleted()) == .F.
+        if (cAlias)->ZB1_FILIAL == xFilial(cAlias) .and. (cAlias)->(Deleted()) == .F.
             oItem := JsonObject():New()
-            oItem["id"]    := alltrim((cAlias)->A1_COD)
-            oItem["store"] := alltrim((cAlias)->A1_LOJA)
-            oItem["name"]  := alltrim((cAlias)->A1_NOME)
-            oItem["cnpj"]  := alltrim((cAlias)->A1_CGC)
-            oItem["email"] := alltrim((cAlias)->A1_EMAIL)
+            oItem["id"]    := alltrim((cAlias)->ZB1_COD)
+            oItem["store"] := alltrim((cAlias)->ZB1_LOJA)
+            oItem["name"]  := alltrim((cAlias)->ZB1_NOME)
+            oItem["cnpj"]  := alltrim((cAlias)->ZB1_CGC)
+            oItem["email"] := alltrim((cAlias)->ZB1_EMAIL)
             aAdd(aItems, oItem)
             nCount++
         endif
@@ -588,7 +596,7 @@ return
 method getById() class CustomerAPI
     local oJson  := JsonObject():New()
     local cId    := oRest:getPathParamsRequest()["id"]
-    local cAlias := "SA1"
+    local cAlias := "ZB1"
 
     if empty(cId)
         oRest:setStatusCode(400)
@@ -604,11 +612,11 @@ method getById() class CustomerAPI
     (cAlias)->(DbSetOrder(1))
 
     if (cAlias)->(DbSeek(xFilial(cAlias) + cId))
-        oJson["id"]    := alltrim((cAlias)->A1_COD)
-        oJson["store"] := alltrim((cAlias)->A1_LOJA)
-        oJson["name"]  := alltrim((cAlias)->A1_NOME)
-        oJson["cnpj"]  := alltrim((cAlias)->A1_CGC)
-        oJson["email"] := alltrim((cAlias)->A1_EMAIL)
+        oJson["id"]    := alltrim((cAlias)->ZB1_COD)
+        oJson["store"] := alltrim((cAlias)->ZB1_LOJA)
+        oJson["name"]  := alltrim((cAlias)->ZB1_NOME)
+        oJson["cnpj"]  := alltrim((cAlias)->ZB1_CGC)
+        oJson["email"] := alltrim((cAlias)->ZB1_EMAIL)
 
         oRest:setStatusCode(200)
         oRest:setResponse(oJson:toJson())
@@ -616,7 +624,7 @@ method getById() class CustomerAPI
         oRest:setStatusCode(404)
         oJson["code"]    := "NOT_FOUND"
         oJson["message"] := "Customer not found: " + cId
-        oJson["detailedMessage"] := "No SA1 record matches the informed id"
+        oJson["detailedMessage"] := "No ZB1 record matches the informed id"
         oRest:setResponse(oJson:toJson())
     endif
 
@@ -631,7 +639,8 @@ method create() class CustomerAPI
     local cBody    := oRest:getBodyRequest()
     local oJson    := JsonObject():New()
     local oResp    := JsonObject():New()
-    local cAlias   := "SA1"
+    local cAlias   := "ZB1"
+    local cCodigo  := ""
     local lSuccess := .F.
 
     if empty(cBody)
@@ -659,26 +668,29 @@ method create() class CustomerAPI
         return
     endif
 
+    // Custom table ZB1 (a standard table goes through MsExecAuto: see the note above)
     DbSelectArea(cAlias)
     (cAlias)->(DbSetOrder(1))
+    cCodigo := GetSXENum("ZB1", "ZB1_COD")
 
     begin transaction
 
     if RecLock(cAlias, .T.)
-        (cAlias)->A1_FILIAL := xFilial(cAlias)
-        (cAlias)->A1_COD    := GetSXENum("SA1", "A1_COD")
-        (cAlias)->A1_LOJA   := "01"
-        (cAlias)->A1_NOME   := oJson["name"]
+        (cAlias)->ZB1_FILIAL := xFilial(cAlias)
+        (cAlias)->ZB1_COD    := cCodigo
+        (cAlias)->ZB1_LOJA   := "01"
+        (cAlias)->ZB1_NOME   := oJson["name"]
         if oJson["cnpj"] != nil
-            (cAlias)->A1_CGC := oJson["cnpj"]
+            (cAlias)->ZB1_CGC := oJson["cnpj"]
         endif
         if oJson["email"] != nil
-            (cAlias)->A1_EMAIL := oJson["email"]
+            (cAlias)->ZB1_EMAIL := oJson["email"]
         endif
         MsUnlock()
         ConfirmSX8()
         lSuccess := .T.
     else
+        RollBackSX8() // RecLock failed: release the number reserved by GetSXENum
         DisarmTransaction()
         oRest:setStatusCode(500)
         oResp["code"]    := "INTERNAL_ERROR"
@@ -691,8 +703,8 @@ method create() class CustomerAPI
 
     if lSuccess
         oRest:setStatusCode(201)
-        oResp["id"]      := alltrim((cAlias)->A1_COD)
-        oResp["name"]    := alltrim((cAlias)->A1_NOME)
+        oResp["id"]      := alltrim((cAlias)->ZB1_COD)
+        oResp["name"]    := alltrim((cAlias)->ZB1_NOME)
         oResp["message"] := "Customer created successfully"
         oRest:setResponse(oResp:toJson())
     endif
@@ -710,7 +722,7 @@ method update() class CustomerAPI
     local cId      := oRest:getPathParamsRequest()["id"]
     local oJson    := JsonObject():New()
     local oResp    := JsonObject():New()
-    local cAlias   := "SA1"
+    local cAlias   := "ZB1"
     local lSuccess := .F.
 
     if empty(cId)
@@ -744,7 +756,7 @@ method update() class CustomerAPI
         oRest:setStatusCode(404)
         oResp["code"]    := "NOT_FOUND"
         oResp["message"] := "Customer not found: " + cId
-        oResp["detailedMessage"] := "No SA1 record matches the informed id"
+        oResp["detailedMessage"] := "No ZB1 record matches the informed id"
         oRest:setResponse(oResp:toJson())
         FreeObj(oJson)
         FreeObj(oResp)
@@ -755,13 +767,13 @@ method update() class CustomerAPI
 
     if RecLock(cAlias, .F.)
         if oJson["name"] != nil
-            (cAlias)->A1_NOME := oJson["name"]
+            (cAlias)->ZB1_NOME := oJson["name"]
         endif
         if oJson["cnpj"] != nil
-            (cAlias)->A1_CGC := oJson["cnpj"]
+            (cAlias)->ZB1_CGC := oJson["cnpj"]
         endif
         if oJson["email"] != nil
-            (cAlias)->A1_EMAIL := oJson["email"]
+            (cAlias)->ZB1_EMAIL := oJson["email"]
         endif
         MsUnlock()
         lSuccess := .T.
@@ -778,8 +790,8 @@ method update() class CustomerAPI
 
     if lSuccess
         oRest:setStatusCode(200)
-        oResp["id"]      := alltrim((cAlias)->A1_COD)
-        oResp["name"]    := alltrim((cAlias)->A1_NOME)
+        oResp["id"]      := alltrim((cAlias)->ZB1_COD)
+        oResp["name"]    := alltrim((cAlias)->ZB1_NOME)
         oResp["message"] := "Customer updated successfully"
         oRest:setResponse(oResp:toJson())
     endif
@@ -795,7 +807,7 @@ return
 method remove() class CustomerAPI
     local cId      := oRest:getPathParamsRequest()["id"]
     local oResp    := JsonObject():New()
-    local cAlias   := "SA1"
+    local cAlias   := "ZB1"
     local lSuccess := .F.
 
     if empty(cId)
@@ -815,7 +827,7 @@ method remove() class CustomerAPI
         oRest:setStatusCode(404)
         oResp["code"]    := "NOT_FOUND"
         oResp["message"] := "Customer not found: " + cId
-        oResp["detailedMessage"] := "No SA1 record matches the informed id"
+        oResp["detailedMessage"] := "No ZB1 record matches the informed id"
         oRest:setResponse(oResp:toJson())
         FreeObj(oResp)
         return
@@ -1724,7 +1736,7 @@ GET /rest/customers/000001?fields=id,name,email
 
 ### Batch Operations
 
-Processing multiple records in a single request:
+Processing multiple records in a single request. Like the service of section 3, the batch writes the custom table `ZB1` with `RecLock`; a standard table goes through `MsExecAuto` following the routine's documented example, or through the model API:
 
 ```advpl
 WsMethod POST WsService BatchCustomerService
@@ -1735,7 +1747,8 @@ WsMethod POST WsService BatchCustomerService
     Local oResult  := Nil
     Local aItems   := {}
     Local nI       := 0
-    Local cAlias   := "SA1"
+    Local cAlias   := "ZB1"
+    Local cCodigo  := ""
     Local lAllOk   := .T.
 
     If Empty(cBody)
@@ -1769,24 +1782,26 @@ WsMethod POST WsService BatchCustomerService
     For nI := 1 To Len(aItems)
         oResult := JsonObject():New()
         oResult["index"] := nI
+        cCodigo := GetSXENum("ZB1", "ZB1_COD")
 
         If RecLock(cAlias, .T.)
-            (cAlias)->A1_FILIAL := xFilial(cAlias)
-            (cAlias)->A1_COD    := GetSXENum("SA1", "A1_COD")
-            (cAlias)->A1_LOJA   := "01"
-            (cAlias)->A1_NOME   := aItems[nI]["name"]
+            (cAlias)->ZB1_FILIAL := xFilial(cAlias)
+            (cAlias)->ZB1_COD    := cCodigo
+            (cAlias)->ZB1_LOJA   := "01"
+            (cAlias)->ZB1_NOME   := aItems[nI]["name"]
             If aItems[nI]["cnpj"] != Nil
-                (cAlias)->A1_CGC := aItems[nI]["cnpj"]
+                (cAlias)->ZB1_CGC := aItems[nI]["cnpj"]
             EndIf
             If aItems[nI]["email"] != Nil
-                (cAlias)->A1_EMAIL := aItems[nI]["email"]
+                (cAlias)->ZB1_EMAIL := aItems[nI]["email"]
             EndIf
             MsUnlock()
             ConfirmSX8()
 
             oResult["status"]  := "created"
-            oResult["id"]      := Alltrim((cAlias)->A1_COD)
+            oResult["id"]      := Alltrim((cAlias)->ZB1_COD)
         Else
+            RollBackSX8() // RecLock failed: release the number reserved by GetSXENum
             oResult["status"]  := "error"
             oResult["message"] := "Failed to lock record"
             lAllOk := .F.

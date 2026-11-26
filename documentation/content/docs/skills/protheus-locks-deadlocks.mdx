@@ -168,7 +168,7 @@ Um deadlock ocorre quando duas threads cada uma segura um lock que a outra preci
 |--------|-------|----------|
 | Ordem inversa de locks | Thread A bloqueia SA1 depois SE1; Thread B faz o inverso | Convencao de ordem de lock em todo o projeto |
 | Workarea + DML na mesma tabela | `RecLock("SA1")` ativo enquanto `TCSqlExec("UPDATE SA1...")` roda | Escolha um modelo por fluxo de trabalho |
-| Lock cascateante por trigger | SX7 dispara `Posicione` ou lock implicito sobre tabela ja bloqueada | Mantenha expressoes SX7 somente leitura e curtas |
+| Lock cascateante por trigger | O gatilho SX7, executado pela tela, pelo `MsExecAuto` ou pelo `SetValue` do modelo (o `RecLock` direto nao dispara gatilhos), chama uma funcao que faz `RecLock` em registro ja bloqueado | Mantenha expressoes SX7 somente leitura e curtas |
 | Lock de longa duracao | `RecLock` mantido durante computacao lenta ou input do usuario | Compute primeiro; lock+escrita+unlock o mais rapido possivel |
 
 ## Parametros de Sistema Relevantes

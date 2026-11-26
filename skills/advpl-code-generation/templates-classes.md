@@ -672,6 +672,8 @@ FreeObj(oRepo)
 
 A Repository class encapsulates data access, providing CRUD operations and query methods.
 
+> **The write methods (`Create`, `Update`, `Delete`, `Inactivate`) are a template for custom tables (Z\*).** The repository below keeps a custom customer register in the custom table `ZB1` and writes it with `RecLock`, which runs no `X3_VALID` validation, no SX7 trigger and none of the standard routine's logic (mandatory fields, fiscal and integration rules, entry points). Never write a standard table (SA1, SB1, SC5...) this way: run the standard routine through `MsExecAuto` following its documented example (`patterns-soap.md` includes a customer with `MsExecAuto` and `CRMA980`), or, for an MVC routine, use the model API (`patterns-mvc.md`, section 6). A number reserved with `GetSXENum` is released with `RollBackSX8()` when the write fails.
+
 ```tlpp
 #include "tlpp-core.th"
 #include "totvs.ch"
@@ -680,7 +682,7 @@ A Repository class encapsulates data access, providing CRUD operations and query
 namespace custom.fat.clienterepository
 
 /*/{Protheus.doc} ClienteRepository
-Repositorio de acesso a dados de clientes (SA1)
+Repositorio de um cadastro customizado de clientes (tabela ZB1)
 @type Class
 @author Autor
 @since 01/01/2026
@@ -708,7 +710,7 @@ Class ClienteRepository
 EndClass
 
 Method New() Class ClienteRepository
-    ::cAlias := "SA1"
+    ::cAlias := "ZB1"
 Return Self
 
 Method Destroy() Class ClienteRepository
@@ -721,7 +723,7 @@ Method FindById(cCodigo, cLoja) Class ClienteRepository
 
     DbSelectArea(::cAlias)
     DbSetOrder(1) // Filial + Codigo + Loja
-    If DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("A1_COD")[1]) + PadR(cLoja, TamSX3("A1_LOJA")[1]))
+    If DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("ZB1_COD")[1]) + PadR(cLoja, TamSX3("ZB1_LOJA")[1]))
         oResult := ::RecordToJson()
     EndIf
 
@@ -739,14 +741,14 @@ Method FindByCNPJ(cCNPJ) Class ClienteRepository
     // cCNPJ vem de fora (servico/REST): vai como parametro ? do FWPreparedStatement.
     // O %exp:% do BeginSQL NAO e bind: o valor e inserido no texto do comando (TDN Embedded SQL,
     // PPO com ___SQLGetValue) - use %exp:% so com valores internos, nunca com entrada do usuario.
-    cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL"
-    cQuery += " FROM " + RetSqlName("SA1") + " SA1"
-    cQuery += " WHERE SA1.D_E_L_E_T_ = ' '"
-    cQuery += " AND SA1.A1_FILIAL = ?"
-    cQuery += " AND SA1.A1_CGC = ?"
+    cQuery := "SELECT ZB1_COD, ZB1_LOJA, ZB1_NOME, ZB1_CGC, ZB1_EMAIL, ZB1_TEL"
+    cQuery += " FROM " + RetSqlName("ZB1") + " ZB1"
+    cQuery += " WHERE ZB1.D_E_L_E_T_ = ' '"
+    cQuery += " AND ZB1.ZB1_FILIAL = ?"
+    cQuery += " AND ZB1.ZB1_CGC = ?"
 
     oStmt:SetQuery(cQuery)
-    oStmt:SetString(1, xFilial("SA1"))
+    oStmt:SetString(1, xFilial("ZB1"))
     oStmt:SetString(2, cCNPJ)
 
     DbUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cTmpAlias, .F., .T.)
@@ -754,12 +756,12 @@ Method FindByCNPJ(cCNPJ) Class ClienteRepository
 
     If !(cTmpAlias)->(Eof())
         oResult := JsonObject():New()
-        oResult["codigo"]   := AllTrim((cTmpAlias)->A1_COD)
-        oResult["loja"]     := AllTrim((cTmpAlias)->A1_LOJA)
-        oResult["nome"]     := AllTrim((cTmpAlias)->A1_NOME)
-        oResult["cnpj"]     := AllTrim((cTmpAlias)->A1_CGC)
-        oResult["email"]    := AllTrim((cTmpAlias)->A1_EMAIL)
-        oResult["telefone"] := AllTrim((cTmpAlias)->A1_TEL)
+        oResult["codigo"]   := AllTrim((cTmpAlias)->ZB1_COD)
+        oResult["loja"]     := AllTrim((cTmpAlias)->ZB1_LOJA)
+        oResult["nome"]     := AllTrim((cTmpAlias)->ZB1_NOME)
+        oResult["cnpj"]     := AllTrim((cTmpAlias)->ZB1_CGC)
+        oResult["email"]    := AllTrim((cTmpAlias)->ZB1_EMAIL)
+        oResult["telefone"] := AllTrim((cTmpAlias)->ZB1_TEL)
     EndIf
 
     (cTmpAlias)->(DbCloseArea())
@@ -785,17 +787,17 @@ Method FindAll(nPage, nPageSize, cFiltro) Class ClienteRepository
 
     // Filtro digitado pelo usuario: parametro ? do FWPreparedStatement (nunca %exp:% nem concatenado).
     // Filtro vazio: nenhuma clausula LIKE.
-    cQuery := "SELECT A1_COD, A1_LOJA, A1_NOME, A1_CGC, A1_EMAIL, A1_TEL, A1_MSBLQL"
-    cQuery += " FROM " + RetSqlName("SA1") + " SA1"
-    cQuery += " WHERE SA1.D_E_L_E_T_ = ' '"
-    cQuery += " AND SA1.A1_FILIAL = ?"
+    cQuery := "SELECT ZB1_COD, ZB1_LOJA, ZB1_NOME, ZB1_CGC, ZB1_EMAIL, ZB1_TEL, ZB1_MSBLQL"
+    cQuery += " FROM " + RetSqlName("ZB1") + " ZB1"
+    cQuery += " WHERE ZB1.D_E_L_E_T_ = ' '"
+    cQuery += " AND ZB1.ZB1_FILIAL = ?"
     If !Empty(cFiltro)
-        cQuery += " AND (SA1.A1_NOME LIKE ? OR SA1.A1_CGC LIKE ?)"
+        cQuery += " AND (ZB1.ZB1_NOME LIKE ? OR ZB1.ZB1_CGC LIKE ?)"
     EndIf
-    cQuery += " ORDER BY A1_COD, A1_LOJA"
+    cQuery += " ORDER BY ZB1_COD, ZB1_LOJA"
 
     oStmt:SetQuery(cQuery)
-    oStmt:SetString(1, xFilial("SA1"))
+    oStmt:SetString(1, xFilial("ZB1"))
     If !Empty(cFiltro)
         // Curinga montado no ADVPL; % e _ digitados continuam curingas do LIKE
         oStmt:SetString(2, "%" + cFiltro + "%")
@@ -813,13 +815,13 @@ Method FindAll(nPage, nPageSize, cFiltro) Class ClienteRepository
 
     While !(cTmpAlias)->(Eof()) .And. Len(aResult) < nPageSize
         oItem := JsonObject():New()
-        oItem["codigo"]   := AllTrim((cTmpAlias)->A1_COD)
-        oItem["loja"]     := AllTrim((cTmpAlias)->A1_LOJA)
-        oItem["nome"]     := AllTrim((cTmpAlias)->A1_NOME)
-        oItem["cnpj"]     := AllTrim((cTmpAlias)->A1_CGC)
-        oItem["email"]    := AllTrim((cTmpAlias)->A1_EMAIL)
-        oItem["telefone"] := AllTrim((cTmpAlias)->A1_TEL)
-        oItem["bloqueado"] := AllTrim((cTmpAlias)->A1_MSBLQL) == "1"
+        oItem["codigo"]   := AllTrim((cTmpAlias)->ZB1_COD)
+        oItem["loja"]     := AllTrim((cTmpAlias)->ZB1_LOJA)
+        oItem["nome"]     := AllTrim((cTmpAlias)->ZB1_NOME)
+        oItem["cnpj"]     := AllTrim((cTmpAlias)->ZB1_CGC)
+        oItem["email"]    := AllTrim((cTmpAlias)->ZB1_EMAIL)
+        oItem["telefone"] := AllTrim((cTmpAlias)->ZB1_TEL)
+        oItem["bloqueado"] := AllTrim((cTmpAlias)->ZB1_MSBLQL) == "1"
         aAdd(aResult, oItem)
         (cTmpAlias)->(DbSkip())
     EndWh
@@ -828,26 +830,33 @@ Method FindAll(nPage, nPageSize, cFiltro) Class ClienteRepository
 
 Return aResult
 
-// Create a new customer
+// Create a new customer in the custom table ZB1 (standard table: MsExecAuto, see the note above)
 Method Create(cNome, cCNPJ, cEmail, cTelefone) Class ClienteRepository
-    Local lRet  := .T.
-    Local aArea := GetArea()
+    Local lRet    := .F.
+    Local aArea   := GetArea()
+    Local cCodigo := ""
 
     Default cEmail    := ""
     Default cTelefone := ""
 
+    DbSelectArea(::cAlias)
+    cCodigo := GetSXENum(::cAlias, "ZB1_COD")
+
     Begin Transaction
-        DbSelectArea(::cAlias)
-        RecLock(::cAlias, .T.)
-            SA1->A1_FILIAL := xFilial(::cAlias)
-            SA1->A1_COD    := GetSXENum(::cAlias, "A1_COD")
-            SA1->A1_LOJA   := "01"
-            SA1->A1_NOME   := cNome
-            SA1->A1_CGC    := cCNPJ
-            SA1->A1_EMAIL  := cEmail
-            SA1->A1_TEL    := cTelefone
-        MsUnlock()
-        ConfirmSX8()
+        If RecLock(::cAlias, .T.)
+            ZB1->ZB1_FILIAL := xFilial(::cAlias)
+            ZB1->ZB1_COD    := cCodigo
+            ZB1->ZB1_LOJA   := "01"
+            ZB1->ZB1_NOME   := cNome
+            ZB1->ZB1_CGC    := cCNPJ
+            ZB1->ZB1_EMAIL  := cEmail
+            ZB1->ZB1_TEL    := cTelefone
+            MsUnlock()
+            ConfirmSX8()
+            lRet := .T.
+        Else
+            RollBackSX8() // Falha: libera o numero reservado por GetSXENum
+        EndIf
     End Transaction
 
     RestArea(aArea)
@@ -862,7 +871,7 @@ Method Update(cCodigo, cLoja, oData) Class ClienteRepository
     DbSelectArea(::cAlias)
     DbSetOrder(1)
 
-    If !DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("A1_COD")[1]) + PadR(cLoja, TamSX3("A1_LOJA")[1]))
+    If !DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("ZB1_COD")[1]) + PadR(cLoja, TamSX3("ZB1_LOJA")[1]))
         RestArea(aArea)
         Return .F.
     EndIf
@@ -870,16 +879,16 @@ Method Update(cCodigo, cLoja, oData) Class ClienteRepository
     Begin Transaction
         RecLock(::cAlias, .F.)
             If oData["nome"] <> Nil
-                SA1->A1_NOME := oData["nome"]
+                ZB1->ZB1_NOME := oData["nome"]
             EndIf
             If oData["cnpj"] <> Nil
-                SA1->A1_CGC := oData["cnpj"]
+                ZB1->ZB1_CGC := oData["cnpj"]
             EndIf
             If oData["email"] <> Nil
-                SA1->A1_EMAIL := oData["email"]
+                ZB1->ZB1_EMAIL := oData["email"]
             EndIf
             If oData["telefone"] <> Nil
-                SA1->A1_TEL := oData["telefone"]
+                ZB1->ZB1_TEL := oData["telefone"]
             EndIf
         MsUnlock()
     End Transaction
@@ -896,7 +905,7 @@ Method Delete(cCodigo, cLoja) Class ClienteRepository
     DbSelectArea(::cAlias)
     DbSetOrder(1)
 
-    If !DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("A1_COD")[1]) + PadR(cLoja, TamSX3("A1_LOJA")[1]))
+    If !DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("ZB1_COD")[1]) + PadR(cLoja, TamSX3("ZB1_LOJA")[1]))
         RestArea(aArea)
         Return .F.
     EndIf
@@ -919,14 +928,14 @@ Method Inactivate(cCodigo, cLoja) Class ClienteRepository
     DbSelectArea(::cAlias)
     DbSetOrder(1)
 
-    If !DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("A1_COD")[1]) + PadR(cLoja, TamSX3("A1_LOJA")[1]))
+    If !DbSeek(xFilial(::cAlias) + PadR(cCodigo, TamSX3("ZB1_COD")[1]) + PadR(cLoja, TamSX3("ZB1_LOJA")[1]))
         RestArea(aArea)
         Return .F.
     EndIf
 
     Begin Transaction
         RecLock(::cAlias, .F.)
-            SA1->A1_MSBLQL := "1"
+            ZB1->ZB1_MSBLQL := "1"
         MsUnlock()
     End Transaction
 
@@ -934,17 +943,17 @@ Method Inactivate(cCodigo, cLoja) Class ClienteRepository
 
 Return lRet
 
-// Convert current SA1 record to JsonObject
+// Convert current ZB1 record to JsonObject
 Private Method RecordToJson() Class ClienteRepository
     Local oJson := JsonObject():New()
 
-    oJson["codigo"]    := AllTrim(SA1->A1_COD)
-    oJson["loja"]      := AllTrim(SA1->A1_LOJA)
-    oJson["nome"]      := AllTrim(SA1->A1_NOME)
-    oJson["cnpj"]      := AllTrim(SA1->A1_CGC)
-    oJson["email"]     := AllTrim(SA1->A1_EMAIL)
-    oJson["telefone"]  := AllTrim(SA1->A1_TEL)
-    oJson["bloqueado"] := AllTrim(SA1->A1_MSBLQL) == "1"
+    oJson["codigo"]    := AllTrim(ZB1->ZB1_COD)
+    oJson["loja"]      := AllTrim(ZB1->ZB1_LOJA)
+    oJson["nome"]      := AllTrim(ZB1->ZB1_NOME)
+    oJson["cnpj"]      := AllTrim(ZB1->ZB1_CGC)
+    oJson["email"]     := AllTrim(ZB1->ZB1_EMAIL)
+    oJson["telefone"]  := AllTrim(ZB1->ZB1_TEL)
+    oJson["bloqueado"] := AllTrim(ZB1->ZB1_MSBLQL) == "1"
 
 Return oJson
 ```
