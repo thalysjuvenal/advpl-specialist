@@ -450,10 +450,12 @@ valid_stop_json() { # strict shape check of the Stop JSON: systemMessage only
 json_context() { json_string .hookSpecificOutput.additionalContext additionalContext "$1"; }
 
 # json_string FILTER KEY JSON: the string at the jq FILTER, decoded (without
-# jq: the first "KEY" key, \uXXXX kept)
+# jq: the first "KEY" key, \uXXXX kept). jq.exe on Windows ends every output
+# line with CRLF (text-mode stdout): the CR is dropped, as the hooks do, so
+# that has_line and run_hint see the same lines as on Linux and macOS.
 json_string() {
   if command -v jq >/dev/null 2>&1; then
-    printf '%s' "$3" | jq -r "$1 // empty" 2>/dev/null
+    printf '%s' "$3" | jq -r "$1 // empty" 2>/dev/null | LC_ALL=C awk '{ sub(/\r$/, ""); print }'
   else
     printf '%s\n' "$3" | KEY="$2" LC_ALL=C awk '
       match($0, "\"" ENVIRON["KEY"] "\":\"") {
